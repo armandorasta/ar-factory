@@ -1,9 +1,13 @@
-class_name Bus extends Unit
+class_name Supplier extends Unit
 
 @onready var sprite: Sprite2D = $Sprite2D
 
+var _seq: PackedInt32Array
+
 ## Must be called after _ready
-func setup(world: WorldPanel, grid_loc: Vector2i) -> void:
+func setup(world: WorldPanel, grid_loc: Vector2i, sequence: PackedInt32Array) -> void:
+	self._seq = sequence
+
 	sprite.apply_scale(world.cell_width / 128 * Vector2.ONE)
 	sprite.translate(world.cell_width * Vector2(grid_loc.x + 0.5, grid_loc.y + 0.5))
 	set_dir(dir)

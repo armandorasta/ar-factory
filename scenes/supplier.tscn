@@ -1,0 +1,18 @@
+[gd_scene format=3 uid="uid://dmn4mwly6oqh5"]
+
+[ext_resource type="Script" uid="uid://7oqqkkrhtf7u" path="res://scripts/supplier.gd" id="1_hokn4"]
+
+[sub_resource type="Gradient" id="Gradient_hokn4"]
+offsets = PackedFloat32Array(0, 0.65916955, 0.866782, 1)
+colors = PackedColorArray(0.97005206, 0.41555616, 0.41555616, 1, 0.9495534, 0.49149203, 0.40250632, 1, 0.93713504, 0.53749466, 0.3946006, 1, 0, 0, 0, 1)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_jwykw"]
+gradient = SubResource("Gradient_hokn4")
+width = 128
+height = 128
+
+[node name="Supplier" type="Node2D" unique_id=2081016730]
+script = ExtResource("1_hokn4")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=172897121]
+texture = SubResource("GradientTexture2D_jwykw")

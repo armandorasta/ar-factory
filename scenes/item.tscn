@@ -1,0 +1,20 @@
+[gd_scene format=3 uid="uid://b6xq57m5popir"]
+
+[ext_resource type="Script" uid="uid://bday6v4mkv3oo" path="res://scripts/item.gd" id="1_s8enn"]
+[ext_resource type="Texture2D" uid="uid://boh6flaxihb46" path="res://resources/item.png" id="2_s8enn"]
+
+[node name="Item" type="Node2D" unique_id=2081016730]
+script = ExtResource("1_s8enn")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=172897121]
+texture = ExtResource("2_s8enn")
+
+[node name="Label" type="Label" parent="." unique_id=1704646317]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.13671875, 0.13671875, 0.13671875, 1)
+theme_override_font_sizes/font_size = 50
+text = "0"
