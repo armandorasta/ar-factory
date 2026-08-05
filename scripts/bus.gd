@@ -3,10 +3,11 @@ class_name Bus extends Unit
 @onready var sprite: Sprite2D = $Sprite2D
 
 ## Must be called after _ready
-func setup(world: WorldPanel, grid_loc: Vector2i) -> void:
+func setup(world: WorldPanel, gloc: Vector2i, direction: Direction) -> void:
+	super.init(gloc, direction)
 	sprite.apply_scale(world.cell_width / 128 * Vector2.ONE)
-	sprite.translate(world.cell_width * Vector2(grid_loc.x + 0.5, grid_loc.y + 0.5))
-	set_dir(dir)
+	sprite.translate(world.cell_width * Vector2(gloc.x + 0.5, gloc.y + 0.5))
+	set_dir(direction)
 
 
 func _ready() -> void:

@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://klsj0xfb4qp2"]
 
-[ext_resource type="Theme" uid="uid://bgeqg0claw8ur" path="res://resources/arfac_theme.tres" id="1_0wfyh"]
+[ext_resource type="Script" uid="uid://h3n2v38jd6dy" path="res://scripts/level.gd" id="1_jyhfs"]
 [ext_resource type="Script" uid="uid://owr5nboekwgf" path="res://scripts/factory_pan.gd" id="2_jyhfs"]
 [ext_resource type="Script" uid="uid://cx8jra2f0nw2j" path="res://scripts/world_panel.gd" id="2_tbgi4"]
 [ext_resource type="Script" uid="uid://cx77a22wpy1y1" path="res://scripts/cam.gd" id="3_sugp2"]
@@ -14,21 +14,20 @@ border_width_bottom = 1
 border_color = Color(0.8813782, 1, 0.6106771, 1)
 border_blend = true
 
-[node name="WorldPanel" type="Panel" unique_id=846370845]
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme = ExtResource("1_0wfyh")
+[node name="Level" type="Node2D" unique_id=1731236255]
+script = ExtResource("1_jyhfs")
+
+[node name="WorldPanel" type="Panel" parent="." unique_id=1258821105]
+custom_minimum_size = Vector2(1200, 720)
 script = ExtResource("2_tbgi4")
 
-[node name="Cam" type="Camera2D" parent="." unique_id=330737528]
+[node name="Cam" type="Camera2D" parent="WorldPanel" unique_id=330737528]
+position = Vector2(530, 248)
 script = ExtResource("3_sugp2")
 
-[node name="HUDLayer" type="CanvasLayer" parent="." unique_id=1773833209]
+[node name="HUDLayer" type="CanvasLayer" parent="WorldPanel" unique_id=1773833209]
 
-[node name="MarginContainer" type="MarginContainer" parent="HUDLayer" unique_id=1432749004]
+[node name="MarginContainer" type="MarginContainer" parent="WorldPanel/HUDLayer" unique_id=1432749004]
 anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
@@ -38,10 +37,51 @@ grow_horizontal = 2
 grow_vertical = 0
 theme_override_constants/margin_bottom = 15
 
-[node name="FactoryPan" type="Panel" parent="HUDLayer/MarginContainer" unique_id=1562847483]
+[node name="HBoxContainer" type="HBoxContainer" parent="WorldPanel/HUDLayer/MarginContainer" unique_id=1312282162]
+layout_mode = 2
+alignment = 1
+
+[node name="FactoryPan" type="Panel" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer" unique_id=1562847483]
 custom_minimum_size = Vector2(700, 50)
 layout_mode = 2
 size_flags_horizontal = 4
 size_flags_vertical = 4
 theme_override_styles/panel = SubResource("StyleBoxFlat_0wfyh")
 script = ExtResource("2_jyhfs")
+
+[node name="ButtPanel" type="Panel" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer" unique_id=1305208497]
+custom_minimum_size = Vector2(350, 50)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_0wfyh")
+
+[node name="MarginContainer" type="MarginContainer" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel" unique_id=1190093278]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 6
+
+[node name="ButtsHBox" type="HBoxContainer" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer" unique_id=202614545]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="PlayButt" type="Button" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox" unique_id=1254505]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+text = "PLAY"
+
+[node name="PauseButt" type="Button" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox" unique_id=1866396312]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+text = "PAUSE"
+
+[node name="DebugButt" type="Button" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox" unique_id=1629186902]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+text = "DEBUG"
