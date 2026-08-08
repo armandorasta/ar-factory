@@ -9,7 +9,7 @@ var dims := Vector2i(15, 10)
 var cell_width: float = 100.0
 
 ## Simulation
-var tick_millis: float = 1000.0
+var tick_millis: float = 500.0
 var tick_timer: Timer
 
 var _units: Array[Unit] = []
@@ -49,41 +49,17 @@ func add_item(gloc: Vector2i, value: int) -> void:
 	assert(get_item(gloc) == null)
 	var new_item := ItemScene.instantiate()
 	add_child(new_item)
-	new_item.setup(self, gloc, value)
 	_items.push_back(new_item)
+	new_item.setup(self, gloc, value)
 
 
-func add_cmd(new_op: Command) -> void:
-	_cmds.push_back(new_op)
+func add_cmd(new_cmd: Command) -> void:
+	_cmds.push_back(new_cmd)
 
 
 func do_per_frame(dt: float) -> void:
 	for cmd in _cmds:
 		cmd.do_per_frame(self)
-
-
-func _ready() -> void:
-	size = cell_width * dims
-
-	tick_timer = Timer.new()
-	tick_timer.one_shot = true
-	add_child(tick_timer)
-
-	_place_some_units()
-
-
-func _place_some_units() -> void:
-	var my_supp := SupplierScene.instantiate()
-	_units.push_back(my_supp)
-	_supps.push_back(my_supp)
-	add_child(my_supp)
-	my_supp.setup(self, Vector2i(0, 2), 2, [1, 2, 3, 4])
-
-	for x in range(1, 5):
-		var my_bus := BusScene.instantiate()
-		_units.push_back(my_bus)
-		add_child(my_bus)
-		my_bus.setup(self, Vector2i(x,2), Unit.Direction.EAST)
 
 
 func on_tick() -> void:
@@ -100,14 +76,62 @@ func on_tick() -> void:
 		_cmds[i].on_tick(self)
 
 	# Remove the finished commands.
-	_cmds = _cmds.filter(func(x): return !x.is_done)
+	_cmds = _cmds.filter(func(x: Command): return !x.is_done())
 
 
 func clean_up() -> void:
-	_cmds.clear()
+	for u in _units:
+		u.reset()
+	
 	for it in _items:
 		remove_child(it)
+	
 	_items.clear()
+	_cmds.clear()
+
+
+func _ready() -> void:
+	size = cell_width * dims
+
+	tick_timer = Timer.new()
+	tick_timer.one_shot = true
+	add_child(tick_timer)
+
+	_place_some_units()
+
+
+func _process(dt: float) -> void:
+	# var mloc := get_local_mouse_position()
+	# var gloc := pos_to_grid(mloc)
+	# var norm_loc := grid_to_pos(gloc)
+	# print("%s -> %s -> %s" % [mloc, gloc, norm_loc])
+	pass
+
+
+func _place_some_units() -> void:
+	_place_supplier(Vector2i(2, 3), Unit.Direction.EAST, 2, [1, 2, 3, 4])
+	_place_bus(Vector2i(3, 3), Unit.Direction.EAST)
+	_place_bus(Vector2i(4, 3), Unit.Direction.EAST)
+	_place_bus(Vector2i(5, 3), Unit.Direction.SOUTH)
+	_place_bus(Vector2i(5, 4), Unit.Direction.SOUTH)
+	_place_bus(Vector2i(5, 5), Unit.Direction.WEST)
+	_place_bus(Vector2i(4, 5), Unit.Direction.WEST)
+	_place_bus(Vector2i(3, 5), Unit.Direction.NORTH)
+
+
+func _place_supplier(loc: Vector2i, dir: Unit.Direction, rate: int, seq: Array[int]) -> void:
+	var my_supp := SupplierScene.instantiate()
+	_units.push_back(my_supp)
+	_supps.push_back(my_supp)
+	add_child(my_supp)
+	my_supp.setup(self, loc, dir, rate, seq)
+
+
+func _place_bus(loc: Vector2i, dir: Unit.Direction) -> void:
+	var my_bus := BusScene.instantiate()
+	_units.push_back(my_bus)
+	add_child(my_bus)
+	my_bus.setup(self, loc, dir, 1)
 
 
 func _draw() -> void:

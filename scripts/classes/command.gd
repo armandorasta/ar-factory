@@ -1,7 +1,20 @@
 @abstract class_name Command
 
-## Checked every tick, once true, the command is removed.
-var is_done: bool = false
+## Number of _ticks it takes to finish.
+var _ticks: int = 1
+
+## Keeps track of _ticks passed for this command.
+## Not that simple though, because sometimes the command has to wait for something and freezes.
+var _count: int = 0
+
+
+func _init(tick_count: int) -> void:
+	assert(tick_count > 0)
+	self._ticks = tick_count
+
+
+func get_tick_count() -> int:
+	return _ticks
 
 
 ## Called every frame until the tick ends, in which after `on_tick` is called.
@@ -9,12 +22,24 @@ func do_per_frame(_world: WorldPanel) -> void:
 	pass
 
 
-## Called on the ticks after the command spawns
+## Called on the _ticks after the command spawns, should not call `inc_count` here!
 func on_spawn_tick(_world: WorldPanel) -> void:
 	pass
 
 
-## Called on the ticks after the command spawns
+## Called on the _ticks after the command spawns
 func on_tick(_world: WorldPanel) -> void:
-	# This is a good default to prevent new commands from executing infinitely.
-	is_done = true
+	inc_count()
+
+
+func inc_count() -> void:
+	_count += 1
+
+
+func dec_count() -> void:
+	_count -= 1
+
+
+func is_done() -> bool:
+	assert(_ticks > 0)
+	return _count >= _ticks

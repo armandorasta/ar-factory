@@ -4,12 +4,22 @@ class_name Item extends Node2D
 @onready var label: Label = $CenterContainer/Sprite2D/CenterContainer/Label
 
 var grid_loc: Vector2i
-var value: int
+var value: int:
+	set(new_val): 
+		value = new_val
+		label.text = str(value)
 
+var _world: WorldPanel
 
 func setup(world: WorldPanel, gloc: Vector2i, val: int) -> void:
-	self.grid_loc = gloc
+	self._world = world
 	self.value = val
+	self.grid_loc = gloc
+	sync_pos_with_grid()
 
 	sprite.apply_scale(world.cell_width / 200 * Vector2.ONE)
-	sprite.translate(world.cell_width * Vector2(grid_loc.x + 0.5, grid_loc.y + 0.5))
+	sprite.translate(world.cell_width * 0.5 * Vector2.ONE)
+
+
+func sync_pos_with_grid() -> void:
+	position = _world.grid_to_pos(grid_loc)

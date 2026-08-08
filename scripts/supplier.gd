@@ -3,40 +3,42 @@ class_name Supplier extends Unit
 @onready var sprite: Sprite2D = $Sprite2D
 
 var _seq: PackedInt32Array
-var _rate: int
-
-# When it reaches `_rate` we spawn an item and reset.
-# It can go past `_rate` when the item is blocked.
-var _count: int = 0
+var _index: int = 0
 
 ## Must be called after _ready
-func setup(world: WorldPanel, gloc: Vector2i, spawn_rate: int, sequence: PackedInt32Array) -> void:
-	super.init(gloc, dir)
+func setup(world: WorldPanel, gloc: Vector2i, direction: Direction, work_rate: int, 
+	sequence: PackedInt32Array) -> void:
+	super.init(world, gloc, direction, work_rate)
 	self._seq = sequence
-	self._rate = spawn_rate
 
 	sprite.apply_scale(world.cell_width / 128 * Vector2.ONE)
-	sprite.translate(world.cell_width * Vector2(gloc.x + 0.5, gloc.y + 0.5))
+	sprite.translate(world.cell_width * 0.5 * Vector2.ONE)
 	set_dir(dir)
 
 
-func _ready() -> void:
-	pass
-
-
 func on_tick(world: WorldPanel) -> void:
-	_count += 1
-	if _count < _rate:
+	if !is_work_tick():
+		inc_count()
 		return
 	
-	var dest_gloc := grid_loc + dir_to_grid(dir)
-	# If the current item is stuck for some reason, just wait for it to go away.
-	if world.get_item(dest_gloc) != null:
+	if _index >= _seq.size():
 		return
 
-	_count = 0
-	world.add_cmd(CmdSpawn.new(grid_loc, randi_range(1, 20)))
+	var dest_gloc := grid_loc + dir_to_grid(dir)
+	if world.get_item(dest_gloc) != null:
+		# If another item is in the way, just wait for it to go away.
+		return
+
+	world.add_cmd(CmdSpawn.new(grid_loc, _seq[_index]))
 	world.add_cmd(CmdMove.new(grid_loc, dest_gloc))
+	
+	_index += 1
+	inc_count()
+
+
+func reset() -> void:
+	super.reset()
+	_index = 0
 
 
 func set_dir(new_dir: Direction) -> void:

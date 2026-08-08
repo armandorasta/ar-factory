@@ -42,7 +42,6 @@ func _on_tick() -> void:
 func _on_world_tick_timer_time_out() -> void:
 	assert(_play_mode != PlayMode.OFF)
 	_on_tick()
-	print("boobies")
 	world.tick_timer.start(world.tick_millis * 0.001)
 
 

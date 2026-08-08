@@ -5,6 +5,7 @@ var grid_to: Vector2i
 var tracked_item: Item
 
 func _init(from: Vector2i, to: Vector2i) -> void:
+	super(1)
 	self.grid_from = from
 	self.grid_to = to
 
@@ -20,10 +21,9 @@ func on_spawn_tick(world: WorldPanel) -> void:
 	var my_item := world.get_item(grid_from)
 	assert(my_item != null)
 	self.tracked_item = my_item
+	tracked_item.grid_loc = grid_to
 
 
 func on_tick(world: WorldPanel) -> void:
-	# Snap it to final location just in case.
-	tracked_item.position = world.grid_to_pos(grid_to)
-	tracked_item.grid_loc = grid_to
-	is_done = true
+	# tracked_item.sync_pos_with_grid() # Snap the position just in-case.
+	inc_count()
