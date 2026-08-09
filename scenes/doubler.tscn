@@ -1,0 +1,33 @@
+[gd_scene format=3 uid="uid://cuiklwu3pepi8"]
+
+[ext_resource type="Script" uid="uid://c60nupfgy0vwh" path="res://scripts/doubler.gd" id="1_4xhep"]
+
+[sub_resource type="Gradient" id="Gradient_t7ha2"]
+offsets = PackedFloat32Array(0.56920415, 0.9463668, 1)
+colors = PackedColorArray(0.053385437, 0.56366986, 1, 1, 0.53715175, 0.94401044, 0.9154032, 1, 1, 1, 1, 1)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_4xhep"]
+gradient = SubResource("Gradient_t7ha2")
+width = 128
+height = 128
+
+[node name="Doubler" type="Node2D" unique_id=2081016730]
+script = ExtResource("1_4xhep")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=691290124]
+texture = SubResource("GradientTexture2D_4xhep")
+
+[node name="Label" type="Label" parent="Sprite2D" unique_id=521038823]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -64.0
+offset_top = -64.0
+offset_right = -64.0
+offset_bottom = -64.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 29
+text = "2x"
+horizontal_alignment = 1
+vertical_alignment = 1

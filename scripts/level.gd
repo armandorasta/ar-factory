@@ -11,6 +11,9 @@ enum PlayMode {
 @onready var play_butt: Button = $WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PlayButt
 @onready var pause_butt: Button = $WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PauseButt
 @onready var debug_butt: Button = $WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/DebugButt
+@onready var tools_hbox: HBoxContainer = $WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/ToolsHBox
+@onready var play_hbox: HBoxContainer = $WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox
+@onready var ticks_label: Label = $WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TicksLabel
 
 
 # Simulation params
@@ -26,6 +29,11 @@ func _ready() -> void:
 	debug_butt.pressed.connect(_on_debug_butt_pressed)
 	_sync_butt_states()
 
+	# Show the right toolbox from the get go
+	play_hbox.hide()
+	tools_hbox.show()
+
+
 
 func _process(dt: float) -> void:
 	match _play_mode:
@@ -37,6 +45,7 @@ func _process(dt: float) -> void:
 
 func _on_tick() -> void:
 	world.on_tick()
+	ticks_label.text = "ticks: %d" % world.tick_count
 
 
 func _on_world_tick_timer_time_out() -> void:
@@ -49,8 +58,12 @@ func _on_play_butt_pressed() -> void:
 	assert(_play_mode != PlayMode.PLAY)
 	_play_mode = PlayMode.PLAY
 	_sync_butt_states()
+
 	world.tick_timer.paused = false
 	_on_world_tick_timer_time_out()
+
+	tools_hbox.hide()
+	play_hbox.show()
 
 
 func _on_pause_butt_pressed() -> void:
@@ -58,6 +71,9 @@ func _on_pause_butt_pressed() -> void:
 	_play_mode = PlayMode.OFF
 	_sync_butt_states()
 	_finalize_runtime()
+
+	play_hbox.hide()
+	tools_hbox.show()
 
 
 func _on_debug_butt_pressed() -> void:

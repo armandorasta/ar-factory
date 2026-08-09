@@ -5,7 +5,7 @@ class_name Item extends Node2D
 
 var grid_loc: Vector2i
 var value: int:
-	set(new_val): 
+	set(new_val):
 		value = new_val
 		label.text = str(value)
 

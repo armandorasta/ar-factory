@@ -24,13 +24,12 @@ func on_tick(world: WorldPanel) -> void:
 	if _index >= _seq.size():
 		return
 
-	var dest_gloc := grid_loc + dir_to_grid(dir)
-	if world.get_item(dest_gloc) != null:
+	if world.get_item(grid_loc + dir_to_grid(dir)) != null:
 		# If another item is in the way, just wait for it to go away.
 		return
 
 	world.add_cmd(CmdSpawn.new(grid_loc, _seq[_index]))
-	world.add_cmd(CmdMove.new(grid_loc, dest_gloc))
+	world.add_cmd(CmdSlide.new(grid_loc, dir))
 	
 	_index += 1
 	inc_count()

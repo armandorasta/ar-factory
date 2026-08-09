@@ -3,6 +3,7 @@ class_name WorldPanel extends Panel
 const ItemScene := preload("res://scenes/item.tscn")
 const BusScene := preload("res://scenes/bus.tscn")
 const SupplierScene := preload("res://scenes/supplier.tscn")
+const DoublerScene := preload("res://scenes/doubler.tscn")
 
 var elems: Array[Unit] = []
 var dims := Vector2i(15, 10)
@@ -11,6 +12,7 @@ var cell_width: float = 100.0
 ## Simulation
 var tick_millis: float = 500.0
 var tick_timer: Timer
+var tick_count: int = 0 # Number of ticks since the start.
 
 var _units: Array[Unit] = []
 var _items: Array[Item] = []
@@ -34,6 +36,10 @@ func get_unit(gloc: Vector2i) -> Unit:
 
 func get_tick_elapsed_millis() -> float:
 	return tick_millis - tick_timer.time_left*1000
+
+
+func is_within_bounds(gloc: Vector2i) -> bool:
+	return Rect2i(Vector2i(), dims).has_point(gloc)
 
 
 func grid_to_pos(gloc: Vector2i) -> Vector2:
@@ -78,6 +84,9 @@ func on_tick() -> void:
 	# Remove the finished commands.
 	_cmds = _cmds.filter(func(x: Command): return !x.is_done())
 
+	tick_count += 1
+	queue_redraw()
+
 
 func clean_up() -> void:
 	for u in _units:
@@ -86,6 +95,7 @@ func clean_up() -> void:
 	for it in _items:
 		remove_child(it)
 	
+	tick_count = 0
 	_items.clear()
 	_cmds.clear()
 
@@ -111,7 +121,8 @@ func _process(dt: float) -> void:
 func _place_some_units() -> void:
 	_place_supplier(Vector2i(2, 3), Unit.Direction.EAST, 2, [1, 2, 3, 4])
 	_place_bus(Vector2i(3, 3), Unit.Direction.EAST)
-	_place_bus(Vector2i(4, 3), Unit.Direction.EAST)
+	# _place_bus(Vector2i(4, 3), Unit.Direction.EAST)
+	_place_doubler(Vector2i(4, 3), Unit.Direction.EAST, 2)
 	_place_bus(Vector2i(5, 3), Unit.Direction.SOUTH)
 	_place_bus(Vector2i(5, 4), Unit.Direction.SOUTH)
 	_place_bus(Vector2i(5, 5), Unit.Direction.WEST)
@@ -134,7 +145,16 @@ func _place_bus(loc: Vector2i, dir: Unit.Direction) -> void:
 	my_bus.setup(self, loc, dir, 1)
 
 
+func _place_doubler(loc: Vector2i, dir: Unit.Direction, rate: int) -> void:
+	var doub := DoublerScene.instantiate()
+	_units.push_back(doub)
+	add_child(doub)
+	doub.setup(self, loc, dir, rate)
+
+
 func _draw() -> void:
+	draw_rect(Rect2(Vector2(), size), Color(0, 0.1, 0) if tick_count % 2 == 1 else Color(0, 0.11, 0))
+
 	for i in range(1, dims.x):
 		draw_line(Vector2(i * cell_width, 0), Vector2(i * cell_width, size.y), Color.RED)
 
