@@ -23,20 +23,21 @@ func do_per_frame(_world: WorldPanel) -> void:
 
 
 ## Called on the _ticks after the command spawns, should not call `inc_count` here!
-func on_spawn_tick(_world: WorldPanel) -> void:
+func on_spawn(_world: WorldPanel) -> void:
 	pass
 
 
 ## Called on the _ticks after the command spawns
 func on_tick(_world: WorldPanel) -> void:
-	inc_count()
+	pass
 
 
-func inc_count() -> void:
+func increment_count() -> void:
 	_count += 1
 
 
-func dec_count() -> void:
+## Pauses the tick counter for this tick
+func pause_this_tick() -> void:
 	_count -= 1
 
 

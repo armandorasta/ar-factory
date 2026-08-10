@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://cuiklwu3pepi8"]
 
-[ext_resource type="Script" uid="uid://c60nupfgy0vwh" path="res://scripts/doubler.gd" id="1_4xhep"]
+[ext_resource type="Script" uid="uid://db2aaanbfvp7x" path="res://scripts/unit_updater.gd" id="1_f12t3"]
 
 [sub_resource type="Gradient" id="Gradient_t7ha2"]
 offsets = PackedFloat32Array(0.56920415, 0.9463668, 1)
@@ -12,7 +12,7 @@ width = 128
 height = 128
 
 [node name="Doubler" type="Node2D" unique_id=2081016730]
-script = ExtResource("1_4xhep")
+script = ExtResource("1_f12t3")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=691290124]
 texture = SubResource("GradientTexture2D_4xhep")

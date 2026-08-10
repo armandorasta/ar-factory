@@ -1,9 +1,9 @@
 class_name WorldPanel extends Panel
 
 const ItemScene := preload("res://scenes/item.tscn")
-const BusScene := preload("res://scenes/bus.tscn")
-const SupplierScene := preload("res://scenes/supplier.tscn")
-const DoublerScene := preload("res://scenes/doubler.tscn")
+const UnitBusScene := preload("res://scenes/unit_bus.tscn")
+const UnitSupplierScene := preload("res://scenes/unit_supplier.tscn")
+const UnitUpdaterScene := preload("res://scenes/unit_updater.tscn")
 
 var elems: Array[Unit] = []
 var dims := Vector2i(15, 10)
@@ -16,7 +16,7 @@ var tick_count: int = 0 # Number of ticks since the start.
 
 var _units: Array[Unit] = []
 var _items: Array[Item] = []
-var _supps: Array[Supplier] = []
+var _supps: Array[UnitSupplier] = []
 var _cmds: Array[Command] = []
 
 
@@ -71,11 +71,12 @@ func do_per_frame(dt: float) -> void:
 func on_tick() -> void:
 	var old_size := _cmds.size()
 	for u in _units: # Add commands
-		u.on_tick(self)
+		u.on_tick()
+		u.increment_count()
 
 	# Commands added this very tick by the last loop
 	for i in range(old_size, _cmds.size()):
-		_cmds[i].on_spawn_tick(self)
+		_cmds[i].on_spawn(self)
 	
 	# Old commands
 	for i in old_size: # Execute a tick of the commands
@@ -83,6 +84,8 @@ func on_tick() -> void:
 
 	# Remove the finished commands.
 	_cmds = _cmds.filter(func(x: Command): return !x.is_done())
+	for c in _cmds:
+		c.increment_count()
 
 	tick_count += 1
 	queue_redraw()
@@ -122,7 +125,7 @@ func _place_some_units() -> void:
 	_place_supplier(Vector2i(2, 3), Unit.Direction.EAST, 2, [1, 2, 3, 4])
 	_place_bus(Vector2i(3, 3), Unit.Direction.EAST)
 	# _place_bus(Vector2i(4, 3), Unit.Direction.EAST)
-	_place_doubler(Vector2i(4, 3), Unit.Direction.EAST, 2)
+	_place_updater(Vector2i(4, 3), Unit.Direction.EAST, 4, UnitUpdater.UpdateType.NEGATE)
 	_place_bus(Vector2i(5, 3), Unit.Direction.SOUTH)
 	_place_bus(Vector2i(5, 4), Unit.Direction.SOUTH)
 	_place_bus(Vector2i(5, 5), Unit.Direction.WEST)
@@ -131,7 +134,7 @@ func _place_some_units() -> void:
 
 
 func _place_supplier(loc: Vector2i, dir: Unit.Direction, rate: int, seq: Array[int]) -> void:
-	var my_supp := SupplierScene.instantiate()
+	var my_supp := UnitSupplierScene.instantiate()
 	_units.push_back(my_supp)
 	_supps.push_back(my_supp)
 	add_child(my_supp)
@@ -139,17 +142,18 @@ func _place_supplier(loc: Vector2i, dir: Unit.Direction, rate: int, seq: Array[i
 
 
 func _place_bus(loc: Vector2i, dir: Unit.Direction) -> void:
-	var my_bus := BusScene.instantiate()
+	var my_bus := UnitBusScene.instantiate()
 	_units.push_back(my_bus)
 	add_child(my_bus)
-	my_bus.setup(self, loc, dir, 1)
+	my_bus.setup(self, loc, dir, 2)
 
 
-func _place_doubler(loc: Vector2i, dir: Unit.Direction, rate: int) -> void:
-	var doub := DoublerScene.instantiate()
+func _place_updater(loc: Vector2i, dir: Unit.Direction, rate: int, up_t: 
+	UnitUpdater.UpdateType) -> void:
+	var doub := UnitUpdaterScene.instantiate()
 	_units.push_back(doub)
 	add_child(doub)
-	doub.setup(self, loc, dir, rate)
+	doub.setup(self, loc, dir, rate, up_t)
 
 
 func _draw() -> void:

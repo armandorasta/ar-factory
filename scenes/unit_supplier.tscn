@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://dmn4mwly6oqh5"]
 
-[ext_resource type="Script" uid="uid://7oqqkkrhtf7u" path="res://scripts/supplier.gd" id="1_hokn4"]
+[ext_resource type="Script" uid="uid://cm3nygqgjk6np" path="res://scripts/unit_supplier.gd" id="1_av7tt"]
 
 [sub_resource type="Gradient" id="Gradient_hokn4"]
 offsets = PackedFloat32Array(0, 0.65916955, 0.866782, 1)
@@ -12,7 +12,7 @@ width = 128
 height = 128
 
 [node name="Supplier" type="Node2D" unique_id=2081016730]
-script = ExtResource("1_hokn4")
+script = ExtResource("1_av7tt")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=172897121]
 texture = SubResource("GradientTexture2D_jwykw")

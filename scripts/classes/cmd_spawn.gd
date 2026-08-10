@@ -12,5 +12,5 @@ func _init(gloc: Vector2i, val: int) -> void:
 	self.value = val
 
 
-func on_spawn_tick(world: WorldPanel) -> void:
+func on_spawn(world: WorldPanel) -> void:
 	world.add_item(grid_loc, value)

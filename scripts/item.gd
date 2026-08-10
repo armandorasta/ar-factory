@@ -3,16 +3,16 @@ class_name Item extends Node2D
 @onready var sprite: Sprite2D = $CenterContainer/Sprite2D
 @onready var label: Label = $CenterContainer/Sprite2D/CenterContainer/Label
 
+var world: WorldPanel
 var grid_loc: Vector2i
 var value: int:
 	set(new_val):
 		value = new_val
 		label.text = str(value)
 
-var _world: WorldPanel
 
-func setup(world: WorldPanel, gloc: Vector2i, val: int) -> void:
-	self._world = world
+func setup(world_: WorldPanel, gloc: Vector2i, val: int) -> void:
+	self.world = world_
 	self.value = val
 	self.grid_loc = gloc
 	sync_pos_with_grid()
@@ -22,4 +22,4 @@ func setup(world: WorldPanel, gloc: Vector2i, val: int) -> void:
 
 
 func sync_pos_with_grid() -> void:
-	position = _world.grid_to_pos(grid_loc)
+	position = world.grid_to_pos(grid_loc)

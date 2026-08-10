@@ -1,4 +1,4 @@
-class_name Supplier extends Unit
+class_name UnitSupplier extends Unit
 
 @onready var sprite: Sprite2D = $Sprite2D
 
@@ -8,7 +8,7 @@ var _index: int = 0
 ## Must be called after _ready
 func setup(world: WorldPanel, gloc: Vector2i, direction: Direction, work_rate: int, 
 	sequence: PackedInt32Array) -> void:
-	super.init(world, gloc, direction, work_rate)
+	super.init(world, gloc, direction, work_rate, 0)
 	self._seq = sequence
 
 	sprite.apply_scale(world.cell_width / 128 * Vector2.ONE)
@@ -16,9 +16,8 @@ func setup(world: WorldPanel, gloc: Vector2i, direction: Direction, work_rate: i
 	set_dir(dir)
 
 
-func on_tick(world: WorldPanel) -> void:
+func on_tick() -> void:
 	if !is_work_tick():
-		inc_count()
 		return
 	
 	if _index >= _seq.size():
@@ -26,13 +25,13 @@ func on_tick(world: WorldPanel) -> void:
 
 	if world.get_item(grid_loc + dir_to_grid(dir)) != null:
 		# If another item is in the way, just wait for it to go away.
+		pause_this_tick()
 		return
 
 	world.add_cmd(CmdSpawn.new(grid_loc, _seq[_index]))
 	world.add_cmd(CmdSlide.new(grid_loc, dir))
 	
 	_index += 1
-	inc_count()
 
 
 func reset() -> void:

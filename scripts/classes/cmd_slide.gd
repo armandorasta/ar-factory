@@ -17,15 +17,11 @@ func do_per_frame(world: WorldPanel) -> void:
 	tracked_item.position = src_loc.lerp(dest_loc, weight)
 
 
-func on_spawn_tick(world: WorldPanel) -> void:
+func on_spawn(world: WorldPanel) -> void:
 	var my_item := world.get_item(grid_from)
 	assert(my_item != null)
 	self.tracked_item = my_item
 	tracked_item.grid_loc = _get_grid_to()
-
-
-func on_tick(world: WorldPanel) -> void:
-	inc_count()
 
 
 func _get_grid_to() -> Vector2i:
