@@ -6,11 +6,11 @@ var grid_loc: Vector2i
 var value: int
 
 
-func _init(gloc: Vector2i, val: int) -> void:
-	super(1)
+func _init(world_: WorldPanel, gloc: Vector2i, val: int) -> void:
+	super(world_, 1)
 	self.grid_loc = gloc
 	self.value = val
 
 
-func on_spawn(world: WorldPanel) -> void:
+func on_spawn() -> void:
 	world.add_item(grid_loc, value)

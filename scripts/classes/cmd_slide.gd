@@ -4,24 +4,34 @@ var grid_from: Vector2i
 var dir: Unit.Direction
 var tracked_item: Item
 
-func _init(from: Vector2i, dir_: Unit.Direction) -> void:
-	super(1)
+func _init(world_: WorldPanel, from: Vector2i, dir_: Unit.Direction) -> void:
+	super(world_, 2)
 	self.grid_from = from
 	self.dir = dir_
+	
+	var dest_tile := world.get_tile(_get_grid_to())
+	assert(dest_tile.is_free())
+	dest_tile.make_solid()
 
 
-func do_per_frame(world: WorldPanel) -> void:
+func do_per_frame(_dt: float) -> void:
 	var src_loc := world.grid_to_pos(grid_from)
 	var dest_loc := world.grid_to_pos(_get_grid_to())
 	var weight := world.get_tick_elapsed_millis() / world.tick_millis
 	tracked_item.position = src_loc.lerp(dest_loc, weight)
 
 
-func on_spawn(world: WorldPanel) -> void:
-	var my_item := world.get_item(grid_from)
-	assert(my_item != null)
-	self.tracked_item = my_item
-	tracked_item.grid_loc = _get_grid_to()
+func on_spawn() -> void:
+	assert(world.has_item(grid_from))
+	var grid_to := _get_grid_to()
+	world.teleport_item(grid_from, grid_to)
+	tracked_item = world.get_item(grid_to)
+
+
+func on_tick() -> void:
+	var dest_tile := world.get_tile(_get_grid_to())
+	assert(dest_tile.is_solid())
+	dest_tile.make_free()
 
 
 func _get_grid_to() -> Vector2i:

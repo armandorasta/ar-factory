@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://knx24ed2y4xy"]
+
+[ext_resource type="Script" uid="uid://bet7elrvvfpug" path="res://scripts/unit_slider.gd" id="1_w5qrc"]
+[ext_resource type="Texture2D" uid="uid://b34och1pif20w" path="res://resources/belt.png" id="2_3bjfd"]
+
+[node name="Slider" type="Node2D" unique_id=2081016730]
+script = ExtResource("1_w5qrc")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=172897121]
+texture = ExtResource("2_3bjfd")

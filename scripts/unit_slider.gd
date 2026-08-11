@@ -1,13 +1,15 @@
-class_name UnitBus extends Unit
+class_name UnitSlider extends Unit
 
 @onready var sprite: Sprite2D = $Sprite2D
 
 ## Must be called after _ready
-func setup(world: WorldPanel, gloc: Vector2i, direction: Direction, work_rate: int) -> void:
-	super.init(world, gloc, direction, work_rate, 1)
+func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int) -> void:
+	super.init(world_, Type.STEADY, work_rate, 1, gloc)
 	sprite.apply_scale(world.cell_width / 128 * Vector2.ONE)
 	sprite.translate(world.cell_width * 0.5 * Vector2.ONE)
-	set_dir(direction)
+	set_dir(dir)
+
+	item_slots[0].grid_loc = grid_loc
 
 
 ## Same as `UnitSupplier` except no spawning, and no `CmdMove` if no item.
@@ -15,16 +17,14 @@ func on_tick() -> void:
 	if !is_work_tick():
 		return
 
-	var my_item := world.get_item(grid_loc)
-	if my_item == null: # No item? just keep counting ticks.
+	if item_slots[0].is_empty(): # No item? just keep counting ticks.
 		return
 
-	var dest_gloc := grid_loc + dir_to_grid(dir)
-	if !world.is_within_bounds(dest_gloc) || world.get_item(dest_gloc) != null:
+	if !world.item_can_go_to(grid_loc + dir_to_grid(dir)):
 		pause_this_tick()
 		return
 	
-	world.add_cmd(CmdSlide.new(grid_loc, dir))
+	world.add_cmd(CmdSlide.new(world, grid_loc, dir))
 
 
 func set_dir(new_dir: Direction) -> void:

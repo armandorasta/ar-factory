@@ -1,5 +1,7 @@
 @abstract class_name Command
 
+var world: WorldPanel
+
 ## Number of _ticks it takes to finish.
 var _ticks: int = 1
 
@@ -8,8 +10,9 @@ var _ticks: int = 1
 var _count: int = 0
 
 
-func _init(tick_count: int) -> void:
+func _init(world_: WorldPanel, tick_count: int) -> void:
 	assert(tick_count > 0)
+	self.world = world_
 	self._ticks = tick_count
 
 
@@ -18,21 +21,21 @@ func get_tick_count() -> int:
 
 
 ## Called every frame until the tick ends, in which after `on_tick` is called.
-func do_per_frame(_world: WorldPanel) -> void:
+func do_per_frame(dt: float) -> void:
 	pass
 
 
 ## Called on the _ticks after the command spawns, should not call `inc_count` here!
-func on_spawn(_world: WorldPanel) -> void:
+func on_spawn() -> void:
 	pass
 
 
 ## Called on the _ticks after the command spawns
-func on_tick(_world: WorldPanel) -> void:
+func on_tick() -> void:
 	pass
 
 
-func increment_count() -> void:
+func preprocess_tick() -> void:
 	_count += 1
 
 

@@ -6,13 +6,13 @@ var grid_loc: Vector2i
 var update_type: UnitUpdater.UpdateType
 
 
-func _init(gloc: Vector2i, up_t: UnitUpdater.UpdateType) -> void:
-	super(1)
+func _init(world_: WorldPanel, gloc: Vector2i, up_t: UnitUpdater.UpdateType) -> void:
+	super(world_, 1)
 	self.grid_loc = gloc
 	self.update_type = up_t
 
 
-func on_spawn(world: WorldPanel) -> void:
+func on_spawn() -> void:
+	assert(world.has_item(grid_loc))
 	var it := world.get_item(grid_loc)
-	assert(it != null)
 	it.value = UnitUpdater.apply(update_type, it.value)
