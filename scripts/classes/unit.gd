@@ -23,6 +23,9 @@ var item_slots: Array[ItemSlot] = []
 ## Keeps track of the `rate` every tick.
 var _count: int = 0
 
+## Commands that need to finish for the unit to keep operating again
+var _pending_cmds: Array[Command] = []
+
 func init(world_: WorldPanel, type_: Type, work_rate: int, item_count: int, gloc: Vector2i) -> void:
 	self.type = type_
 	self.world = world_
@@ -42,9 +45,15 @@ func is_work_tick() -> bool:
 	return _count > 0 && _count % rate == 0
 
 
+func has_pending_cmds() -> bool:
+	return !_pending_cmds.is_empty()
+
+
 func preprocess_tick() -> void:
 	for its in item_slots:
 		its.update(world)
+
+	_pending_cmds = _pending_cmds.filter(func(x: Command): !x.is_done())
 
 	match type:
 		Type.STEADY:    
@@ -82,6 +91,11 @@ func check_for_item(slot_index: int) -> bool:
 		print("Got fed an item just now")
 	
 	return slot.is_full()
+
+
+func pend_cmd(world: WorldPanel, cmd: Command) -> void:
+	world.add_cmd(cmd)
+	_pending_cmds.push_back(cmd)
 
 
 func reset() -> void:

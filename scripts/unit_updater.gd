@@ -35,15 +35,15 @@ func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, update_type_: Upd
 
 
 func on_tick() -> void:
-	if !is_work_tick():
+	if !is_work_tick() || has_pending_cmds():
 		return
 
 	if !world.item_can_slide(grid_loc, dir):
 		pause_this_tick()
 		return
 
-	world.add_cmd(CmdUpdate.new(world, grid_loc, update_type))
-	world.add_cmd(CmdSlide.new(world, grid_loc, dir))
+	pend_cmd(world, CmdUpdate.new(world, grid_loc, update_type))
+	pend_cmd(world, CmdSlide.new(world, grid_loc, dir))
 
 
 func set_dir(new_dir: Direction) -> void:

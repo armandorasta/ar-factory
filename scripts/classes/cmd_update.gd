@@ -7,7 +7,7 @@ var update_type: UnitUpdater.UpdateType
 
 
 func _init(world_: WorldPanel, gloc: Vector2i, up_t: UnitUpdater.UpdateType) -> void:
-	super(world_, 1)
+	super(world_, 0)
 	self.grid_loc = gloc
 	self.update_type = up_t
 

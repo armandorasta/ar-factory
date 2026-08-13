@@ -7,7 +7,7 @@ var value: int
 
 
 func _init(world_: WorldPanel, gloc: Vector2i, val: int) -> void:
-	super(world_, 1)
+	super(world_, 0)
 	self.grid_loc = gloc
 	self.value = val
 

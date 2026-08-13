@@ -63,7 +63,7 @@ func item_can_slide(item_g_loc: Vector2i, item_dir: Unit.Direction) -> bool:
 ## Returns the item.
 func add_item(gloc: Vector2i, value: int) -> Item:
 	var my_tile := get_tile(gloc)
-	assert(!my_tile.is_reserved())
+	assert(!my_tile.is_reserved()) # Might have to change this to `has_item`, but who knows.
 	var new_item := ItemScene.instantiate()
 	add_child(new_item)
 	new_item.setup(self, gloc, value)
@@ -116,7 +116,6 @@ func on_tick() -> void:
 
 	for i in _cmds.size():
 		var my_cmd := _cmds[i]
-		my_cmd.preprocess_tick()
 		if i >= old_size: # Commands added this very tick by the last loop
 			my_cmd.on_spawn()
 		else: # Old commands
@@ -124,6 +123,8 @@ func on_tick() -> void:
 
 	# Remove the finished commands.
 	_cmds = _cmds.filter(func(x: Command): return !x.is_done())
+	for c in _cmds:
+		c.increment_count()
 
 	tick_count += 1
 	queue_redraw()
@@ -154,18 +155,18 @@ func _ready() -> void:
 
 
 func _place_some_units() -> void:
-	_place_supplier(Vector2i(0, 3), Unit.Direction.EAST, 2, [1, 2, 3, 4])
+	_place_supplier(Vector2i(0, 3), Unit.Direction.EAST, 1, [1, 2, 3, 4])
 	_place_bus(Vector2i(1, 3), Unit.Direction.EAST)
-	_place_updater(Vector2i(2, 3), Unit.Direction.EAST, 2, UnitUpdater.UpdateType.INCREMENT)
-	_place_bus(Vector2i(3, 3), Unit.Direction.NORTH)
-	_place_updater(Vector2i(3, 2), Unit.Direction.NORTH, 2, UnitUpdater.UpdateType.NEGATE)
-	_place_bus(Vector2i(3, 1), Unit.Direction.WEST)
-	_place_updater(Vector2i(2, 1), Unit.Direction.WEST, 2, UnitUpdater.UpdateType.DOUBLE)
-	_place_bus(Vector2i(1, 1), Unit.Direction.WEST)
-	#_place_bus(Vector2i(3, 3), Unit.Direction.WEST)
-	#_place_bus(Vector2i(4, 3), Unit.Direction.WEST)
-	#_place_bus(Vector2i(5, 3), Unit.Direction.WEST)
-	#_place_supplier(Vector2i(6, 3), Unit.Direction.WEST, 2, [1, 2, 3])
+	#_place_updater(Vector2i(2, 3), Unit.Direction.EAST, 2, UnitUpdater.UpdateType.INCREMENT)
+	#_place_bus(Vector2i(3, 3), Unit.Direction.NORTH)
+	#_place_updater(Vector2i(3, 2), Unit.Direction.NORTH, 2, UnitUpdater.UpdateType.NEGATE)
+	#_place_bus(Vector2i(3, 1), Unit.Direction.WEST)
+	#_place_updater(Vector2i(2, 1), Unit.Direction.WEST, 2, UnitUpdater.UpdateType.DOUBLE)
+	#_place_bus(Vector2i(1, 1), Unit.Direction.WEST)
+	
+	#_place_supplier(Vector2i(1, 5), Unit.Direction.NORTH, 2, [1, 2, 3, 4])
+	#_place_bus(Vector2i(1, 4), Unit.Direction.NORTH)
+	
 
 
 func _place_supplier(loc: Vector2i, dir: Unit.Direction, rate: int, seq: Array[int]) -> void:

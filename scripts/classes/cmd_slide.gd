@@ -5,7 +5,7 @@ var dir: Unit.Direction
 var tracked_item: Item
 
 func _init(world_: WorldPanel, from: Vector2i, dir_: Unit.Direction) -> void:
-	super(world_, 2)
+	super(world_, 1)
 	self.grid_from = from
 	self.dir = dir_
 	

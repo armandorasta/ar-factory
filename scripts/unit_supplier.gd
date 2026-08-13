@@ -23,7 +23,7 @@ func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, sequence: PackedI
 
 
 func on_tick() -> void:
-	if !is_work_tick():
+	if !is_work_tick() || has_pending_cmds():
 		return
 
 	match _state:
@@ -35,7 +35,7 @@ func on_tick() -> void:
 				pause_this_tick()
 				return
 			
-			world.add_cmd(CmdSpawn.new(world, grid_loc, pop_next_value()))
+			pend_cmd(world, CmdSpawn.new(world, grid_loc, pop_next_value()))
 			_state = State.SLIDING_AWAY
 			on_tick()
 		
@@ -43,13 +43,15 @@ func on_tick() -> void:
 			if !world.item_can_slide(grid_loc, dir):
 				pause_this_tick()
 				return
-			world.add_cmd(CmdSlide.new(world, grid_loc, dir))
+			
+			pend_cmd(world, CmdSlide.new(world, grid_loc, dir))
 			_state = State.DEFAULT
 
 
 func reset() -> void:
 	super.reset()
 	_index = 0
+	_state = State.DEFAULT
 
 
 func is_done_with_seq() -> bool:

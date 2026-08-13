@@ -3,7 +3,7 @@
 var world: WorldPanel
 
 ## Number of _ticks it takes to finish.
-var _ticks: int = 1
+var _ticks: int
 
 ## Keeps track of _ticks passed for this command.
 ## Not that simple though, because sometimes the command has to wait for something and freezes.
@@ -11,7 +11,6 @@ var _count: int = 0
 
 
 func _init(world_: WorldPanel, tick_count: int) -> void:
-	assert(tick_count > 0)
 	self.world = world_
 	self._ticks = tick_count
 
@@ -35,7 +34,7 @@ func on_tick() -> void:
 	pass
 
 
-func preprocess_tick() -> void:
+func increment_count() -> void:
 	_count += 1
 
 
@@ -45,5 +44,4 @@ func pause_this_tick() -> void:
 
 
 func is_done() -> bool:
-	assert(_ticks > 0)
 	return _count >= _ticks
