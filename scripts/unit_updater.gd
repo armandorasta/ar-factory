@@ -38,14 +38,12 @@ func on_tick() -> void:
 	if !is_work_tick():
 		return
 
-	if !world.item_can_go_to(grid_loc + dir_to_grid(dir)):
+	if !world.item_can_slide(grid_loc, dir):
 		pause_this_tick()
 		return
 
 	world.add_cmd(CmdUpdate.new(world, grid_loc, update_type))
 	world.add_cmd(CmdSlide.new(world, grid_loc, dir))
-	
-	item_slots[0].clear()
 
 
 func set_dir(new_dir: Direction) -> void:

@@ -9,9 +9,11 @@ func _init(world_: WorldPanel, from: Vector2i, dir_: Unit.Direction) -> void:
 	self.grid_from = from
 	self.dir = dir_
 	
-	var dest_tile := world.get_tile(_get_grid_to())
-	assert(dest_tile.is_free())
-	dest_tile.make_solid()
+	var grid_to := _get_grid_to()
+	assert(world_.is_within_bounds(grid_from))
+	assert(world_.is_within_bounds(grid_to))
+	
+	world_.get_tile(grid_to).set_reserved(true)
 
 
 func do_per_frame(_dt: float) -> void:
@@ -22,16 +24,11 @@ func do_per_frame(_dt: float) -> void:
 
 
 func on_spawn() -> void:
-	assert(world.has_item(grid_from))
+	assert(world.get_tile(grid_from).has_item())
 	var grid_to := _get_grid_to()
-	world.teleport_item(grid_from, grid_to)
-	tracked_item = world.get_item(grid_to)
-
-
-func on_tick() -> void:
-	var dest_tile := world.get_tile(_get_grid_to())
-	assert(dest_tile.is_solid())
-	dest_tile.make_free()
+	var dest_tile := world.get_tile(grid_to)
+	assert(!dest_tile.has_item() && dest_tile.is_reserved())
+	tracked_item = world.teleport_item(grid_from, grid_to)
 
 
 func _get_grid_to() -> Vector2i:

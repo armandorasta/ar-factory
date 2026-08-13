@@ -3,8 +3,8 @@
 [ext_resource type="Script" uid="uid://db2aaanbfvp7x" path="res://scripts/unit_updater.gd" id="1_f12t3"]
 
 [sub_resource type="Gradient" id="Gradient_t7ha2"]
-offsets = PackedFloat32Array(0.56920415, 0.9463668, 1)
-colors = PackedColorArray(0.053385437, 0.56366986, 1, 1, 0.53715175, 0.94401044, 0.9154032, 1, 1, 1, 1, 1)
+offsets = PackedFloat32Array(0)
+colors = PackedColorArray(0.037000008, 0.4119333, 0.74, 1)
 
 [sub_resource type="GradientTexture2D" id="GradientTexture2D_4xhep"]
 gradient = SubResource("Gradient_t7ha2")
@@ -17,7 +17,7 @@ script = ExtResource("1_f12t3")
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=691290124]
 texture = SubResource("GradientTexture2D_4xhep")
 
-[node name="Label" type="Label" parent="Sprite2D" unique_id=521038823]
+[node name="CenterContainer" type="MarginContainer" parent="Sprite2D" unique_id=1762224801]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -27,7 +27,36 @@ offset_right = -64.0
 offset_bottom = -64.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Sprite2D/CenterContainer" unique_id=1566466298]
+layout_mode = 2
+alignment = 1
+
+[node name="InLabel" type="Label" parent="Sprite2D/CenterContainer/HBoxContainer" unique_id=1848978167]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.37, 0.706, 1, 1)
+theme_override_font_sizes/font_size = 24
+text = ">"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Label" type="Label" parent="Sprite2D/CenterContainer/HBoxContainer" unique_id=521038823]
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 29
-text = "2x"
+text = "UP"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 1
+
+[node name="OutLabel" type="Label" parent="Sprite2D/CenterContainer/HBoxContainer" unique_id=1822978251]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.37, 0.706, 1, 1)
+theme_override_font_sizes/font_size = 24
+text = ">"
 horizontal_alignment = 1
 vertical_alignment = 1

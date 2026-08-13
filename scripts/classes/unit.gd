@@ -1,6 +1,13 @@
 @abstract class_name Unit extends Node2D
 
-enum Direction {NORTH, SOUTH, WEST, EAST}
+## `inv_dir` relys on the order of these.
+enum Direction {
+	NORTH = 0, 
+	EAST  = 1,
+	WEST  = 2, 
+	SOUTH = 3, 
+}
+
 enum Type {
 	STEADY,       # Always counts ticks, even when no item is fed, like sliders.
 	ON_DEMAND, # Counts ticks only when all item slots are filled, like updaters.
@@ -85,11 +92,15 @@ func reset() -> void:
 
 static func dir_to_grid(my_dir: Direction) -> Vector2i:
 	match my_dir:
-		Direction.NORTH: return Vector2i( 0, -1)
-		Direction.SOUTH: return Vector2i( 0, +1)
-		Direction.EAST:  return Vector2i(+1,  0)
-		Direction.WEST:  return Vector2i(-1,  0)
+		Direction.NORTH: return Vector2i(0, -1)
+		Direction.SOUTH: return Vector2i(0, +1)
+		Direction.EAST : return Vector2i(+1, 0)
+		Direction.WEST : return Vector2i(-1, 0)
 	return -INF * Vector2i()
+
+
+static func inv_dir(my_dir: Direction) -> Direction:
+	return 3 - my_dir as Direction
 
 
 class ItemSlot:
@@ -112,4 +123,4 @@ class ItemSlot:
 
 
 	func update(world: WorldPanel) -> void:
-		item = world.get_item(grid_loc, true)
+		item = world.get_tile(grid_loc).get_item(true)

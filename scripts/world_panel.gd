@@ -6,7 +6,7 @@ const UnitSupplierScene := preload("res://scenes/unit_supplier.tscn")
 const UnitUpdaterScene := preload("res://scenes/unit_updater.tscn")
 
 var elems: Array[Unit] = []
-var dims := Vector2i(5, 5)
+var dims := Vector2i(5, 7)
 var cell_width: float = 100.0
 
 ## Simulation
@@ -15,27 +15,12 @@ var tick_timer: Timer
 var tick_count: int = 0 # Number of ticks since the start.
 
 var _units: Array[Unit] = []
-var _supps: Array[UnitSupplier] = []
 var _cmds: Array[Command] = []
 var _tiles: Array[Tile] = []
 
 
 func get_tile(gloc: Vector2i) -> Tile:
 	return _tiles[gloc.y * dims.x + gloc.x]
-
-
-func get_item(gloc: Vector2i, is_maybe_null: bool = false) -> Item:
-	assert(is_maybe_null || has_item(gloc))
-	return get_tile(gloc).item
-
-
-func get_item_or_null(gloc: Vector2i) -> Item:
-	return get_tile(gloc).item
-
-
-func has_item(gloc: Vector2i) -> bool:
-	assert(is_within_bounds(gloc))
-	return get_tile(gloc).item != null
 
 
 func get_unit(gloc: Vector2i) -> Unit:
@@ -61,46 +46,58 @@ func grid_to_pos(gloc: Vector2i) -> Vector2:
 func pos_to_grid(pos: Vector2) -> Vector2i:
 	return Vector2i(pos / cell_width)
 
-
-func item_can_go_to(gloc: Vector2i) -> bool:
-	return is_within_bounds(gloc) && get_tile(gloc).is_free()
-
-
-func item_can_enter_from_dir(dir: Unit.Direction) -> bool:
+## Does not account for whether the tile is reserved or not.
+func item_can_be_in(gloc: Vector2i) -> bool:
+	if is_within_bounds(gloc): 
+		return true
+	if get_tile(gloc).is_free(): 
+		return true
 	return false
 
 
-func add_item(gloc: Vector2i, value: int) -> void:
-	assert(!has_item(gloc))
+func item_can_slide(item_g_loc: Vector2i, item_dir: Unit.Direction) -> bool:
+	var dest_tile := get_tile(item_g_loc + Unit.dir_to_grid(item_dir))
+	return !dest_tile.is_reserved() && !dest_tile.has_wall(Unit.inv_dir(item_dir))
+	
+
+## Returns the item.
+func add_item(gloc: Vector2i, value: int) -> Item:
+	var my_tile := get_tile(gloc)
+	assert(!my_tile.is_reserved())
 	var new_item := ItemScene.instantiate()
 	add_child(new_item)
 	new_item.setup(self, gloc, value)
-	get_tile(gloc).item = new_item
+	my_tile.set_item(new_item)
+	return new_item
 
 
-func remove_item(gloc: Vector2i, possible_null: bool = false) -> void:
-	assert(possible_null || get_item(gloc) != null)
-	var my_tile := get_tile(gloc)
-	my_tile.item.queue_free()
-	my_tile.item = null
+## Returns the clone, not the original
+func clone_item(g_from: Vector2i, g_to: Vector2i, is_maybe_null: bool = false, 
+	is_override: bool = false
+) -> Item:
+	assert(is_maybe_null || get_tile(g_from).has_item())
+	assert(is_override || !get_tile(g_to).has_item())
+	return add_item(g_to, get_tile(g_from).get_item().value)
 
 
-func clone_item(g_from: Vector2i, g_to: Vector2i, is_override: bool = false) -> void:
-	assert(get_item(g_from) != null)
-	assert(is_override || get_item(g_to) == null)
-	add_item(g_to, get_item(g_from).value)
-
-
-func teleport_item(g_from: Vector2i, g_to: Vector2i) -> void:
-	assert(get_item(g_from) != null)
-	assert(get_item(g_to) == null)
+## Returns the teleported item.
+func teleport_item(g_from: Vector2i, g_to: Vector2i, is_maybe_null: bool = false, 
+	is_override: bool = false
+) -> Item:
 	var src_tile := get_tile(g_from)
-	get_tile(g_to).item = src_tile.item
-	src_tile.item = null
+	var dest_tile := get_tile(g_to)
+	assert(is_maybe_null || src_tile.has_item())
+	assert(is_override || !dest_tile.has_item())
+	dest_tile.set_item(src_tile.extract_item())
+	return dest_tile.get_item()
 
 
 func add_cmd(new_cmd: Command) -> void:
 	_cmds.push_back(new_cmd)
+
+
+func reserve_tile(gloc: Vector2i) -> void:
+	return get_tile(gloc).set_reserved(true)
 
 
 func do_per_frame(dt: float) -> void:
@@ -110,8 +107,11 @@ func do_per_frame(dt: float) -> void:
 
 func on_tick() -> void:
 	var old_size := _cmds.size()
-	for u in _units: # Add commands
+	
+	for u in _units: # Preprocess all units first
 		u.preprocess_tick()
+	
+	for u in _units: # Add commands
 		u.on_tick()
 
 	for i in _cmds.size():
@@ -134,8 +134,7 @@ func clean_up() -> void:
 		u.reset()
 	
 	for tile in _tiles:
-		if tile.item != null:
-			remove_child(tile.item)
+		tile.destroy_item(true)
 	
 	tick_count = 0
 	_cmds.clear()
@@ -149,37 +148,29 @@ func _ready() -> void:
 	add_child(tick_timer)
 
 	for i in dims.x * dims.y:
-		_tiles.push_back(Tile.new())
+		_tiles.push_back(Tile.new(false))
 
 	_place_some_units()
 
 
 func _place_some_units() -> void:
-	# _place_supplier(Vector2i(2, 3), Unit.Direction.EAST, 2, [1, 2, 3, 4])
-	# _place_bus(Vector2i(3, 3), Unit.Direction.EAST)
-	# _place_updater(Vector2i(4, 3), Unit.Direction.EAST, 4, UnitUpdater.UpdateType.NEGATE)
-	# _place_bus(Vector2i(5, 3), Unit.Direction.SOUTH)
-	# _place_bus(Vector2i(5, 4), Unit.Direction.SOUTH)
-	# _place_bus(Vector2i(5, 5), Unit.Direction.WEST)
-	# _place_bus(Vector2i(4, 5), Unit.Direction.WEST)
-	# _place_bus(Vector2i(3, 5), Unit.Direction.NORTH)
-
-	_place_supplier(Vector2i(2, 3), Unit.Direction.EAST, 2, [1])
-	_place_bus(Vector2i(3, 3), Unit.Direction.EAST)
-	# _place_bus(Vector2i(4, 3), Unit.Direction.SOUTH)
-	# _place_bus(Vector2i(4, 4), Unit.Direction.SOUTH)
-	# _place_bus(Vector2i(4, 5), Unit.Direction.SOUTH)
-	# _place_bus(Vector2i(4, 6), Unit.Direction.SOUTH)
-	# _place_bus(Vector2i(4, 7), Unit.Direction.SOUTH)
-	
-	# _place_supplier(Vector2i(6, 3), Unit.Direction.WEST, 2, [1, 2])
-	# _place_bus(Vector2i(5, 3), Unit.Direction.WEST)
+	_place_supplier(Vector2i(0, 3), Unit.Direction.EAST, 2, [1, 2, 3, 4])
+	_place_bus(Vector2i(1, 3), Unit.Direction.EAST)
+	_place_updater(Vector2i(2, 3), Unit.Direction.EAST, 2, UnitUpdater.UpdateType.INCREMENT)
+	_place_bus(Vector2i(3, 3), Unit.Direction.NORTH)
+	_place_updater(Vector2i(3, 2), Unit.Direction.NORTH, 2, UnitUpdater.UpdateType.NEGATE)
+	_place_bus(Vector2i(3, 1), Unit.Direction.WEST)
+	_place_updater(Vector2i(2, 1), Unit.Direction.WEST, 2, UnitUpdater.UpdateType.DOUBLE)
+	_place_bus(Vector2i(1, 1), Unit.Direction.WEST)
+	#_place_bus(Vector2i(3, 3), Unit.Direction.WEST)
+	#_place_bus(Vector2i(4, 3), Unit.Direction.WEST)
+	#_place_bus(Vector2i(5, 3), Unit.Direction.WEST)
+	#_place_supplier(Vector2i(6, 3), Unit.Direction.WEST, 2, [1, 2, 3])
 
 
 func _place_supplier(loc: Vector2i, dir: Unit.Direction, rate: int, seq: Array[int]) -> void:
 	var my_supp := UnitSupplierScene.instantiate()
 	_units.push_back(my_supp)
-	_supps.push_back(my_supp)
 	add_child(my_supp)
 	my_supp.setup(self, loc, rate, seq)
 	my_supp.set_dir(dir)
@@ -214,37 +205,109 @@ func _draw() -> void:
 
 
 class Tile:
-	enum TileState {
-		FREE,
-		SOLID,
-		SOLID_NEXT_TICK,
+	enum TileType {
+		FREE  = 0x0, # Anything allowed in from any direction.
+		INPUT = 0x1, # Item allowed if it's going into the input direction.
+		SOLID = 0x2, # No items allowed EVER.
 	}
 
-	const NORTH_WALL_ID := 0
-	const EAST_WALL_ID  := 1
-	const SOUTH_WALL_ID := 2
-	const WEST_WALL_ID  := 3
+	const _NORTH_WALL_ID := 0
+	const _EAST_WALL_ID  := 1
+	const _SOUTH_WALL_ID := 2
+	const _WEST_WALL_ID  := 3
 
-	var walls: Array[bool] = [false, false, false, false]
-	var item: Item = null
+	## Only `INPUT` tiles have walls.
+	var _walls: Array[bool] = []
+	var _type: TileType = TileType.FREE
+	var _item: Item = null
 	
-	var _state: TileState = TileState.FREE
+	## The makes the tile inaccessible to items even if it's empty.
+	var _is_reserved: bool = false
 
-	func is_free() -> bool:
-		return _state == TileState.FREE
 
-	func is_solid() -> bool:
-		return _state == TileState.SOLID || _state == TileState.SOLID_NEXT_TICK
+	func _init(is_solid_: bool) -> void:
+		_type = TileType.SOLID if is_solid_ else TileType.FREE
 
-	func is_solid_next_tick() -> bool:
-		return _state == TileState.SOLID_NEXT_TICK
+
+	## Is the tile solid? if not are items not allowed there?
+	func is_reserved() -> bool:
+		return is_solid() || _is_reserved
+
+
+	func is_free()  -> bool: return _type == TileType.FREE
+	func is_input() -> bool: return _type == TileType.INPUT
+	func is_solid() -> bool: return _type == TileType.SOLID
+
+	func has_wall(dir_: Unit.Direction) -> bool:
+		if is_solid():
+			return true
+		
+		if is_free():
+			return false
+		
+		match dir_:
+			Unit.Direction.NORTH: return _walls[_NORTH_WALL_ID]
+			Unit.Direction.EAST : return _walls[_EAST_WALL_ID]
+			Unit.Direction.SOUTH: return _walls[_SOUTH_WALL_ID]
+			Unit.Direction.WEST : return _walls[_WEST_WALL_ID]
+			_: return false
+
+
+	func has_item() -> bool:
+		return _item != null
+
+	func get_item(is_maybe_null: bool = false) -> Item:
+		assert(is_maybe_null || has_item())
+		return _item
+
+
+	func make_free()  -> void: 
+		_type = TileType.FREE
+		_walls.clear()
 	
-	func make_free() -> void:
-		_state = TileState.FREE
-
-	func make_solid() -> void:
-		_state = TileState.SOLID
-
-	func make_solid_next_tick() -> void:
-		_state = TileState.SOLID_NEXT_TICK
+	func make_input() -> void: 
+		_type = TileType.INPUT
+		_walls.resize(4)
 	
+	func make_solid() -> void: 
+		_type = TileType.SOLID
+		_walls.clear()
+
+
+	func set_wall(dir_: Unit.Direction, to_what: bool) -> void:
+		assert(is_input())
+		match dir_:
+			Unit.Direction.NORTH: _walls[_NORTH_WALL_ID] = to_what
+			Unit.Direction.EAST : _walls[_EAST_WALL_ID]  = to_what
+			Unit.Direction.SOUTH: _walls[_SOUTH_WALL_ID] = to_what
+			Unit.Direction.WEST : _walls[_WEST_WALL_ID]  = to_what
+
+
+	func set_item(new_item: Item, is_override: bool = false) -> void:
+		assert(is_free() || is_input())
+		assert(is_override || !has_item())
+		destroy_item(true)
+
+		_item = new_item
+		_is_reserved = true
+
+
+	func destroy_item(is_maybe_null: bool = false) -> void:
+		assert(is_maybe_null || has_item())
+		if _item != null:
+			_item.queue_free()
+			_item = null
+		_is_reserved = false
+
+
+	## Same as `destroy_item` except it returns the item instead of destroying it.
+	func extract_item(is_maybe_null: bool = false) -> Item:
+		assert(is_maybe_null || has_item())
+		var my_item := _item
+		_item = null
+		_is_reserved = false
+		return my_item
+
+	
+	func set_reserved(to_what: bool) -> void:
+		_is_reserved = to_what

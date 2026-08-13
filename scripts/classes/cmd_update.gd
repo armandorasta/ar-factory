@@ -13,6 +13,6 @@ func _init(world_: WorldPanel, gloc: Vector2i, up_t: UnitUpdater.UpdateType) -> 
 
 
 func on_spawn() -> void:
-	assert(world.has_item(grid_loc))
-	var it := world.get_item(grid_loc)
-	it.value = UnitUpdater.apply(update_type, it.value)
+	assert(world.get_tile(grid_loc).has_item())
+	var it := world.get_tile(grid_loc).get_item()
+	it.set_value(UnitUpdater.apply(update_type, it.get_value()))

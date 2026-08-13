@@ -20,7 +20,7 @@ func on_tick() -> void:
 	if item_slots[0].is_empty(): # No item? just keep counting ticks.
 		return
 
-	if !world.item_can_go_to(grid_loc + dir_to_grid(dir)):
+	if !world.item_can_slide(grid_loc, dir):
 		pause_this_tick()
 		return
 	
