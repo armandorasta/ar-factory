@@ -8,6 +8,7 @@ enum UpdateType {
 
 
 @onready var sprite: Sprite2D = $Sprite2D
+@onready var label: Label = $Sprite2D/CenterContainer/HBoxContainer/Label
 
 var update_type: UpdateType
 
@@ -26,6 +27,10 @@ static func apply(up_t: UpdateType, val: int) -> int:
 func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, update_type_: UpdateType) -> void:
 	super.init(world_, Type.ON_DEMAND, work_rate, 1, gloc)
 	self.update_type = update_type_
+	match update_type:
+		UpdateType.DOUBLE   : label.text = "2x"
+		UpdateType.NEGATE   : label.text = "-x"
+		UpdateType.INCREMENT: label.text = "x+1"
 
 	sprite.apply_scale(world_.cell_width / 128 * Vector2.ONE)
 	sprite.translate(world_.cell_width * 0.5 * Vector2.ONE)
@@ -35,15 +40,15 @@ func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, update_type_: Upd
 
 
 func on_tick() -> void:
-	if !is_work_tick() || has_pending_cmds():
+	if !is_work_tick():
 		return
-
-	if !world.item_can_slide(grid_loc, dir):
+		
+	if has_pending_cmds():
 		pause_this_tick()
 		return
 
-	pend_cmd(world, CmdUpdate.new(world, grid_loc, update_type))
-	pend_cmd(world, CmdSlide.new(world, grid_loc, dir))
+	pend_cmd(CmdUpdate.new(world, grid_loc, update_type))
+	pend_cmd(CmdSlide.new(world, grid_loc, dir))
 
 
 func set_dir(new_dir: Direction) -> void:

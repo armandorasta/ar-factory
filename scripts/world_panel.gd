@@ -4,6 +4,8 @@ const ItemScene := preload("res://scenes/item.tscn")
 const UnitSliderScene := preload("res://scenes/unit_slider.tscn")
 const UnitSupplierScene := preload("res://scenes/unit_supplier.tscn")
 const UnitUpdaterScene := preload("res://scenes/unit_updater.tscn")
+const UnitBinScene := preload("res://scenes/unit_bin.tscn")
+const UnitDemanderScene := preload("res://scenes/unit_demander.tscn")
 
 var elems: Array[Unit] = []
 var dims := Vector2i(5, 7)
@@ -106,25 +108,26 @@ func do_per_frame(dt: float) -> void:
 
 
 func on_tick() -> void:
-	var old_size := _cmds.size()
-	
 	for u in _units: # Preprocess all units first
 		u.preprocess_tick()
-	
+
 	for u in _units: # Add commands
 		u.on_tick()
 
-	for i in _cmds.size():
-		var my_cmd := _cmds[i]
-		if i >= old_size: # Commands added this very tick by the last loop
-			my_cmd.on_spawn()
-		else: # Old commands
-			my_cmd.on_tick()
-
-	# Remove the finished commands.
-	_cmds = _cmds.filter(func(x: Command): return !x.is_done())
 	for c in _cmds:
-		c.increment_count()
+		c.do_pre_tick()
+
+	for c in _cmds:
+		c.on_tick()
+
+	for c in _cmds:
+		c.do_post_tick()
+
+	for c in _cmds:
+		c.count_this_tick()
+	
+	# Remove the finished commands.
+	_cmds = _cmds.filter(func(x: Command): return !x.is_done())		
 
 	tick_count += 1
 	queue_redraw()
@@ -157,15 +160,20 @@ func _ready() -> void:
 func _place_some_units() -> void:
 	_place_supplier(Vector2i(0, 3), Unit.Direction.EAST, 1, [1, 2, 3, 4])
 	_place_bus(Vector2i(1, 3), Unit.Direction.EAST)
+	_place_bus(Vector2i(2, 3), Unit.Direction.EAST)
 	#_place_updater(Vector2i(2, 3), Unit.Direction.EAST, 2, UnitUpdater.UpdateType.INCREMENT)
-	#_place_bus(Vector2i(3, 3), Unit.Direction.NORTH)
+	_place_bus(Vector2i(3, 3), Unit.Direction.NORTH)
+	_place_bus(Vector2i(3, 2), Unit.Direction.NORTH)
 	#_place_updater(Vector2i(3, 2), Unit.Direction.NORTH, 2, UnitUpdater.UpdateType.NEGATE)
-	#_place_bus(Vector2i(3, 1), Unit.Direction.WEST)
+	_place_bus(Vector2i(3, 1), Unit.Direction.WEST)
+	_place_bus(Vector2i(2, 1), Unit.Direction.WEST)
 	#_place_updater(Vector2i(2, 1), Unit.Direction.WEST, 2, UnitUpdater.UpdateType.DOUBLE)
-	#_place_bus(Vector2i(1, 1), Unit.Direction.WEST)
+	_place_bus(Vector2i(1, 1), Unit.Direction.WEST)
+	 #_place_demander(Vector2(0, 1), [-4, -6, -8, -10])
+	_place_bin(Vector2(0, 1))
 	
-	#_place_supplier(Vector2i(1, 5), Unit.Direction.NORTH, 2, [1, 2, 3, 4])
-	#_place_bus(Vector2i(1, 4), Unit.Direction.NORTH)
+	# _place_supplier(Vector2i(1, 5), Unit.Direction.NORTH, 2, [3, 4])
+	# _place_bus(Vector2i(1, 4), Unit.Direction.NORTH)
 	
 
 
@@ -193,6 +201,19 @@ func _place_updater(loc: Vector2i, dir: Unit.Direction, rate: int, up_t:
 	add_child(doub)
 	doub.setup(self, loc, rate, up_t)
 	doub.set_dir(dir)
+
+
+func _place_bin(loc: Vector2i) -> void:
+	var bin := UnitBinScene.instantiate()
+	_units.push_back(bin)
+	add_child(bin)
+	bin.setup(self, loc)
+
+func _place_demander(loc: Vector2i, seq: Array[int]) -> void:
+	var dem := UnitDemanderScene.instantiate()
+	_units.push_back(dem)
+	add_child(dem)
+	dem.setup(self, loc, seq)
 
 
 func _draw() -> void:

@@ -14,17 +14,14 @@ func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int) -> void:
 
 ## Same as `UnitSupplier` except no spawning, and no `CmdMove` if no item.
 func on_tick() -> void:
-	if !is_work_tick() || has_pending_cmds():
+	if !is_work_tick():
 		return
-
-	if item_slots[0].is_empty(): # No item? just keep counting ticks.
-		return
-
-	if !world.item_can_slide(grid_loc, dir):
+	
+	if has_pending_cmds():
 		pause_this_tick()
 		return
 	
-	pend_cmd(world, CmdSlide.new(world, grid_loc, dir))
+	pend_cmd(CmdSlide.new(world, grid_loc, dir))
 
 
 func set_dir(new_dir: Direction) -> void:

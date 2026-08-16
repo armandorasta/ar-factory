@@ -19,22 +19,27 @@ func get_tick_count() -> int:
 	return _ticks
 
 
-## Called every frame until the tick ends, in which after `on_tick` is called.
+## Called every frame until the tick ends, called after `do_post_tick`.
 func do_per_frame(dt: float) -> void:
 	pass
 
 
-## Called on the _ticks after the command spawns, should not call `inc_count` here!
-func on_spawn() -> void:
-	pass
-
-
-## Called on the _ticks after the command spawns
+## Called every tick
 func on_tick() -> void:
 	pass
 
 
-func increment_count() -> void:
+## Called before all the ticks have been processed
+func do_pre_tick() -> void:
+	pass
+
+
+## Called after all the ticks have been processed
+func do_post_tick() -> void:
+	pass
+
+
+func count_this_tick() -> void:
 	_count += 1
 
 
@@ -44,4 +49,4 @@ func pause_this_tick() -> void:
 
 
 func is_done() -> bool:
-	return _count >= _ticks
+	return _count > _ticks

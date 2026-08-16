@@ -11,7 +11,7 @@ gradient = SubResource("Gradient_t7ha2")
 width = 128
 height = 128
 
-[node name="Updater" type="Node2D" unique_id=2081016730]
+[node name="Doubler" type="Node2D" unique_id=2081016730]
 script = ExtResource("1_f12t3")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=691290124]
@@ -51,6 +51,7 @@ theme_override_font_sizes/font_size = 29
 text = "UP"
 horizontal_alignment = 1
 vertical_alignment = 1
+autowrap_mode = 1
 
 [node name="OutLabel" type="Label" parent="Sprite2D/CenterContainer/HBoxContainer" unique_id=1822978251]
 layout_mode = 2

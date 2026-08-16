@@ -12,7 +12,12 @@ func _init(world_: WorldPanel, gloc: Vector2i, up_t: UnitUpdater.UpdateType) -> 
 	self.update_type = up_t
 
 
-func on_spawn() -> void:
-	assert(world.get_tile(grid_loc).has_item())
-	var it := world.get_tile(grid_loc).get_item()
-	it.set_value(UnitUpdater.apply(update_type, it.get_value()))
+func on_tick() -> void:
+	var my_tile := world.get_tile(grid_loc)
+	if !my_tile.has_item():
+		pause_this_tick()
+		return
+	
+	var it := my_tile.get_item()
+	var updated_value := UnitUpdater.apply(update_type, it.get_value())
+	it.set_value(updated_value)
