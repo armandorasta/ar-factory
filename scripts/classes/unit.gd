@@ -49,6 +49,18 @@ func has_pending_cmds() -> bool:
 	return !_pending_cmds.is_empty()
 
 
+## Returns true if we are waiting for the animation of a slide command to end, that slide command
+## is on one of the outputs of the unit.
+## In this case, we can often just pend new commands before the end of the animation on  the next
+## tick.
+func is_just_awaiting_out_sliding_anim() -> bool:
+	# The cloner has multiple outputs, we need to account for that.
+	return (
+		_pending_cmds.all(func(x): return x is CmdSlide) && 
+		_pending_cmds.all(func(x: CmdSlide): return x.is_awaiting_anim())
+	)
+
+
 func preprocess_tick() -> void:
 	for its in item_slots:
 		its.update(world)
@@ -58,13 +70,14 @@ func preprocess_tick() -> void:
 	match type:
 		Type.STEADY:    
 			_count += 1
+		
 		Type.ON_DEMAND:
 			if item_slots.all(func(x): return x.is_full()):
 				_count += 1
 			else:
 				_count = 0
-		_:
-			assert(false)
+		
+		_: assert(false)
 
 
 ## Pauses the tick counter for this tick

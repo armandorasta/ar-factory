@@ -43,7 +43,7 @@ func on_tick() -> void:
 	if !is_work_tick():
 		return
 		
-	if has_pending_cmds():
+	if has_pending_cmds() && !is_just_awaiting_out_sliding_anim():
 		pause_this_tick()
 		return
 

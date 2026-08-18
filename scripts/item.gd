@@ -7,7 +7,7 @@ var world: WorldPanel
 var grid_loc: Vector2i
 
 var _value: int
-
+var cant_move_this_tick: bool = false
 
 func setup(world_: WorldPanel, gloc: Vector2i, val: int) -> void:
 	self.world = world_

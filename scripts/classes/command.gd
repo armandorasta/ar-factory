@@ -29,16 +29,6 @@ func on_tick() -> void:
 	pass
 
 
-## Called before all the ticks have been processed
-func do_pre_tick() -> void:
-	pass
-
-
-## Called after all the ticks have been processed
-func do_post_tick() -> void:
-	pass
-
-
 func count_this_tick() -> void:
 	_count += 1
 
@@ -49,4 +39,4 @@ func pause_this_tick() -> void:
 
 
 func is_done() -> bool:
-	return _count > _ticks
+	return _count >= _ticks

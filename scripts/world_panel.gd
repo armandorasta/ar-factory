@@ -12,13 +12,19 @@ var dims := Vector2i(5, 7)
 var cell_width: float = 100.0
 
 ## Simulation
-var tick_millis: float = 500.0
 var tick_timer: Timer
 var tick_count: int = 0 # Number of ticks since the start.
+var _tick_millis: float = 300.0
+
+var blocked_slide_cmds: Array[CmdSlide] = []
 
 var _units: Array[Unit] = []
 var _cmds: Array[Command] = []
 var _tiles: Array[Tile] = []
+
+
+func get_tick_rate() -> float:
+	return 1000.0 / _tick_millis
 
 
 func get_tile(gloc: Vector2i) -> Tile:
@@ -33,7 +39,7 @@ func get_unit(gloc: Vector2i) -> Unit:
 
 
 func get_tick_elapsed_millis() -> float:
-	return tick_millis - tick_timer.time_left*1000
+	return _tick_millis - tick_timer.time_left*1000
 
 
 func is_within_bounds(gloc: Vector2i) -> bool:
@@ -108,20 +114,34 @@ func do_per_frame(dt: float) -> void:
 
 
 func on_tick() -> void:
+	for tile in _tiles:
+		if tile.has_item():
+			tile.get_item().cant_move_this_tick = false
+
 	for u in _units: # Preprocess all units first
 		u.preprocess_tick()
 
 	for u in _units: # Add commands
 		u.on_tick()
 
-	for c in _cmds:
-		c.do_pre_tick()
-
+	_cmds.shuffle()
 	for c in _cmds:
 		c.on_tick()
 
-	for c in _cmds:
-		c.do_post_tick()
+	# Slide command overlapping.
+	# If any update happens in a pass, end that pass and start over,
+	# repeat until a full pass happens with no updates.
+	while 1 + 1 == 2:
+		var dirty_index := -1
+		for i in blocked_slide_cmds.size():
+			if blocked_slide_cmds[i].is_updated_this_pass():
+				dirty_index = i
+				break
+		if dirty_index == -1: # None has updated? it's over.
+			break
+		# Something moved? can only move once per tick so bye-bye.
+		blocked_slide_cmds.pop_at(dirty_index)
+	blocked_slide_cmds.clear()
 
 	for c in _cmds:
 		c.count_this_tick()
@@ -133,6 +153,10 @@ func on_tick() -> void:
 	queue_redraw()
 
 
+func set_tick_rate(rate_per_second: float) -> void:
+	_tick_millis = 1000.0 / rate_per_second
+
+
 func clean_up() -> void:
 	for u in _units:
 		u.reset()
@@ -142,6 +166,7 @@ func clean_up() -> void:
 	
 	tick_count = 0
 	_cmds.clear()
+	blocked_slide_cmds.clear()
 
 
 func _ready() -> void:
@@ -158,22 +183,15 @@ func _ready() -> void:
 
 
 func _place_some_units() -> void:
-	_place_supplier(Vector2i(0, 3), Unit.Direction.EAST, 1, [1, 2, 3, 4])
+	_place_supplier(Vector2i(0, 3), Unit.Direction.EAST, 1, [1, 2, 3, 4, 5, 6, 7])
 	_place_bus(Vector2i(1, 3), Unit.Direction.EAST)
-	_place_bus(Vector2i(2, 3), Unit.Direction.EAST)
-	#_place_updater(Vector2i(2, 3), Unit.Direction.EAST, 2, UnitUpdater.UpdateType.INCREMENT)
-	_place_bus(Vector2i(3, 3), Unit.Direction.NORTH)
+	_place_bus(Vector2i(2, 3), Unit.Direction.NORTH)
+	_place_bus(Vector2i(2, 2), Unit.Direction.EAST)
 	_place_bus(Vector2i(3, 2), Unit.Direction.NORTH)
-	#_place_updater(Vector2i(3, 2), Unit.Direction.NORTH, 2, UnitUpdater.UpdateType.NEGATE)
 	_place_bus(Vector2i(3, 1), Unit.Direction.WEST)
 	_place_bus(Vector2i(2, 1), Unit.Direction.WEST)
-	#_place_updater(Vector2i(2, 1), Unit.Direction.WEST, 2, UnitUpdater.UpdateType.DOUBLE)
-	_place_bus(Vector2i(1, 1), Unit.Direction.WEST)
-	 #_place_demander(Vector2(0, 1), [-4, -6, -8, -10])
-	_place_bin(Vector2(0, 1))
-	
-	# _place_supplier(Vector2i(1, 5), Unit.Direction.NORTH, 2, [3, 4])
-	# _place_bus(Vector2i(1, 4), Unit.Direction.NORTH)
+	_place_bus(Vector2i(1, 1), Unit.Direction.SOUTH)
+	_place_bus(Vector2i(1, 2), Unit.Direction.SOUTH)
 	
 
 

@@ -14,6 +14,8 @@ enum PlayMode {
 @onready var tools_hbox: HBoxContainer = $WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/ToolsHBox
 @onready var play_hbox: HBoxContainer = $WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox
 @onready var ticks_label: Label = $WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TicksLabel
+@onready var speed_slider: HSlider = $WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/SpeedHSlider
+@onready var tick_speed_label: Label = $WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TickSpeedLabel
 
 
 # Simulation params
@@ -28,11 +30,13 @@ func _ready() -> void:
 	pause_butt.pressed.connect(_on_pause_butt_pressed)
 	debug_butt.pressed.connect(_on_debug_butt_pressed)
 	_sync_butt_states()
+	
+	speed_slider.value_changed.connect(_on_speed_slider_value_changed)
+	speed_slider.value = 3.0
 
 	# Show the right toolbox from the get go
 	play_hbox.hide()
 	tools_hbox.show()
-
 
 
 func _process(dt: float) -> void:
@@ -51,7 +55,7 @@ func _on_tick() -> void:
 func _on_world_tick_timer_time_out() -> void:
 	assert(_play_mode != PlayMode.OFF)
 	_on_tick()
-	world.tick_timer.start(world.tick_millis * 0.001)
+	world.tick_timer.start(world._tick_millis * 0.001)
 
 
 func _on_play_butt_pressed() -> void:
@@ -80,6 +84,11 @@ func _on_debug_butt_pressed() -> void:
 	_play_mode = PlayMode.DEBUG
 	_sync_butt_states()
 	print("debug_butt_pressed")
+
+
+func _on_speed_slider_value_changed(new_val: float) -> void:
+	world.set_tick_rate(new_val)
+	tick_speed_label.text = "%.1f tick/s" % (1000.0/world._tick_millis)
 
 
 func _sync_butt_states() -> void:

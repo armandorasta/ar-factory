@@ -7,7 +7,7 @@ var value: int
 var _is_wait_tick: bool = true
 
 func _init(world_: WorldPanel, gloc: Vector2i, required_val: int) -> void:
-	super(world_, 1)
+	super(world_, 2)
 	self.grid_loc = gloc
 	self.value = required_val
 
@@ -18,10 +18,12 @@ func on_tick() -> void:
 		pause_this_tick()
 		return
 
-	if _is_wait_tick:
+	if _is_wait_tick: # Wait for the item to finish sliding into the slot.
 		_is_wait_tick = false
 		pause_this_tick()
 		return
+
+	_is_wait_tick = true
 
 	var it_val := my_tile.get_item().get_value()
 	if it_val == value:
