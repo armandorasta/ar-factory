@@ -32,11 +32,8 @@ func _ready() -> void:
 	_sync_butt_states()
 	
 	speed_slider.value_changed.connect(_on_speed_slider_value_changed)
-	speed_slider.value = 3.0
-
-	# Show the right toolbox from the get go
-	play_hbox.hide()
-	tools_hbox.show()
+	world.reset_tick_rate()
+	speed_slider.value = world.get_tick_rate()
 
 
 func _process(dt: float) -> void:
@@ -62,22 +59,17 @@ func _on_play_butt_pressed() -> void:
 	assert(_play_mode != PlayMode.PLAY)
 	_play_mode = PlayMode.PLAY
 	_sync_butt_states()
+	_on_simulation_start()
 
 	world.tick_timer.paused = false
 	_on_world_tick_timer_time_out()
-
-	tools_hbox.hide()
-	play_hbox.show()
 
 
 func _on_pause_butt_pressed() -> void:
 	assert(_play_mode != PlayMode.OFF)
 	_play_mode = PlayMode.OFF
 	_sync_butt_states()
-	_finalize_runtime()
-
-	play_hbox.hide()
-	tools_hbox.show()
+	_on_simulation_end()
 
 
 func _on_debug_butt_pressed() -> void:
@@ -97,19 +89,30 @@ func _sync_butt_states() -> void:
 			play_butt.disabled = false
 			pause_butt.disabled = true
 			debug_butt.disabled = false
+			play_hbox.hide()
+			tools_hbox.show()
+
 
 		PlayMode.DEBUG:
 			play_butt.disabled = false
 			pause_butt.disabled = false
 			debug_butt.disabled = false
+			play_hbox.show()
+			tools_hbox.hide()
 
 		PlayMode.PLAY:
 			play_butt.disabled = true
 			pause_butt.disabled = false
 			debug_butt.disabled = false
+			play_hbox.show()
+			tools_hbox.hide()
+
+
+func _on_simulation_start() -> void:
+	pass
 
 
 ## Stuff to do when the program is about to shut-down, either because it has ended, or halted midway.
-func _finalize_runtime() -> void:
+func _on_simulation_end() -> void:
 	world.clean_up()
 	world.tick_timer.paused = true

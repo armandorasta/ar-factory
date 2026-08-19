@@ -1,5 +1,8 @@
 class_name Item extends Node2D
 
+const MAX_VALUE: int = 1000
+const MIN_VALUE: int = -MAX_VALUE
+
 @onready var sprite: Sprite2D = $CenterContainer/Sprite2D
 @onready var label: Label = $CenterContainer/Sprite2D/CenterContainer/Label
 
@@ -23,8 +26,9 @@ func get_value() -> int:
 	return _value
 
 func set_value(new_val: int) -> void:
-	_value = new_val
-	label.text = str(new_val)
+	# assert(MIN_VALUE <= new_val && new_val <= MAX_VALUE)
+	_value = clampi(new_val, MIN_VALUE, MAX_VALUE)
+	label.text = str(_value)
 
 
 func sync_pos_with_grid() -> void:
