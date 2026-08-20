@@ -1,11 +1,11 @@
 class_name WorldPanel extends Panel
 
 const ItemScene := preload("res://scenes/item.tscn")
-const UnitSliderScene := preload("res://scenes/unit_slider.tscn")
-const UnitSupplierScene := preload("res://scenes/unit_supplier.tscn")
-const UnitUpdaterScene := preload("res://scenes/unit_updater.tscn")
-const UnitBinScene := preload("res://scenes/unit_bin.tscn")
-const UnitDemanderScene := preload("res://scenes/unit_demander.tscn")
+const UNSliderScene := preload("res://scenes/un_slider.tscn")
+const UNSupplierScene := preload("res://scenes/un_supplier.tscn")
+const UNUpdaterScene := preload("res://scenes/un_updater.tscn")
+const UNBinScene := preload("res://scenes/un_bin.tscn")
+const UNDemanderScene := preload("res://scenes/un_demander.tscn")
 
 var elems: Array[Unit] = []
 var dims := Vector2i(5, 7)
@@ -20,7 +20,6 @@ var _tick_millis: float
 var blocked_slide_cmds: Array[CmdSlide] = []
 
 var _units: Array[Unit] = []
-var _cmds: Array[Command] = []
 var _tiles: Array[Tile] = []
 
 
@@ -101,17 +100,13 @@ func teleport_item(g_from: Vector2i, g_to: Vector2i, is_maybe_null: bool = false
 	return dest_tile.get_item()
 
 
-func add_cmd(new_cmd: Command) -> void:
-	_cmds.push_back(new_cmd)
-
-
 func reserve_tile(gloc: Vector2i) -> void:
 	return get_tile(gloc).set_reserved(true)
 
 
 func do_per_frame(dt: float) -> void:
-	for cmd in _cmds:
-		cmd.do_per_frame(dt)
+	for u in _units:
+		u.do_per_frame(dt)
 
 
 func on_tick() -> void:
@@ -122,21 +117,15 @@ func on_tick() -> void:
 	for u in _units: # Preprocess all units first
 		u.preprocess_tick()
 
+	# The above loop should not be moved below this one.
 	for u in _units: # Add commands
-		u.on_tick()
+		u.pend_new_commands()
 
-	# _cmds.shuffle()
-	for c in _cmds:
-		c.on_tick()
+	for u in _units: # Process commands
+		u.handle_cmd_tick()
 
-	_handle_slide_cmd_overlapping()
-
-	for c in _cmds:
-		c.count_this_tick()
+	_handle_slide_cmd_overlapping() # Overlap slide commands
 	
-	# Remove the finished commands.
-	_cmds = _cmds.filter(func(x: Command): return !x.is_done())		
-
 	tick_count += 1
 	queue_redraw()
 
@@ -157,7 +146,6 @@ func clean_up() -> void:
 		tile.destroy_item(true)
 	
 	tick_count = 0
-	_cmds.clear()
 	blocked_slide_cmds.clear()
 
 
@@ -185,29 +173,30 @@ func _draw() -> void:
 
 
 func _place_some_units() -> void:
-	_place_supplier(Vector2i(0, 3), Unit.Direction.EAST, 1, [1, 2, 3, 4, 5, 6, 7])
-	_place_bus(Vector2i(1, 3), Unit.Direction.EAST)
-	# _place_bus(Vector2i(2, 3), Unit.Direction.EAST)
-	_place_updater(Vector2i(2, 3), Unit.Direction.EAST, 1, UnitUpdater.UpdateType.DOUBLE)
-	_place_bus(Vector2i(3, 3), Unit.Direction.NORTH)
-	_place_bus(Vector2i(3, 2), Unit.Direction.NORTH)
-	_place_bus(Vector2i(3, 1), Unit.Direction.WEST)
-	# _place_bus(Vector2i(2, 1), Unit.Direction.WEST)
-	_place_updater(Vector2i(2, 1), Unit.Direction.WEST, 1, UnitUpdater.UpdateType.DOUBLE)
-	_place_bus(Vector2i(1, 1), Unit.Direction.SOUTH)
-	_place_bus(Vector2i(1, 2), Unit.Direction.SOUTH)
+	_place_supplier(Vector2i(0, 3), Unit.Direction.EAST, 1, [1, 2, 3])
+	_place_supplier(Vector2i(1, 4), Unit.Direction.NORTH, 1, [1, 2, 3])
+	_place_slider(Vector2i(1, 3), Unit.Direction.EAST)
+	# _place_slider(Vector2i(2, 3), Unit.Direction.EAST)
+	_place_updater(Vector2i(2, 3), Unit.Direction.EAST, 1, UNUpdater.UpdateType.DOUBLE)
+	_place_slider(Vector2i(3, 3), Unit.Direction.NORTH)
+	_place_slider(Vector2i(3, 2), Unit.Direction.NORTH)
+	_place_slider(Vector2i(3, 1), Unit.Direction.WEST)
+	# _place_slider(Vector2i(2, 1), Unit.Direction.WEST)
+	_place_updater(Vector2i(2, 1), Unit.Direction.WEST, 1, UNUpdater.UpdateType.DOUBLE)
+	_place_slider(Vector2i(1, 1), Unit.Direction.WEST)
+	_place_demander(Vector2i(0, 1), Unit.Direction.EAST, [4, 8, 12])
 	
 
 func _place_supplier(loc: Vector2i, dir: Unit.Direction, rate: int, seq: Array[int]) -> void:
-	var my_supp := UnitSupplierScene.instantiate()
+	var my_supp := UNSupplierScene.instantiate()
 	_units.push_back(my_supp)
 	add_child(my_supp)
 	my_supp.setup(self, loc, rate, seq)
 	my_supp.set_dir(dir)
 
 
-func _place_bus(loc: Vector2i, dir: Unit.Direction) -> void:
-	var my_bus := UnitSliderScene.instantiate()
+func _place_slider(loc: Vector2i, dir: Unit.Direction) -> void:
+	var my_bus := UNSliderScene.instantiate()
 	_units.push_back(my_bus)
 	add_child(my_bus)
 	my_bus.setup(self, loc, 1)
@@ -215,9 +204,9 @@ func _place_bus(loc: Vector2i, dir: Unit.Direction) -> void:
 
 
 func _place_updater(loc: Vector2i, dir: Unit.Direction, rate: int, up_t: 
-	UnitUpdater.UpdateType
+	UNUpdater.UpdateType
 ) -> void:
-	var doub := UnitUpdaterScene.instantiate()
+	var doub := UNUpdaterScene.instantiate()
 	_units.push_back(doub)
 	add_child(doub)
 	doub.setup(self, loc, rate, up_t)
@@ -225,19 +214,20 @@ func _place_updater(loc: Vector2i, dir: Unit.Direction, rate: int, up_t:
 
 
 func _place_bin(loc: Vector2i) -> void:
-	var bin := UnitBinScene.instantiate()
+	var bin := UNBinScene.instantiate()
 	_units.push_back(bin)
 	add_child(bin)
 	bin.setup(self, loc)
 
-func _place_demander(loc: Vector2i, seq: Array[int]) -> void:
-	var dem := UnitDemanderScene.instantiate()
+func _place_demander(loc: Vector2i, dir: Unit.Direction, seq: Array[int]) -> void:
+	var dem := UNDemanderScene.instantiate()
 	_units.push_back(dem)
 	add_child(dem)
 	dem.setup(self, loc, seq)
+	dem.set_dir(dir)
 
 
-## Called after `on_tick` is called on every slide command.
+## Called after handling all ticks of pending commands
 func _handle_slide_cmd_overlapping() -> void:
 	# Slide command overlapping.
 	# If any update happens in a pass, end that pass and start over,
@@ -257,9 +247,10 @@ func _handle_slide_cmd_overlapping() -> void:
 
 class Tile:
 	enum TileType {
-		FREE  = 0x0, # Anything allowed in from any direction.
-		INPUT = 0x1, # Item allowed if it's going into the input direction.
-		SOLID = 0x2, # No items allowed EVER.
+		FREE   = 0x0, # Anything allowed in from any direction.
+		INPUT  = 0x1, # Item allowed if it's going into the input direction.
+		OUTPUT = 0x2, # Items are generated from this block, demanders can only be connected to outputs
+		SOLID  = 0x4, # No items allowed EVER.
 	}
 
 	const _NORTH_WALL_ID := 0
@@ -287,6 +278,7 @@ class Tile:
 
 	func is_free()  -> bool: return _type == TileType.FREE
 	func is_input() -> bool: return _type == TileType.INPUT
+	func is_output() -> bool: return _type == TileType.OUTPUT
 	func is_solid() -> bool: return _type == TileType.SOLID
 
 	func has_wall(dir_: Unit.Direction) -> bool:
@@ -316,8 +308,12 @@ class Tile:
 		_type = TileType.FREE
 		_walls.clear()
 	
-	func make_input() -> void: 
+	func make_input() -> void:
 		_type = TileType.INPUT
+		_walls.resize(4)
+
+	func make_output() -> void:
+		_type = TileType.OUTPUT
 		_walls.resize(4)
 	
 	func make_solid() -> void: 

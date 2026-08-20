@@ -4,26 +4,22 @@ var grid_loc: Vector2i
 
 ## Item must have this value, else the design fails.
 var value: int
-var _is_wait_tick: bool = true
 
 func _init(world_: WorldPanel, gloc: Vector2i, required_val: int) -> void:
-	super(world_, 2)
+	super(world_, 1)
 	self.grid_loc = gloc
 	self.value = required_val
 
 
 func on_tick() -> void:
 	var my_tile := world.get_tile(grid_loc)
-	if !my_tile.has_item():
+	if !my_tile.has_item() || my_tile.get_item().cant_move_this_tick:
 		pause_this_tick()
 		return
 
-	if _is_wait_tick: # Wait for the item to finish sliding into the slot.
-		_is_wait_tick = false
-		pause_this_tick()
-		return
-
-	_is_wait_tick = true
+	# The item should be able to move, this means it did not move this tick, which means we are not
+	# send an item into oblivion mid-animation.
+	assert(!my_tile.get_item().cant_move_this_tick)
 
 	var it_val := my_tile.get_item().get_value()
 	if it_val == value:

@@ -9,8 +9,14 @@ const MIN_VALUE: int = -MAX_VALUE
 var world: WorldPanel
 var grid_loc: Vector2i
 
-var _value: int
+## This flag means the item has already moved this tick.
+## It also means the item is mid sliding animation, meaning freeing it will crash the game,
+## so the expression `!item.cant_move_this_tick` returns true when the item is has already finished
+## its sliding animation, and has not moved this tick. 
 var cant_move_this_tick: bool = false
+
+var _value: int
+
 
 func setup(world_: WorldPanel, gloc: Vector2i, val: int) -> void:
 	self.world = world_

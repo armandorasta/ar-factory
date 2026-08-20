@@ -1,4 +1,4 @@
-class_name UnitUpdater extends Unit
+class_name UNUpdater extends Unit
 
 enum UpdateType {
 	DOUBLE,
@@ -25,7 +25,7 @@ static func apply(up_t: UpdateType, val: int) -> int:
 
 ## Must be called after _ready
 func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, update_type_: UpdateType) -> void:
-	super.init(world_, Type.ON_DEMAND, work_rate, 1, gloc)
+	super.init(world_, Type.ON_DEMAND, work_rate, 1, 1, gloc)
 	self.update_type = update_type_
 	match update_type:
 		UpdateType.DOUBLE   : label.text = "2x"
@@ -36,10 +36,10 @@ func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, update_type_: Upd
 	sprite.translate(world_.cell_width * 0.5 * Vector2.ONE)
 	set_dir(dir)
 
-	item_slots[0].grid_loc = grid_loc
+	input_slots[0].grid_loc = grid_loc
 
 
-func on_tick() -> void:
+func pend_new_commands() -> void:
 	if !is_work_tick():
 		return
 		

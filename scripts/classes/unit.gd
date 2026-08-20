@@ -18,7 +18,9 @@ var dir: Direction = Direction.EAST
 var grid_loc: Vector2i
 var rate: int
 var world: WorldPanel
-var item_slots: Array[ItemSlot] = []
+var input_slots: Array[InputSlot] = []
+var output_slots: Array[OutputSlot] = []
+var tiles: Array[WorldPanel.Tile] = []
 
 ## Keeps track of the `rate` every tick.
 var _count: int = 0
@@ -26,7 +28,7 @@ var _count: int = 0
 ## Commands that need to finish for the unit to keep operating again
 var _pending_cmds: Array[Command] = []
 
-func init(world_: WorldPanel, type_: Type, work_rate: int, item_count: int, gloc: Vector2i) -> void:
+func init(world_: WorldPanel, type_: Type, work_rate: int, input_count: int, output_count: int, gloc: Vector2i) -> void:
 	self.type = type_
 	self.world = world_
 	self.grid_loc = gloc
@@ -34,11 +36,14 @@ func init(world_: WorldPanel, type_: Type, work_rate: int, item_count: int, gloc
 
 	position = world.grid_to_pos(gloc)
 	
-	for i in item_count:
-		item_slots.push_back(ItemSlot.new())
+	for i in input_count:
+		input_slots.push_back(InputSlot.new())
+	
+	for i in output_count:
+		output_slots.push_back(OutputSlot.new())
 
 
-@abstract func on_tick() -> void
+@abstract func pend_new_commands() -> void
 
 
 func is_work_tick() -> bool:
@@ -51,28 +56,35 @@ func has_pending_cmds() -> bool:
 
 ## Returns true if we are waiting for the animation of a slide command to end, that slide command
 ## is on one of the outputs of the unit.
-## In this case, we can often just pend new commands before the end of the animation on  the next
+## In this case, we can often just pend new commands before the end of the animation on the next
 ## tick.
+## If there are no pending commands, it will return false!
 func is_just_awaiting_out_sliding_anim() -> bool:
 	# The cloner has multiple outputs, we need to account for that.
 	return (
+		!_pending_cmds.is_empty() &&
 		_pending_cmds.all(func(x): return x is CmdSlide) && 
 		_pending_cmds.all(func(x: CmdSlide): return x.is_awaiting_anim())
 	)
 
 
+## This HAS to be called before `pend_new_commands`, because it increments the tick counter.
 func preprocess_tick() -> void:
-	for its in item_slots:
+	for its in input_slots:
 		its.update(world)
 
+	for cmd in _pending_cmds:
+		cmd.count_this_tick()
+	
+	# `is_done` depends on the loop just above.
 	_pending_cmds = _pending_cmds.filter(func(x: Command): return !x.is_done())
-
+	
 	match type:
 		Type.STEADY:    
 			_count += 1
 		
 		Type.ON_DEMAND:
-			if item_slots.all(func(x): return x.is_full()):
+			if input_slots.all(func(x): return x.is_full()):
 				_count += 1
 			else:
 				_count = 0
@@ -89,32 +101,36 @@ func pause_this_tick() -> void:
 ## if it finds one it assigns it to the slot and returns true, 
 ## if it doesn't find one it returns false
 func check_for_item(slot_index: int) -> bool:
-	assert(slot_index >= 0 && slot_index < item_slots.size())
+	assert(slot_index >= 0 && slot_index < input_slots.size())
 	
-	var slot := item_slots[slot_index]
+	var slot := input_slots[slot_index]
 	if slot.is_full(): # We have an item, no work needs to be done
 		print("already have an item")
 		return true
 	
 	# We don't have an item, so check if one was fed to the slot, and assign if so
 	slot.item = world.get_item(slot.grid_loc)
-	if !slot.is_empty():
-		print("No item yet")
-	else:
-		print("Got fed an item just now")
-	
 	return slot.is_full()
 
 
 func pend_cmd(cmd: Command) -> void:
-	cmd.world.add_cmd(cmd)
 	_pending_cmds.push_back(cmd)
+
+
+func do_per_frame(dt: float) -> void:
+	for cmd in _pending_cmds:
+		cmd.do_per_frame(dt)
+
+
+func handle_cmd_tick() -> void:
+	for cmd in _pending_cmds:
+		cmd.on_tick()
 
 
 func reset() -> void:
 	_count = 0
 	_pending_cmds.clear()
-	for its in item_slots:
+	for its in input_slots:
 		its.item = null
 
 
@@ -131,7 +147,7 @@ static func inv_dir(my_dir: Direction) -> Direction:
 	return 3 - my_dir as Direction
 
 
-class ItemSlot:
+class InputSlot:
 	var grid_loc: Vector2i
 	var item: Item
 
@@ -152,3 +168,10 @@ class ItemSlot:
 
 	func update(world: WorldPanel) -> void:
 		item = world.get_tile(grid_loc).get_item(true)
+
+
+class OutputSlot:
+	var grid_loc: Vector2i
+
+
+

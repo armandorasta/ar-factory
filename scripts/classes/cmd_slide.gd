@@ -35,7 +35,9 @@ func on_tick() -> void:
 	_state_machine.call_next_state()
 
 
-## Returns true if the item moved this pass, else returns false
+## If the item moved this pass, it will return true, 
+## if it didn't, it will try to move it, if it succeeds, it will return true,
+## otherwise it will return false.
 func is_updated_this_pass() -> bool:
 	assert(_state_machine.get_state() == _handle_dest_tile) # Blocked for real?
 	assert(tracked_item != null && !tracked_item.cant_move_this_tick)

@@ -1,6 +1,6 @@
-[gd_scene format=3 uid="uid://cwy4m7dmsp7fo"]
+[gd_scene format=3 uid="uid://bphindl43xahl"]
 
-[ext_resource type="Script" path="res://scripts/unit_demander.gd" id="1_25bmm"]
+[ext_resource type="Script" uid="uid://csa8l2sa077by" path="res://scripts/unit_demander.gd" id="1_25bmm"]
 
 [sub_resource type="Gradient" id="Gradient_25bmm"]
 colors = PackedColorArray(0.2221174, 0.36067706, 0.14699468, 1, 0.8766988, 1, 0.49088544, 1)

@@ -1,4 +1,4 @@
-class_name UnitSupplier extends Unit
+class_name UNSupplier extends Unit
 
 @onready var sprite: Sprite2D = $Sprite2D
 
@@ -8,7 +8,7 @@ var _index: int = -1
 
 ## Must be called after _ready
 func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, sequence: PackedInt32Array) -> void:
-	super.init(world_, Type.STEADY, work_rate, 0, gloc)
+	super.init(world_, Type.STEADY, work_rate, 0, 1, gloc)
 	self._seq = sequence
 
 	sprite.apply_scale(world_.cell_width / 128 * Vector2.ONE)
@@ -16,7 +16,7 @@ func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, sequence: PackedI
 	set_dir(dir)
 
 
-func on_tick() -> void:
+func pend_new_commands() -> void:
 	if _is_done_with_seq():
 		return
 
