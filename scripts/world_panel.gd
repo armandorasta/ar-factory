@@ -7,7 +7,6 @@ const UNUpdaterScene := preload("res://scenes/un_updater.tscn")
 const UNBinScene := preload("res://scenes/un_bin.tscn")
 const UNDemanderScene := preload("res://scenes/un_demander.tscn")
 
-var elems: Array[Unit] = []
 var dims := Vector2i(5, 7)
 var cell_width: float = 100.0
 
@@ -15,12 +14,11 @@ var cell_width: float = 100.0
 var default_tick_millis: float = 300.0
 var tick_timer: Timer
 var tick_count: int = 0 # Number of ticks since the start.
+
 var _tick_millis: float
-
-var blocked_slide_cmds: Array[CmdSlide] = []
-
 var _units: Array[Unit] = []
 var _tiles: Array[Tile] = []
+var _blocked_slide_cmds: Array[CmdSlide] = []
 
 
 func get_tick_rate() -> float:
@@ -33,7 +31,7 @@ func get_tile(gloc: Vector2i) -> Tile:
 
 func get_unit(gloc: Vector2i) -> Unit:
 	for u in _units:
-		if u.grid_loc == gloc:
+		if u.has_tile(gloc):
 			return u
 	return null
 
@@ -146,7 +144,7 @@ func clean_up() -> void:
 		tile.destroy_item(true)
 	
 	tick_count = 0
-	blocked_slide_cmds.clear()
+	_blocked_slide_cmds.clear()
 
 
 func _ready() -> void:
@@ -157,7 +155,7 @@ func _ready() -> void:
 	add_child(tick_timer)
 
 	for i in dims.x * dims.y:
-		_tiles.push_back(Tile.new(false))
+		_tiles.push_back(Tile.new())
 
 	_place_some_units()
 
@@ -166,10 +164,16 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2(), size), Color(0, 0.1, 0) if tick_count % 2 == 1 else Color(0, 0.11, 0))
 
 	for i in range(1, dims.x):
-		draw_line(Vector2(i * cell_width, 0), Vector2(i * cell_width, size.y), Color.RED)
+		draw_line(Vector2(i * cell_width, 0), Vector2(i * cell_width, size.y), Color.CYAN)
 
 	for i in range(1, dims.y):
 		draw_line(Vector2(0, i * cell_width), Vector2(size.x, i * cell_width), Color.RED)
+
+	for y in dims.y:
+		for x in dims.x:
+			var tile_gloc := Vector2i(x, y)
+			get_tile(tile_gloc).draw_self_on_world(self, grid_to_pos(tile_gloc))
+			
 
 
 func _place_some_units() -> void:
@@ -234,15 +238,15 @@ func _handle_slide_cmd_overlapping() -> void:
 	# repeat until a full pass happens with no updates.
 	while 1 + 1 == 2:
 		var dirty_index := -1
-		for i in blocked_slide_cmds.size():
-			if blocked_slide_cmds[i].is_updated_this_pass():
+		for i in _blocked_slide_cmds.size():
+			if _blocked_slide_cmds[i].is_updated_this_pass():
 				dirty_index = i
 				break
 		if dirty_index == -1: # None has updated? it's over.
 			break
 		# Something moved? can only move once per tick so bye-bye.
-		blocked_slide_cmds.pop_at(dirty_index)
-	blocked_slide_cmds.clear()
+		_blocked_slide_cmds.pop_at(dirty_index)
+	_blocked_slide_cmds.clear()
 
 
 class Tile:
@@ -253,22 +257,26 @@ class Tile:
 		SOLID  = 0x4, # No items allowed EVER.
 	}
 
-	const _NORTH_WALL_ID := 0
-	const _EAST_WALL_ID  := 1
-	const _SOUTH_WALL_ID := 2
-	const _WEST_WALL_ID  := 3
+	## Does not matter for free tiles.
+	var color: Color = Color.WHITE
 
-	## Only `INPUT` tiles have walls.
-	var _walls: Array[bool] = []
 	var _type: TileType = TileType.FREE
 	var _item: Item = null
+	
+	# Only matters for inputs and outputs.
+	# Inputs face where they take in items, outputs face where they push out items.
+	var _dir: Unit.Direction = Unit.Direction.EAST
 	
 	## The makes the tile inaccessible to items even if it's empty.
 	var _is_reserved: bool = false
 
 
-	func _init(is_solid_: bool) -> void:
-		_type = TileType.SOLID if is_solid_ else TileType.FREE
+	func _init() -> void:
+		pass
+
+
+	func get_dir() -> Unit.Direction:
+		return _dir
 
 
 	## Is the tile solid? if not are items not allowed there?
@@ -281,53 +289,28 @@ class Tile:
 	func is_output() -> bool: return _type == TileType.OUTPUT
 	func is_solid() -> bool: return _type == TileType.SOLID
 
-	func has_wall(dir_: Unit.Direction) -> bool:
-		if is_solid():
-			return true
-		
-		if is_free():
-			return false
-		
-		match dir_:
-			Unit.Direction.NORTH: return _walls[_NORTH_WALL_ID]
-			Unit.Direction.EAST : return _walls[_EAST_WALL_ID]
-			Unit.Direction.SOUTH: return _walls[_SOUTH_WALL_ID]
-			Unit.Direction.WEST : return _walls[_WEST_WALL_ID]
-			_: return false
+
+	func can_enter_from_dir(dir: Unit.Direction) -> bool:
+		return is_free() || !is_solid() && dir == Unit.inv_dir(_dir)
 
 
 	func has_item() -> bool:
 		return _item != null
+
 
 	func get_item(is_maybe_null: bool = false) -> Item:
 		assert(is_maybe_null || has_item())
 		return _item
 
 
-	func make_free()  -> void: 
-		_type = TileType.FREE
-		_walls.clear()
-	
-	func make_input() -> void:
-		_type = TileType.INPUT
-		_walls.resize(4)
-
-	func make_output() -> void:
-		_type = TileType.OUTPUT
-		_walls.resize(4)
-	
-	func make_solid() -> void: 
-		_type = TileType.SOLID
-		_walls.clear()
+	func make_free()   -> void: _type = TileType.FREE	
+	func make_input()  -> void: _type = TileType.INPUT
+	func make_output() -> void: _type = TileType.OUTPUT
+	func make_solid()  -> void: _type = TileType.SOLID
 
 
-	func set_wall(dir_: Unit.Direction, to_what: bool) -> void:
-		assert(is_input())
-		match dir_:
-			Unit.Direction.NORTH: _walls[_NORTH_WALL_ID] = to_what
-			Unit.Direction.EAST : _walls[_EAST_WALL_ID]  = to_what
-			Unit.Direction.SOUTH: _walls[_SOUTH_WALL_ID] = to_what
-			Unit.Direction.WEST : _walls[_WEST_WALL_ID]  = to_what
+	func set_dir(new_dir: Unit.Direction) -> void:
+		_dir = new_dir
 
 
 	func set_item(new_item: Item, is_override: bool = false) -> void:
@@ -347,7 +330,7 @@ class Tile:
 		_is_reserved = false
 
 
-	## Same as `destroy_item` except it returns the item instead of destroying it.
+	## Removes the item from the block and returns it, the caller has full ownership of the item.
 	func extract_item(is_maybe_null: bool = false) -> Item:
 		assert(is_maybe_null || has_item())
 		var my_item := _item
@@ -358,3 +341,14 @@ class Tile:
 	
 	func set_reserved(to_what: bool) -> void:
 		_is_reserved = to_what
+
+	
+	func draw_self_on_world(world: WorldPanel, pos: Vector2) -> void:
+		world.draw_rect(Rect2(pos, Vector2.ONE * world.cell_width), color)
+		if is_input() || is_output():
+			var edge_pos := pos + (0.5*world.cell_width) * (Vector2i.ONE + Unit.dir_to_grid(_dir))
+			world.draw_circle(edge_pos, world.cell_width * 0.1, Color.WHITE)
+			
+
+
+

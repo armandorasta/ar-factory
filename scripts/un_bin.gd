@@ -5,7 +5,7 @@ class_name UNBin extends Unit
 
 ## Must be called after _ready
 func setup(world_: WorldPanel, gloc: Vector2i) -> void:
-	super.init(world_, Type.ON_DEMAND, 1, 1, 0, gloc)
+	super.init(world_, TickType.ON_DEMAND, 1, 1, 0, gloc)
 
 	sprite.apply_scale(world_.cell_width / 128 * Vector2.ONE)
 	sprite.translate(world_.cell_width * 0.5 * Vector2.ONE)

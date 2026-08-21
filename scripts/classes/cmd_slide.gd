@@ -82,7 +82,7 @@ func _handle_dest_tile() -> void:
 	var dest_tile := world.get_tile(grid_to)
 	if dest_tile.is_reserved():
 		# First iteration of this, there will be more later.
-		world.blocked_slide_cmds.push_back(self)
+		world._blocked_slide_cmds.push_back(self)
 		pause_this_tick() # Might be undone in the passes after.
 		return
 

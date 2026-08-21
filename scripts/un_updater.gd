@@ -25,7 +25,7 @@ static func apply(up_t: UpdateType, val: int) -> int:
 
 ## Must be called after _ready
 func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, update_type_: UpdateType) -> void:
-	super.init(world_, Type.ON_DEMAND, work_rate, 1, 1, gloc)
+	super.init(world_, TickType.ON_DEMAND, work_rate, 1, 1, gloc)
 	self.update_type = update_type_
 	match update_type:
 		UpdateType.DOUBLE   : label.text = "2x"

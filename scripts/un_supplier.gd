@@ -8,7 +8,7 @@ var _index: int = -1
 
 ## Must be called after _ready
 func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, sequence: PackedInt32Array) -> void:
-	super.init(world_, Type.STEADY, work_rate, 0, 1, gloc)
+	super.init(world_, TickType.STEADY, work_rate, 0, 1, gloc)
 	self._seq = sequence
 
 	sprite.apply_scale(world_.cell_width / 128 * Vector2.ONE)

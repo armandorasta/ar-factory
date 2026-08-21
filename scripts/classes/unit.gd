@@ -8,12 +8,12 @@ enum Direction {
 	SOUTH = 3, 
 }
 
-enum Type {
-	STEADY,       # Always counts ticks, even when no item is fed, like sliders.
+enum TickType {
+	STEADY,    # Always counts ticks, even when no item is fed, like sliders.
 	ON_DEMAND, # Counts ticks only when all item slots are filled, like updaters.
 }
 
-var type: Type
+var tick_type: TickType
 var dir: Direction = Direction.EAST
 var grid_loc: Vector2i
 var rate: int
@@ -21,6 +21,7 @@ var world: WorldPanel
 var input_slots: Array[InputSlot] = []
 var output_slots: Array[OutputSlot] = []
 var tiles: Array[WorldPanel.Tile] = []
+var dims: Vector2i
 
 ## Keeps track of the `rate` every tick.
 var _count: int = 0
@@ -28,22 +29,36 @@ var _count: int = 0
 ## Commands that need to finish for the unit to keep operating again
 var _pending_cmds: Array[Command] = []
 
-func init(world_: WorldPanel, type_: Type, work_rate: int, input_count: int, output_count: int, gloc: Vector2i) -> void:
-	self.type = type_
+func init(world_: WorldPanel, tick_type_: TickType, work_rate: int, gloc: Vector2i, 
+	dims_: Vector2i
+) -> void:
 	self.world = world_
-	self.grid_loc = gloc
+	self.tick_type = tick_type_
 	self.rate = work_rate
+	self.grid_loc = gloc
+	self.dims = dims_
 
 	position = world.grid_to_pos(gloc)
+
+	assert(0 < dims_.x && dims_.x + gloc.x < world.dims_.x)
+	assert(0 < dims_.y && dims_.y + gloc.y < world.dims_.y)
+	for y in dims_.y:
+		for x in dims_.x:
+			tiles.push_back(world.get_tile(gloc + Vector2i(x, y)))
 	
-	for i in input_count:
-		input_slots.push_back(InputSlot.new())
-	
-	for i in output_count:
-		output_slots.push_back(OutputSlot.new())
+	build_tiles()
+	assert(input_slots.size() > 0 || output_slots.size() > 0)	
 
 
+## Used to specify:
+## what tiles the unit will occupy, 
+## where the inputs and outputs are and their directions.
+@abstract func build_tiles() -> void
 @abstract func pend_new_commands() -> void
+
+
+func has_tile(gloc: Vector2i) -> bool:
+	return Rect2i(grid_loc, dims).has_point(gloc)
 
 
 func is_work_tick() -> bool:
@@ -79,11 +94,11 @@ func preprocess_tick() -> void:
 	# `is_done` depends on the loop just above.
 	_pending_cmds = _pending_cmds.filter(func(x: Command): return !x.is_done())
 	
-	match type:
-		Type.STEADY:    
+	match tick_type:
+		TickType.STEADY:    
 			_count += 1
 		
-		Type.ON_DEMAND:
+		TickType.ON_DEMAND:
 			if input_slots.all(func(x): return x.is_full()):
 				_count += 1
 			else:

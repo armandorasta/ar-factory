@@ -10,7 +10,7 @@ var _in_slider: UNSlider
 
 ## Must be called after _ready
 func setup(world_: WorldPanel, gloc: Vector2i, sequence: PackedInt32Array) -> void:
-	super.init(world_, Type.STEADY, 1, 1, 0, gloc)
+	super.init(world_, TickType.STEADY, 1, 1, 0, gloc)
 	self._seq = sequence
 
 	sprite.apply_scale(world_.cell_width / 128 * Vector2.ONE)

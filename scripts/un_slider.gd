@@ -4,7 +4,7 @@ class_name UNSlider extends Unit
 
 ## Must be called after _ready
 func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int) -> void:
-	super.init(world_, Type.STEADY, work_rate, 1, 1, gloc)
+	super.init(world_, TickType.STEADY, work_rate, 1, 1, gloc)
 	sprite.apply_scale(world.cell_width / 128 * Vector2.ONE)
 	sprite.translate(world.cell_width * 0.5 * Vector2.ONE)
 	set_dir(dir)
