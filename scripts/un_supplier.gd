@@ -1,19 +1,17 @@
 class_name UNSupplier extends Unit
 
-@onready var sprite: Sprite2D = $Sprite2D
-
 var _seq: PackedInt32Array
 var _index: int = -1
 
 
 ## Must be called after _ready
 func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, sequence: PackedInt32Array) -> void:
-	super.init(world_, TickType.STEADY, work_rate, 0, 1, gloc)
+	super.init(world_, TickType.STEADY, work_rate, gloc, Vector2i.ONE)
 	self._seq = sequence
 
-	sprite.apply_scale(world_.cell_width / 128 * Vector2.ONE)
-	sprite.translate(world_.cell_width * 0.5 * Vector2.ONE)
-	set_dir(dir)
+
+func build_tiles() -> void:
+	add_output(Vector2i.ZERO, Unit.Direction.EAST)
 
 
 func pend_new_commands() -> void:
@@ -44,12 +42,3 @@ func _pop_next_value() -> int:
 	assert(!_is_done_with_seq())
 	_index += 1
 	return _seq[_index]
-
-
-func set_dir(new_dir: Direction) -> void:
-	dir = new_dir
-	match dir:
-		Direction.EAST:  sprite.rotation = PI * 0.0
-		Direction.SOUTH: sprite.rotation = PI * 0.5
-		Direction.WEST:  sprite.rotation = PI * 1.0
-		Direction.NORTH: sprite.rotation = PI * 1.5

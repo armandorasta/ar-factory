@@ -1,16 +1,13 @@
 class_name UNSlider extends Unit
 
-@onready var sprite: Sprite2D = $Sprite2D
 
 ## Must be called after _ready
 func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int) -> void:
-	super.init(world_, TickType.STEADY, work_rate, 1, 1, gloc)
-	sprite.apply_scale(world.cell_width / 128 * Vector2.ONE)
-	sprite.translate(world.cell_width * 0.5 * Vector2.ONE)
-	set_dir(dir)
+	super.init(world_, TickType.STEADY, work_rate, gloc, Vector2i.ONE)
 
-	input_slots[0].grid_loc = grid_loc
-	output_slots[0].grid_loc = grid_loc
+
+func build_tiles() -> void:
+	add_io(Vector2i.ZERO, Unit.Direction.WEST)
 
 
 ## Same as `UNSupplier` except no spawning, and no `CmdMove` if no item.

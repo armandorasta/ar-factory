@@ -1,6 +1,5 @@
 class_name UNDemander extends Unit
 
-@onready var sprite: Sprite2D = $Sprite2D
 @onready var label: Label = $Sprite2D/Label
 
 var _seq: PackedInt32Array
@@ -10,20 +9,18 @@ var _in_slider: UNSlider
 
 ## Must be called after _ready
 func setup(world_: WorldPanel, gloc: Vector2i, sequence: PackedInt32Array) -> void:
-	super.init(world_, TickType.STEADY, 1, 1, 0, gloc)
+	super.init(world_, TickType.STEADY, 1, gloc, Vector2i.ONE)
 	self._seq = sequence
-
-	sprite.apply_scale(world_.cell_width / 128 * Vector2.ONE)
-	sprite.translate(world_.cell_width * 0.5 * Vector2.ONE)
-	set_dir(dir)
 
 	_update_text()
 
-	input_slots[0].grid_loc = grid_loc
-	
 	_in_slider = world_.get_unit(grid_loc + Unit.dir_to_grid(dir))
 	if !(_in_slider is UNSlider): # Only allow sliders
 		_in_slider = null
+
+
+func build_tiles() -> void:
+	add_input(Vector2i.ZERO, Unit.Direction.WEST)
 
 
 func pend_new_commands() -> void:

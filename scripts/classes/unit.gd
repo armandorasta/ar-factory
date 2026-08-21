@@ -13,6 +13,8 @@ enum TickType {
 	ON_DEMAND, # Counts ticks only when all item slots are filled, like updaters.
 }
 
+@onready var sprite: Sprite2D = $Sprite2D
+
 var tick_type: TickType
 var dir: Direction = Direction.EAST
 var grid_loc: Vector2i
@@ -40,25 +42,37 @@ func init(world_: WorldPanel, tick_type_: TickType, work_rate: int, gloc: Vector
 
 	position = world.grid_to_pos(gloc)
 
-	assert(0 < dims_.x && dims_.x + gloc.x < world.dims_.x)
-	assert(0 < dims_.y && dims_.y + gloc.y < world.dims_.y)
+	# Scale down to 1x1 by dividing by 128, then scale that to dims*cell_width.
+	sprite.apply_scale((world_.cell_width/128.0) * dims_)
+	sprite.translate(world_.cell_width * 0.5 * Vector2.ONE)
+	set_dir(dir)
+	
+	assert(0 < dims_.x && dims_.x + gloc.x < world.dims.x)
+	assert(0 < dims_.y && dims_.y + gloc.y < world.dims.y)
 	for y in dims_.y:
 		for x in dims_.x:
-			tiles.push_back(world.get_tile(gloc + Vector2i(x, y)))
+			var my_tile := world.get_tile(gloc + Vector2i(x, y))
+			my_tile.make_solid()
+			tiles.push_back(my_tile)
 	
 	build_tiles()
-	assert(input_slots.size() > 0 || output_slots.size() > 0)	
+	assert(!input_slots.is_empty() || !output_slots.is_empty())
 
 
 ## Used to specify:
 ## what tiles the unit will occupy, 
 ## where the inputs and outputs are and their directions.
+## The tiles should be built as if the unit is facing east.
 @abstract func build_tiles() -> void
 @abstract func pend_new_commands() -> void
 
 
 func has_tile(gloc: Vector2i) -> bool:
 	return Rect2i(grid_loc, dims).has_point(gloc)
+
+
+func get_tile(gloc: Vector2i) -> WorldPanel.Tile:
+	return world.get_tile(grid_loc + gloc)
 
 
 func is_work_tick() -> bool:
@@ -83,11 +97,53 @@ func is_just_awaiting_out_sliding_anim() -> bool:
 	)
 
 
+func set_dir(new_dir: Direction) -> void:
+	dir = new_dir
+	match dir:
+		Direction.EAST:  sprite.rotation = PI * 0.0
+		Direction.SOUTH: sprite.rotation = PI * 0.5
+		Direction.WEST:  sprite.rotation = PI * 1.0
+		Direction.NORTH: sprite.rotation = PI * 1.5
+
+
+func add_input(gloc: Vector2i, dir_: Unit.Direction) -> void:
+	assert(!input_slots.any(func(x): return x.grid_loc == gloc))
+	assert(!output_slots.any(func(x): return x.grid_loc == gloc))
+
+	var my_tile := get_tile(gloc)
+	assert(my_tile.is_solid())
+	my_tile.make_input()
+	my_tile.set_dir(dir_)
+	input_slots.push_back(InputSlot.new(self, gloc))
+
+
+func add_output(gloc: Vector2i, dir_: Unit.Direction) -> void:
+	assert(!input_slots.any(func(x): return x.grid_loc == gloc))
+	assert(!output_slots.any(func(x): return x.grid_loc == gloc))
+
+	var my_tile := get_tile(gloc)
+	assert(my_tile.is_solid())
+	my_tile.make_output()
+	my_tile.set_dir(dir_)
+	output_slots.push_back(OutputSlot.new(self, gloc))
+
+
+## The direction is for the input not output, the output is gonna be automatically set to the 
+## reverse direction.
+func add_io(gloc: Vector2i, dir_: Unit.Direction) -> void:
+	assert(!input_slots.any(func(x): return x.grid_loc == gloc))
+	assert(!output_slots.any(func(x): return x.grid_loc == gloc))
+
+	var my_tile := get_tile(gloc)
+	assert(my_tile.is_solid())
+	my_tile.make_io()
+	my_tile.set_dir(dir_, true)
+	input_slots.push_back(InputSlot.new(self, gloc))
+	output_slots.push_back(OutputSlot.new(self, gloc))
+
+
 ## This HAS to be called before `pend_new_commands`, because it increments the tick counter.
 func preprocess_tick() -> void:
-	for its in input_slots:
-		its.update(world)
-
 	for cmd in _pending_cmds:
 		cmd.count_this_tick()
 	
@@ -99,7 +155,7 @@ func preprocess_tick() -> void:
 			_count += 1
 		
 		TickType.ON_DEMAND:
-			if input_slots.all(func(x): return x.is_full()):
+			if input_slots.all(func(x: InputSlot): return x.has_item()):
 				_count += 1
 			else:
 				_count = 0
@@ -162,31 +218,35 @@ static func inv_dir(my_dir: Direction) -> Direction:
 	return 3 - my_dir as Direction
 
 
-class InputSlot:
+class Slot:
 	var grid_loc: Vector2i
-	var item: Item
+	var _parent: Unit
 
 
-	func is_full() -> bool:
-		return item != null
+	func _init(parent: Unit, gloc: Vector2i) -> void:
+		self._parent = parent
+		self.grid_loc = gloc
 
 
-	func is_empty() -> bool:
-		return item == null
+	func has_item() -> bool:
+		return _parent.get_tile(_parent.grid_loc + grid_loc).has_item()
 
 
-	func clear() -> Item:
-		var my_it := item
-		item = null
-		return my_it
+	func extract_item(is_maybe_null: bool) -> Item:
+		return _parent.get_tile(_parent.grid_loc + grid_loc).extract_item(is_maybe_null)
 
 
-	func update(world: WorldPanel) -> void:
-		item = world.get_tile(grid_loc).get_item(true)
+	func destroy_item(is_maybe_null: bool) -> void:
+		return _parent.get_tile(_parent.grid_loc + grid_loc).destroy_item(is_maybe_null)
 
 
-class OutputSlot:
-	var grid_loc: Vector2i
+class InputSlot extends Slot:
+	func _init(parent: Unit, gloc: Vector2i) -> void:
+		super(parent, gloc)
+		assert(parent.get_tile(gloc).is_input())
 
 
-
+class OutputSlot extends Slot:
+	func _init(parent: Unit, gloc: Vector2i) -> void:
+		super(parent, gloc)
+		assert(parent.get_tile(gloc).is_output())

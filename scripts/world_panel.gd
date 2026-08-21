@@ -251,21 +251,28 @@ func _handle_slide_cmd_overlapping() -> void:
 
 class Tile:
 	enum TileType {
-		FREE   = 0x0, # Anything allowed in from any direction.
-		INPUT  = 0x1, # Item allowed if it's going into the input direction.
-		OUTPUT = 0x2, # Items are generated from this block, demanders can only be connected to outputs
-		SOLID  = 0x4, # No items allowed EVER.
+		FREE     = 0x0, # Anything allowed in from any direction.
+		INPUT    = 0x1, # Item allowed if it's going into the input direction.
+		OUTPUT   = 0x2, # Items are generated from this block, demanders can only be connected to outputs
+		SOLID    = 0x8, # No items allowed EVER.
+		
+		IO       = 0x1 | 0x2, # Both input and output
 	}
 
 	## Does not matter for free tiles.
-	var color: Color = Color.WHITE
+	var color: Color = Color.BLACK
 
 	var _type: TileType = TileType.FREE
 	var _item: Item = null
 	
 	# Only matters for inputs and outputs.
 	# Inputs face where they take in items, outputs face where they push out items.
+	# For io tiles, this is the direction of the input.
 	var _dir: Unit.Direction = Unit.Direction.EAST
+
+	# Only matters for io tiles
+	# Used for the direction of the output.
+	var _alt_dir: Unit.Direction = Unit.Direction.EAST
 	
 	## The makes the tile inaccessible to items even if it's empty.
 	var _is_reserved: bool = false
@@ -279,15 +286,22 @@ class Tile:
 		return _dir
 
 
+	func get_alt_dir() -> Unit.Direction:
+		return _alt_dir
+
+
 	## Is the tile solid? if not are items not allowed there?
 	func is_reserved() -> bool:
 		return is_solid() || _is_reserved
 
+	# `is_input` and `is_output` are different because one tile can be an input and output at the 
+	# same time.
 
-	func is_free()  -> bool: return _type == TileType.FREE
-	func is_input() -> bool: return _type == TileType.INPUT
-	func is_output() -> bool: return _type == TileType.OUTPUT
-	func is_solid() -> bool: return _type == TileType.SOLID
+	func is_free()   -> bool: return _type == TileType.FREE
+	func is_input()  -> bool: return _type & TileType.INPUT > 0
+	func is_output() -> bool: return _type & TileType.OUTPUT > 0
+	func is_solid()  -> bool: return _type == TileType.SOLID
+	func is_io()     -> bool: return _type == TileType.IO
 
 
 	func can_enter_from_dir(dir: Unit.Direction) -> bool:
@@ -304,16 +318,32 @@ class Tile:
 
 
 	func make_free()   -> void: _type = TileType.FREE	
-	func make_input()  -> void: _type = TileType.INPUT
-	func make_output() -> void: _type = TileType.OUTPUT
 	func make_solid()  -> void: _type = TileType.SOLID
+	func make_input()  -> void:	_type = TileType.INPUT
+	func make_output() -> void: _type = TileType.OUTPUT
+	
+	## Also sets `alt_dir` to the oppsite of the current direction.
+	func make_io() -> void:
+		_type = TileType.IO
+		set_dir(_dir, true)
 
 
-	func set_dir(new_dir: Unit.Direction) -> void:
+	## Cannot set to `alt_dir` if it's an io tile.
+	func set_dir(new_dir: Unit.Direction, is_set_alt_to_inv := false) -> void:
+		assert(_type & (TileType.INPUT | TileType.OUTPUT) > 0)
+		assert(_type != TileType.IO || is_set_alt_to_inv || new_dir != _alt_dir)
 		_dir = new_dir
+		if is_set_alt_to_inv:
+			_alt_dir = Unit.inv_dir(new_dir)
 
 
-	func set_item(new_item: Item, is_override: bool = false) -> void:
+	func set_alt_dir(new_dir: Unit.Direction) -> void:
+		assert(_type == TileType.IO)
+		assert(new_dir != _dir)
+		_alt_dir = new_dir
+
+
+	func set_item(new_item: Item, is_override := false) -> void:
 		assert(is_free() || is_input())
 		assert(is_override || !has_item())
 		destroy_item(true)
@@ -322,7 +352,7 @@ class Tile:
 		_is_reserved = true
 
 
-	func destroy_item(is_maybe_null: bool = false) -> void:
+	func destroy_item(is_maybe_null := false) -> void:
 		assert(is_maybe_null || has_item())
 		if _item != null:
 			_item.queue_free()
@@ -331,7 +361,7 @@ class Tile:
 
 
 	## Removes the item from the block and returns it, the caller has full ownership of the item.
-	func extract_item(is_maybe_null: bool = false) -> Item:
+	func extract_item(is_maybe_null := false) -> Item:
 		assert(is_maybe_null || has_item())
 		var my_item := _item
 		_item = null
@@ -349,6 +379,3 @@ class Tile:
 			var edge_pos := pos + (0.5*world.cell_width) * (Vector2i.ONE + Unit.dir_to_grid(_dir))
 			world.draw_circle(edge_pos, world.cell_width * 0.1, Color.WHITE)
 			
-
-
-

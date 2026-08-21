@@ -1,16 +1,13 @@
 class_name UNBin extends Unit
 
-@onready var sprite: Sprite2D = $Sprite2D
-
 
 ## Must be called after _ready
 func setup(world_: WorldPanel, gloc: Vector2i) -> void:
-	super.init(world_, TickType.ON_DEMAND, 1, 1, 0, gloc)
+	super.init(world_, TickType.ON_DEMAND, 1, gloc, Vector2.ONE)
 
-	sprite.apply_scale(world_.cell_width / 128 * Vector2.ONE)
-	sprite.translate(world_.cell_width * 0.5 * Vector2.ONE)
 
-	input_slots[0].grid_loc = grid_loc
+func build_tiles() -> void:
+	add_input(Vector2i.ZERO, Unit.Direction.WEST)
 
 
 func pend_new_commands() -> void:
