@@ -80,11 +80,19 @@ func _handle_default() -> void:
 func _handle_dest_tile() -> void:
 	var grid_to := get_grid_to()
 	var dest_tile := world.get_tile(grid_to)
-	if dest_tile.is_reserved():
-		# First iteration of this, there will be more later.
-		world._blocked_slide_cmds.push_back(self)
-		pause_this_tick() # Might be undone in the passes after.
-		return
+
+	var inv_dir := Unit.inv_dir(dir)
+	if (dest_tile.is_free() ||
+		dest_tile.is_io()    && inv_dir == dest_tile.get_alt_dir() ||
+		dest_tile.is_input() && inv_dir == dest_tile.get_dir()):
+		if dest_tile.is_reserved():
+			# First iteration of this, there will be more later.
+			world.blocked_slide_cmds.push_back(self)
+			pause_this_tick() # Might be undone in the passes after.
+			return
+	else: # Solid or output or input facing wrong direction
+		pause_this_tick()
+		return # Forever and ever stuck...
 
 	# Item must not have been stolen somehow!
 	assert(world.get_tile(grid_from).has_item())

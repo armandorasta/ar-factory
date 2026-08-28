@@ -11,7 +11,7 @@ func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, sequence: PackedI
 
 
 func build_tiles() -> void:
-	add_output(Vector2i.ZERO, Unit.Direction.EAST)
+	add_output(Vector2i.ZERO, dir)
 
 
 func pend_new_commands() -> void:

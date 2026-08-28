@@ -4,8 +4,6 @@ class_name UNDemander extends Unit
 
 var _seq: PackedInt32Array
 var _index: int = -1
-var _in_slider: UNSlider
-
 
 ## Must be called after _ready
 func setup(world_: WorldPanel, gloc: Vector2i, sequence: PackedInt32Array) -> void:
@@ -14,19 +12,12 @@ func setup(world_: WorldPanel, gloc: Vector2i, sequence: PackedInt32Array) -> vo
 
 	_update_text()
 
-	_in_slider = world_.get_unit(grid_loc + Unit.dir_to_grid(dir))
-	if !(_in_slider is UNSlider): # Only allow sliders
-		_in_slider = null
-
 
 func build_tiles() -> void:
-	add_input(Vector2i.ZERO, Unit.Direction.WEST)
+	add_input(Vector2i.ZERO, dir)
 
 
 func pend_new_commands() -> void:
-	if _in_slider == null: # No slider, no work ever
-		return
-
 	if _is_done_with_seq():
 		print("Done!!1!!")
 		return
@@ -36,15 +27,6 @@ func pend_new_commands() -> void:
 		return
 
 	pend_cmd(CmdDemand.new(world, grid_loc, _pop_next_value()))
-
-
-func set_dir(new_dir: Direction) -> void:
-	dir = new_dir
-	match dir:
-		Direction.EAST:  sprite.rotation = PI * 0.0
-		Direction.SOUTH: sprite.rotation = PI * 0.5
-		Direction.WEST:  sprite.rotation = PI * 1.0
-		Direction.NORTH: sprite.rotation = PI * 1.5
 
 
 func reset() -> void:

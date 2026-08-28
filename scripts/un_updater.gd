@@ -33,7 +33,7 @@ func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, update_type_: Upd
 
 
 func build_tiles() -> void:
-	add_io(Vector2i.ZERO, Unit.Direction.WEST)
+	add_io(Vector2i.ZERO, dir)
 
 
 func pend_new_commands() -> void:
@@ -46,12 +46,3 @@ func pend_new_commands() -> void:
 
 	pend_cmd(CmdUpdate.new(world, grid_loc, update_type))
 	pend_cmd(CmdSlide.new(world, grid_loc, dir))
-
-
-func set_dir(new_dir: Direction) -> void:
-	dir = new_dir
-	match dir:
-		Direction.EAST:  sprite.rotation = PI * 0.0
-		Direction.SOUTH: sprite.rotation = PI * 0.5
-		Direction.WEST:  sprite.rotation = PI * 1.0
-		Direction.NORTH: sprite.rotation = PI * 1.5

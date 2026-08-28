@@ -7,7 +7,7 @@ const UNUpdaterScene := preload("res://scenes/un_updater.tscn")
 const UNBinScene := preload("res://scenes/un_bin.tscn")
 const UNDemanderScene := preload("res://scenes/un_demander.tscn")
 
-var dims := Vector2i(5, 7)
+var dims := Vector2i(7, 5)
 var cell_width: float = 100.0
 
 ## Simulation
@@ -18,7 +18,7 @@ var tick_count: int = 0 # Number of ticks since the start.
 var _tick_millis: float
 var _units: Array[Unit] = []
 var _tiles: Array[Tile] = []
-var _blocked_slide_cmds: Array[CmdSlide] = []
+var blocked_slide_cmds: Array[CmdSlide] = []
 
 
 func get_tick_rate() -> float:
@@ -144,7 +144,7 @@ func clean_up() -> void:
 		tile.destroy_item(true)
 	
 	tick_count = 0
-	_blocked_slide_cmds.clear()
+	blocked_slide_cmds.clear()
 
 
 func _ready() -> void:
@@ -155,7 +155,7 @@ func _ready() -> void:
 	add_child(tick_timer)
 
 	for i in dims.x * dims.y:
-		_tiles.push_back(Tile.new())
+		_tiles.push_back(Tile.new(self))
 
 	_place_some_units()
 
@@ -164,31 +164,33 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2(), size), Color(0, 0.1, 0) if tick_count % 2 == 1 else Color(0, 0.11, 0))
 
 	for i in range(1, dims.x):
-		draw_line(Vector2(i * cell_width, 0), Vector2(i * cell_width, size.y), Color.CYAN)
+		draw_line(Vector2(i * cell_width, 0), Vector2(i * cell_width, size.y), Color(0, 0.18, 0))
 
 	for i in range(1, dims.y):
-		draw_line(Vector2(0, i * cell_width), Vector2(size.x, i * cell_width), Color.RED)
+		draw_line(Vector2(0, i * cell_width), Vector2(size.x, i * cell_width), Color(0, 0.15, 0))
 
 	for y in dims.y:
 		for x in dims.x:
 			var tile_gloc := Vector2i(x, y)
 			get_tile(tile_gloc).draw_self_on_world(self, grid_to_pos(tile_gloc))
-			
+	
+	for unit in _units:
+		draw_rect(Rect2(grid_to_pos(unit.grid_loc), cell_width*unit.dims), Color.BEIGE, false, -2.0)
 
 
 func _place_some_units() -> void:
 	_place_supplier(Vector2i(0, 3), Unit.Direction.EAST, 1, [1, 2, 3])
-	_place_supplier(Vector2i(1, 4), Unit.Direction.NORTH, 1, [1, 2, 3])
 	_place_slider(Vector2i(1, 3), Unit.Direction.EAST)
-	# _place_slider(Vector2i(2, 3), Unit.Direction.EAST)
 	_place_updater(Vector2i(2, 3), Unit.Direction.EAST, 1, UNUpdater.UpdateType.DOUBLE)
-	_place_slider(Vector2i(3, 3), Unit.Direction.NORTH)
-	_place_slider(Vector2i(3, 2), Unit.Direction.NORTH)
-	_place_slider(Vector2i(3, 1), Unit.Direction.WEST)
-	# _place_slider(Vector2i(2, 1), Unit.Direction.WEST)
-	_place_updater(Vector2i(2, 1), Unit.Direction.WEST, 1, UNUpdater.UpdateType.DOUBLE)
-	_place_slider(Vector2i(1, 1), Unit.Direction.WEST)
-	_place_demander(Vector2i(0, 1), Unit.Direction.EAST, [4, 8, 12])
+	_units.back().set_dir(Unit.Direction.NORTH)
+	_units.back().get_tile(Vector2i.ZERO).set_alt_dir(Unit.Direction.WEST)
+	_place_demander(Vector2i(2, 2), Unit.Direction.SOUTH, [2, 4, 6])
+	# _place_slider(Vector2i(3, 3), Unit.Direction.NORTH)
+	# _place_slider(Vector2i(3, 2), Unit.Direction.NORTH)
+	# _place_slider(Vector2i(3, 1), Unit.Direction.WEST)
+	# # _place_slider(Vector2i(2, 1), Unit.Direction.WEST)
+	# _place_updater(Vector2i(2, 1), Unit.Direction.WEST, 1, UNUpdater.UpdateType.DOUBLE)
+	# _place_slider(Vector2i(1, 1), Unit.Direction.WEST)
 	
 
 func _place_supplier(loc: Vector2i, dir: Unit.Direction, rate: int, seq: Array[int]) -> void:
@@ -238,15 +240,15 @@ func _handle_slide_cmd_overlapping() -> void:
 	# repeat until a full pass happens with no updates.
 	while 1 + 1 == 2:
 		var dirty_index := -1
-		for i in _blocked_slide_cmds.size():
-			if _blocked_slide_cmds[i].is_updated_this_pass():
+		for i in blocked_slide_cmds.size():
+			if blocked_slide_cmds[i].is_updated_this_pass():
 				dirty_index = i
 				break
 		if dirty_index == -1: # None has updated? it's over.
 			break
 		# Something moved? can only move once per tick so bye-bye.
-		_blocked_slide_cmds.pop_at(dirty_index)
-	_blocked_slide_cmds.clear()
+		blocked_slide_cmds.pop_at(dirty_index)
+	blocked_slide_cmds.clear()
 
 
 class Tile:
@@ -254,32 +256,31 @@ class Tile:
 		FREE     = 0x0, # Anything allowed in from any direction.
 		INPUT    = 0x1, # Item allowed if it's going into the input direction.
 		OUTPUT   = 0x2, # Items are generated from this block, demanders can only be connected to outputs
-		SOLID    = 0x8, # No items allowed EVER.
+		SOLID    = 0x4, # No items allowed EVER.
 		
 		IO       = 0x1 | 0x2, # Both input and output
 	}
 
-	## Does not matter for free tiles.
-	var color: Color = Color.BLACK
+	var _world: WorldPanel
 
 	var _type: TileType = TileType.FREE
 	var _item: Item = null
 	
 	# Only matters for inputs and outputs.
 	# Inputs face where they take in items, outputs face where they push out items.
-	# For io tiles, this is the direction of the input.
+	# For io tiles, this is the direction of the output.
 	var _dir: Unit.Direction = Unit.Direction.EAST
 
 	# Only matters for io tiles
-	# Used for the direction of the output.
+	# Used for the direction of the input.
 	var _alt_dir: Unit.Direction = Unit.Direction.EAST
 	
 	## The makes the tile inaccessible to items even if it's empty.
 	var _is_reserved: bool = false
 
 
-	func _init() -> void:
-		pass
+	func _init(world_: WorldPanel) -> void:
+		self._world = world_
 
 
 	func get_dir() -> Unit.Direction:
@@ -317,15 +318,31 @@ class Tile:
 		return _item
 
 
-	func make_free()   -> void: _type = TileType.FREE	
-	func make_solid()  -> void: _type = TileType.SOLID
-	func make_input()  -> void:	_type = TileType.INPUT
-	func make_output() -> void: _type = TileType.OUTPUT
+	func make_free() -> void:
+		_type = TileType.FREE
+		_world.queue_redraw()
+
+
+	func make_solid() -> void:
+		_type = TileType.SOLID
+		_world.queue_redraw()
+
+
+	func make_input() -> void:
+		_type = TileType.INPUT
+		_world.queue_redraw()
+
+
+	func make_output() -> void: 
+		_type = TileType.OUTPUT
+		_world.queue_redraw()
+
 	
 	## Also sets `alt_dir` to the oppsite of the current direction.
 	func make_io() -> void:
 		_type = TileType.IO
 		set_dir(_dir, true)
+		_world.queue_redraw()
 
 
 	## Cannot set to `alt_dir` if it's an io tile.
@@ -335,16 +352,18 @@ class Tile:
 		_dir = new_dir
 		if is_set_alt_to_inv:
 			_alt_dir = Unit.inv_dir(new_dir)
+		_world.queue_redraw()
 
 
 	func set_alt_dir(new_dir: Unit.Direction) -> void:
 		assert(_type == TileType.IO)
 		assert(new_dir != _dir)
 		_alt_dir = new_dir
+		_world.queue_redraw()
 
 
 	func set_item(new_item: Item, is_override := false) -> void:
-		assert(is_free() || is_input())
+		assert(!is_solid())
 		assert(is_override || !has_item())
 		destroy_item(true)
 
@@ -374,8 +393,28 @@ class Tile:
 
 	
 	func draw_self_on_world(world: WorldPanel, pos: Vector2) -> void:
-		world.draw_rect(Rect2(pos, Vector2.ONE * world.cell_width), color)
-		if is_input() || is_output():
-			var edge_pos := pos + (0.5*world.cell_width) * (Vector2i.ONE + Unit.dir_to_grid(_dir))
-			world.draw_circle(edge_pos, world.cell_width * 0.1, Color.WHITE)
+		world.draw_rect(Rect2(pos, Vector2.ONE * world.cell_width), _type_to_col())
+		if is_output():
+			var edge_pos := (pos
+				+ (0.5*world.cell_width) * Vector2.ONE
+				+ (0.4*world.cell_width) * Unit.dir_to_grid(_dir))
+			world.draw_circle(edge_pos, world.cell_width * 0.1, Color.BLACK)
+			world.draw_circle(edge_pos, world.cell_width * 0.1, Color.GREEN, false)
+		
+		if is_input():
+			var my_dir := _dir if !is_output() else _alt_dir
+			var edge_pos := (pos
+				+ (0.5*world.cell_width) * Vector2.ONE
+				+ (0.4*world.cell_width) * Unit.dir_to_grid(my_dir))
+			world.draw_circle(edge_pos, world.cell_width * 0.1, Color.BLACK)
+			world.draw_circle(edge_pos, world.cell_width * 0.1, Color.RED, false)
 			
+
+	func _type_to_col() -> Color:
+		match _type:
+			TileType.FREE  : return Color.TRANSPARENT
+			TileType.INPUT : return Color.RED
+			TileType.OUTPUT: return Color.GREEN
+			TileType.SOLID : return Color.DARK_GRAY
+			TileType.IO    : return Color.YELLOW
+		return Color.BLACK

@@ -18,7 +18,7 @@ func on_tick() -> void:
 		return
 
 	# The item should be able to move, this means it did not move this tick, which means we are not
-	# send an item into oblivion mid-animation.
+	# sending an item into oblivion mid-animation.
 	assert(!my_tile.get_item().cant_move_this_tick)
 
 	var it_val := my_tile.get_item().get_value()
