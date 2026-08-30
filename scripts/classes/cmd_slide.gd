@@ -13,12 +13,17 @@ var tracked_item: Item
 var _state_machine: StateMachine = StateMachine.new(_handle_default)
 
 
+static func from_output(world_: WorldPanel, output: WorldPanel.Tile) -> CmdSlide:
+	assert(output.is_output())
+	return CmdSlide.new(world_, output.get_grid_loc(), output.get_dir())
+
+
 func _init(world_: WorldPanel, from: Vector2i, dir_: Unit.Direction) -> void:
 	super(world_, 2)
 	self.grid_from = from
 	self.dir = dir_
 
-	assert(world_.is_within_bounds(grid_from))
+	assert(world_.is_within(grid_from))
 
 
 func do_per_frame(_dt: float) -> void:
@@ -58,7 +63,7 @@ func is_awaiting_anim() -> bool:
 
 
 func get_grid_to() -> Vector2i:
-	return grid_from + Unit.dir_to_grid(dir)
+	return grid_from + Unit.Direction_to_grid(dir)
 
 
 func _handle_default() -> void:
@@ -79,12 +84,12 @@ func _handle_default() -> void:
 
 func _handle_dest_tile() -> void:
 	var grid_to := get_grid_to()
+	if !world.has_tile(grid_to): # Items are not allowed to be scattered in the wild
+		pause_this_tick() # Forever and ever
+		return
+	
 	var dest_tile := world.get_tile(grid_to)
-
-	var inv_dir := Unit.inv_dir(dir)
-	if (dest_tile.is_free() ||
-		dest_tile.is_io()    && inv_dir == dest_tile.get_alt_dir() ||
-		dest_tile.is_input() && inv_dir == dest_tile.get_dir()):
+	if dest_tile.can_enter_in_dir(dir):
 		if dest_tile.is_reserved():
 			# First iteration of this, there will be more later.
 			world.blocked_slide_cmds.push_back(self)

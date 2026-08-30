@@ -1,6 +1,6 @@
 @abstract class_name Unit extends Node2D
 
-## `inv_dir` relys on the order of these.
+## `Direction_inv` relys on the order of these.
 enum Direction {
 	NORTH = 0, 
 	EAST  = 1,
@@ -22,7 +22,7 @@ var rate: int
 var world: WorldPanel
 var input_slots: Array[InputSlot] = []
 var output_slots: Array[OutputSlot] = []
-var tiles: Array[WorldPanel.Tile] = []
+# var tiles: Array[WorldPanel.Tile] = []
 var dims: Vector2i
 
 ## Keeps track of the `rate` every tick.
@@ -32,7 +32,7 @@ var _count: int = 0
 var _pending_cmds: Array[Command] = []
 
 
-static func dir_to_grid(my_dir: Direction) -> Vector2i:
+static func Direction_to_grid(my_dir: Direction) -> Vector2i:
 	match my_dir:
 		Direction.NORTH: return Vector2i(0, -1)
 		Direction.SOUTH: return Vector2i(0, +1)
@@ -41,11 +41,11 @@ static func dir_to_grid(my_dir: Direction) -> Vector2i:
 	return -INF * Vector2i()
 
 
-static func inv_dir(my_dir: Direction) -> Direction:
+static func Direction_inv(my_dir: Direction) -> Direction:
 	return 3 - my_dir as Direction
 
 
-static func rotate_dir_90(my_dir: Direction) -> Direction:
+static func Direction_rotate90(my_dir: Direction) -> Direction:
 	match my_dir:
 		Direction.NORTH: return Direction.EAST
 		Direction.SOUTH: return Direction.WEST
@@ -54,7 +54,7 @@ static func rotate_dir_90(my_dir: Direction) -> Direction:
 	return Direction.EAST
 
 
-static func rotate_dir_neg_90(my_dir: Direction) -> Direction:
+static func Direction_rotate270(my_dir: Direction) -> Direction:
 	match my_dir:
 		Direction.NORTH: return Direction.WEST
 		Direction.SOUTH: return Direction.EAST
@@ -83,9 +83,10 @@ func init(world_: WorldPanel, tick_type_: TickType, work_rate: int, gloc: Vector
 	assert(0 < dims_.y && dims_.y + gloc.y < world.dims.y)
 	for y in dims_.y:
 		for x in dims_.x:
-			var my_tile := world.get_tile(gloc + Vector2i(x, y))
+			var my_loc := gloc + Vector2i(x, y)
+			assert(!world.has_tile(my_loc))
+			var my_tile := world.add_tile(my_loc)
 			my_tile.make_solid()
-			tiles.push_back(my_tile)
 	
 	build_tiles()
 	assert(!input_slots.is_empty() || !output_slots.is_empty())
@@ -135,17 +136,45 @@ func is_just_awaiting_out_sliding_anim() -> bool:
 
 
 func set_dir(new_dir: Direction) -> void:
-	dir = new_dir
-	assert(tiles.size() == 1)
-	get_tile(Vector2i.ZERO).set_dir(new_dir, true)
-	# match dir:
-	# 	Direction.EAST:  sprite.rotation = PI * 0.0
-	# 	Direction.SOUTH: sprite.rotation = PI * 0.5
-	# 	Direction.WEST:  sprite.rotation = PI * 1.0
-	# 	Direction.NORTH: sprite.rotation = PI * 1.5
+	while dir != new_dir:
+		rotate_90()
 
 
-func add_input(gloc: Vector2i, dir_: Unit.Direction) -> void:
+func rotate_90() -> void:	
+	# All asserts
+	if dims.x > dims.y:
+		for y in range(dims.y, dims.x):
+			for x in dims.y:
+				assert(!world.has_tile(grid_loc + Vector2i(x, y)))
+	elif dims.y > dims.x:
+		for y in dims.x:
+			for x in range(dims.x, dims.y):
+				assert(!world.has_tile(grid_loc + Vector2i(x, y)))
+
+	# Collect all the tiles and remove them from the world.
+	var all_tiles: Array[WorldPanel.Tile] = []
+	for y in dims.y:
+		for x in dims.x:
+			all_tiles.push_back(world.extract_tile(grid_loc + Vector2i(x, y)))
+
+	# (new.x, new.y) = (max_y - old.y, old.x)
+	var max_y := dims.y - 1
+	for i in all_tiles.size():
+		var my_tile := all_tiles[i]
+		if !my_tile.is_solid():
+			my_tile.rotate90()
+		
+		var x := i % dims.x
+		var y := i / dims.x
+		var dest_gloc := grid_loc + Vector2i(max_y - y, x)
+		world.install_tile(my_tile, dest_gloc)
+
+	dims = Vector2i(dims.y, dims.x)
+	dir = Unit.Direction_rotate90(dir)
+
+
+## Returns the tile adjusted.
+func add_input(gloc: Vector2i, dir_: Unit.Direction) -> WorldPanel.Tile:
 	assert(is_within(grid_loc + gloc))
 	assert(!input_slots.any(func(x): return x.grid_loc == gloc))
 	assert(!output_slots.any(func(x): return x.grid_loc == gloc))
@@ -153,15 +182,17 @@ func add_input(gloc: Vector2i, dir_: Unit.Direction) -> void:
 	var my_tile := get_tile(gloc)
 	assert(my_tile.is_solid())
 
-	var adj_loc := gloc + Unit.dir_to_grid(dir_)
+	var adj_loc := gloc + Unit.Direction_to_grid(dir_)
 	assert(!is_within(grid_loc + adj_loc))
 
 	my_tile.make_input()
 	my_tile.set_dir(dir_)
-	input_slots.push_back(InputSlot.new(self, gloc))
+	input_slots.push_back(InputSlot.new(my_tile))
+	return my_tile
 
 
-func add_output(gloc: Vector2i, dir_: Unit.Direction) -> void:
+## Returns the tile adjusted.
+func add_output(gloc: Vector2i, dir_: Unit.Direction) -> WorldPanel.Tile:
 	assert(is_within(grid_loc + gloc))
 	assert(!input_slots.any(func(x): return x.grid_loc == gloc))
 	assert(!output_slots.any(func(x): return x.grid_loc == gloc))
@@ -169,17 +200,19 @@ func add_output(gloc: Vector2i, dir_: Unit.Direction) -> void:
 	var my_tile := get_tile(gloc)
 	assert(my_tile.is_solid())
 
-	var adj_loc := gloc + Unit.dir_to_grid(dir_)
+	var adj_loc := gloc + Unit.Direction_to_grid(dir_)
 	assert(!is_within(grid_loc + adj_loc))
 
 	my_tile.make_output()
 	my_tile.set_dir(dir_)
-	output_slots.push_back(OutputSlot.new(self, gloc))
+	output_slots.push_back(OutputSlot.new(my_tile))
+	return my_tile
 
 
+## Returns the tile adjusted.
 ## The direction is for the input not output, the output is gonna be automatically set to the 
 ## reverse direction.
-func add_io(gloc: Vector2i, dir_: Unit.Direction) -> void:
+func add_io(gloc: Vector2i, dir_: Unit.Direction) -> WorldPanel.Tile:
 	assert(is_within(grid_loc + gloc))
 	assert(!input_slots.any(func(x): return x.grid_loc == gloc))
 	assert(!output_slots.any(func(x): return x.grid_loc == gloc))
@@ -187,16 +220,17 @@ func add_io(gloc: Vector2i, dir_: Unit.Direction) -> void:
 	var my_tile := get_tile(gloc)
 	assert(my_tile.is_solid())
 
-	var adj_loc1 := gloc + Unit.dir_to_grid(dir_)
+	var adj_loc1 := gloc + Unit.Direction_to_grid(dir_)
 	assert(!is_within(grid_loc + adj_loc1))
 	
-	var adj_loc2 := gloc + Unit.dir_to_grid(Unit.inv_dir(dir_))
+	var adj_loc2 := gloc + Unit.Direction_to_grid(Unit.Direction_inv(dir_))
 	assert(!is_within(grid_loc + adj_loc2))
 
 	my_tile.make_io()
 	my_tile.set_dir(dir_, true)
-	input_slots.push_back(InputSlot.new(self, gloc))
-	output_slots.push_back(OutputSlot.new(self, gloc))
+	input_slots.push_back(InputSlot.new(my_tile))
+	output_slots.push_back(OutputSlot.new(my_tile))
+	return my_tile
 
 
 ## This HAS to be called before `pend_new_commands`, because it increments the tick counter.
@@ -261,34 +295,31 @@ func reset() -> void:
 
 
 class Slot:
-	var grid_loc: Vector2i
-	var _parent: Unit
+	var _tile: WorldPanel.Tile
 
-
-	func _init(parent: Unit, gloc: Vector2i) -> void:
-		self._parent = parent
-		self.grid_loc = gloc
+	func _init(tile_: WorldPanel.Tile) -> void:
+		self._tile = tile_
 
 
 	func has_item() -> bool:
-		return _parent.get_tile(grid_loc).has_item()
+		return _tile.has_item()
 
 
 	func extract_item(is_maybe_null: bool) -> Item:
-		return _parent.get_tile(grid_loc).extract_item(is_maybe_null)
+		return _tile.extract_item(is_maybe_null)
 
 
 	func destroy_item(is_maybe_null: bool) -> void:
-		return _parent.get_tile(grid_loc).destroy_item(is_maybe_null)
+		return _tile.destroy_item(is_maybe_null)
 
 
 class InputSlot extends Slot:
-	func _init(parent: Unit, gloc: Vector2i) -> void:
-		super(parent, gloc)
-		assert(parent.get_tile(gloc).is_input())
+	func _init(tile_: WorldPanel.Tile) -> void:
+		super(tile_)
+		assert(tile_.is_input())
 
 
 class OutputSlot extends Slot:
-	func _init(parent: Unit, gloc: Vector2i) -> void:
-		super(parent, gloc)
-		assert(parent.get_tile(gloc).is_output())
+	func _init(tile_: WorldPanel.Tile) -> void:
+		super(tile_)
+		assert(tile_.is_output())

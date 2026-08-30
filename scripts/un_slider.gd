@@ -7,10 +7,9 @@ func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int) -> void:
 
 
 func build_tiles() -> void:
-	add_io(Vector2i.ZERO, Unit.inv_dir(dir))
+	add_io(Vector2i.ZERO, dir)
 
 
-## Same as `UNSupplier` except no spawning, and no `CmdMove` if no item.
 func pend_new_commands() -> void:
 	if !is_work_tick():
 		return
