@@ -7,7 +7,7 @@ var output_tile: WorldPanel.Tile
 
 
 ## Must be called after _ready
-func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, sequence: PackedInt32Array) -> void:
+func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, sequence: Array[int]) -> void:
 	super.init(world_, TickType.STEADY, work_rate, gloc, Vector2i(2, 3))
 	self._seq = sequence
 

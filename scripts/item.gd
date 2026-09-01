@@ -31,6 +31,7 @@ func setup(world_: WorldPanel, gloc: Vector2i, val: int) -> void:
 func get_value() -> int:
 	return _value
 
+
 func set_value(new_val: int) -> void:
 	# assert(MIN_VALUE <= new_val && new_val <= MAX_VALUE)
 	_value = clampi(new_val, MIN_VALUE, MAX_VALUE)
@@ -39,3 +40,8 @@ func set_value(new_val: int) -> void:
 
 func sync_pos_with_grid() -> void:
 	position = world.grid_to_pos(grid_loc)
+
+
+## Not mid sliding animation or something.
+func is_stationary() -> bool:
+	return !cant_move_this_tick

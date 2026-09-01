@@ -283,9 +283,10 @@ func _draw() -> void:
 func _place_some_units() -> void:
 	_place_supplier(Vector2i(0, 5), Unit.Direction.EAST, 1, [1, 2, 3])
 	_place_slider(Vector2i(2, 6), Unit.Direction.EAST)
+	# _place_demander(Vector2i(2, 6), Unit.Direction.WEST, [1, 2, 3])
 	
 	_place_supplier(Vector2i(4, 5), Unit.Direction.SOUTH, 1, [1, 2, 3])
-	_place_slider(Vector2i(5, 7), Unit.Direction.EAST)
+	_place_slider(Vector2i(5, 7), Unit.Direction.NORTH)
 	
 	_place_supplier(Vector2i(9, 5), Unit.Direction.WEST, 1, [1, 2, 3])
 	_place_slider(Vector2i(8, 6), Unit.Direction.EAST)
@@ -367,11 +368,12 @@ func _handle_slide_cmd_overlapping() -> void:
 class Tile:
 	enum TileType {
 		FREE     = 0x0, # Anything allowed in from any direction.
-		INPUT    = 0x1, # Item allowed if it's going into the input direction.
-		OUTPUT   = 0x2, # Items are generated from this block, demanders can only be connected to outputs
-		SOLID    = 0x4, # No items allowed EVER.
+		INPUT    = 0x1, # Items are allowed to slide in, but not out.
+		OUTPUT   = 0x2, # Items are allowed to slide out, but not in.
+		SOLID    = 0x4, # Just in the way.
 		
 		IO       = 0x1 | 0x2, # Both input and output
+		SLIDER   = 0x1 | 0x2 | 0x8, # Items are allowed in from 3 directions, out from the 4th.
 	}
 
 	var _world: WorldPanel
@@ -422,7 +424,10 @@ class Tile:
 
 	func is_free()        -> bool: return _type == TileType.FREE
 	func is_solid()       -> bool: return _type == TileType.SOLID
+	func is_slider()      -> bool: return _type == TileType.SLIDER
+	
 	func is_io()          -> bool: return _type == TileType.IO
+	func is_io_only()     -> bool: return _type == TileType.IO
 	
 
 	## IO tiles will return true

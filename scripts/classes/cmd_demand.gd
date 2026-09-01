@@ -1,4 +1,6 @@
 class_name CmdDemand extends Command
+## Same as `CmdAwait`, but checks the value and removes the item if the value matches, otherwise
+## supposed to fail the design.
 
 var grid_loc: Vector2i
 
@@ -13,13 +15,9 @@ func _init(world_: WorldPanel, gloc: Vector2i, required_val: int) -> void:
 
 func on_tick() -> void:
 	var my_tile := world.get_tile(grid_loc)
-	if !my_tile.has_item() || my_tile.get_item().cant_move_this_tick:
+	if !my_tile.has_item() || !my_tile.get_item().is_stationary():
 		pause_this_tick()
 		return
-
-	# The item should be able to move, this means it did not move this tick, which means we are not
-	# sending an item into oblivion mid-animation.
-	assert(!my_tile.get_item().cant_move_this_tick)
 
 	var it_val := my_tile.get_item().get_value()
 	if it_val == value:

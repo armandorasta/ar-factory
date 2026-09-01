@@ -32,35 +32,44 @@ var _count: int = 0
 var _pending_cmds: Array[Command] = []
 
 
+static func Direction_is_valid(my_dir: Direction) -> bool:
+	return 0 <= my_dir && my_dir <= 3
+
+
 static func Direction_to_grid(my_dir: Direction) -> Vector2i:
+	assert(Direction_is_valid(my_dir))
 	match my_dir:
-		Direction.NORTH: return Vector2i(0, -1)
-		Direction.SOUTH: return Vector2i(0, +1)
-		Direction.EAST : return Vector2i(+1, 0)
-		Direction.WEST : return Vector2i(-1, 0)
-	return -INF * Vector2i()
+		Direction.NORTH  : return Vector2i(0, -1)
+		Direction.SOUTH  : return Vector2i(0, +1)
+		Direction.EAST   : return Vector2i(+1, 0)
+		Direction.WEST, _: return Vector2i(-1, 0)
 
 
 static func Direction_inv(my_dir: Direction) -> Direction:
-	return 3 - my_dir as Direction
+	assert(Direction_is_valid(my_dir))
+	match my_dir:
+		Direction.NORTH  : return Direction.SOUTH
+		Direction.SOUTH  : return Direction.NORTH
+		Direction.EAST   : return Direction.WEST
+		Direction.WEST, _: return Direction.EAST
 
 
 static func Direction_rotate90(my_dir: Direction) -> Direction:
+	assert(Direction_is_valid(my_dir))
 	match my_dir:
-		Direction.NORTH: return Direction.EAST
-		Direction.SOUTH: return Direction.WEST
-		Direction.EAST : return Direction.SOUTH
-		Direction.WEST : return Direction.NORTH
-	return Direction.EAST
+		Direction.NORTH  : return Direction.EAST
+		Direction.SOUTH  : return Direction.WEST
+		Direction.EAST   : return Direction.SOUTH
+		Direction.WEST, _: return Direction.NORTH
 
 
 static func Direction_rotate270(my_dir: Direction) -> Direction:
+	assert(Direction_is_valid(my_dir))
 	match my_dir:
-		Direction.NORTH: return Direction.WEST
-		Direction.SOUTH: return Direction.EAST
-		Direction.EAST : return Direction.NORTH
-		Direction.WEST : return Direction.SOUTH
-	return Direction.EAST
+		Direction.NORTH  : return Direction.WEST
+		Direction.SOUTH  : return Direction.EAST
+		Direction.EAST   : return Direction.NORTH
+		Direction.WEST, _: return Direction.SOUTH
 
 
 func init(world_: WorldPanel, tick_type_: TickType, work_rate: int, gloc: Vector2i, 
@@ -79,8 +88,7 @@ func init(world_: WorldPanel, tick_type_: TickType, work_rate: int, gloc: Vector
 	# sprite.apply_scale((world_.cell_width/128.0) * dims_)
 	# sprite.translate(world_.cell_width * 0.5 * Vector2.ONE)
 	
-	assert(0 < dims_.x && dims_.x + gloc.x < world.dims.x)
-	assert(0 < dims_.y && dims_.y + gloc.y < world.dims.y)
+	assert(Rect2i(Vector2i.ZERO, world.dims - gloc).has_point(dims))
 	for y in dims_.y:
 		for x in dims_.x:
 			var my_loc := gloc + Vector2i(x, y)
@@ -97,7 +105,17 @@ func init(world_: WorldPanel, tick_type_: TickType, work_rate: int, gloc: Vector
 ## where the inputs and outputs are and their directions.
 ## The tiles should be built as if the unit is facing east.
 @abstract func build_tiles() -> void
+
+
+## Used to add commands to the queue using `pend_cmd`.
+## Checks like `is_work_tick`, `has_pending_cmds` and `is_is_just_awaiting_out_sliding_anim` are
+## used quite often here.
 @abstract func pend_new_commands() -> void
+
+
+## Called everytime on the tick pending commands queue size goes to zero
+func on_finishing_all_pending_cmds() -> void:
+	pass
 
 
 func has_tile(gloc: Vector2i) -> bool:
@@ -113,10 +131,15 @@ func is_within(gloc: Vector2i) -> bool:
 	return Rect2(grid_loc, dims).has_point(gloc)
 
 
+## Returns true if the machine is expected to operate during this tick, `rate` determines how often
+## this function returns true, ex. when `rate` is 1, it returns true every single tick.
 func is_work_tick() -> bool:
 	return _count > 0 && _count % rate == 0
 
 
+## Returns true if the command queue still has commands to be executed. You usually pend all the 
+## commands you want executed at once when the queue is empty, then wait until the whole sequence
+## is executed.
 func has_pending_cmds() -> bool:
 	return !_pending_cmds.is_empty()
 
@@ -235,11 +258,14 @@ func add_io(gloc: Vector2i, dir_: Unit.Direction) -> WorldPanel.Tile:
 
 ## This HAS to be called before `pend_new_commands`, because it increments the tick counter.
 func preprocess_tick() -> void:
-	for cmd in _pending_cmds:
-		cmd.count_this_tick()
-	
-	# `is_done` depends on the loop just above.
-	_pending_cmds = _pending_cmds.filter(func(x: Command): return !x.is_done())
+	if !_pending_cmds.is_empty():
+		for cmd in _pending_cmds:
+			cmd.count_this_tick()
+		
+		# `is_done` depends on the loop just above.
+		_pending_cmds = _pending_cmds.filter(func(x: Command): return !x.is_done())
+		if _pending_cmds.is_empty():
+			on_finishing_all_pending_cmds()
 	
 	match tick_type:
 		TickType.STEADY:    
@@ -275,6 +301,9 @@ func check_for_item(slot_index: int) -> bool:
 	return slot.is_full()
 
 
+## Adds a command to the queue, when this function is called outside of `pend_new_cmds` the 
+## behaviour is undefined.
+## I wanted to add a flag and stuff, but meh...
 func pend_cmd(cmd: Command) -> void:
 	_pending_cmds.push_back(cmd)
 
