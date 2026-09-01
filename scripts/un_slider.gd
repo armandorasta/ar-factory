@@ -7,7 +7,7 @@ func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int) -> void:
 
 
 func build_tiles() -> void:
-	add_io(Vector2i.ZERO, dir)
+	add_slider(Vector2i.ZERO, dir)
 
 
 func pend_new_commands() -> void:

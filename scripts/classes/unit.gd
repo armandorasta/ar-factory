@@ -93,8 +93,7 @@ func init(world_: WorldPanel, tick_type_: TickType, work_rate: int, gloc: Vector
 		for x in dims_.x:
 			var my_loc := gloc + Vector2i(x, y)
 			assert(!world.has_tile(my_loc))
-			var my_tile := world.add_tile(my_loc)
-			my_tile.make_solid()
+			world.install_tile(WorldPanel.TlSolid.new(world, my_loc))
 	
 	build_tiles()
 	assert(!input_slots.is_empty() || !output_slots.is_empty())
@@ -184,50 +183,63 @@ func rotate_90() -> void:
 	var max_y := dims.y - 1
 	for i in all_tiles.size():
 		var my_tile := all_tiles[i]
-		if !my_tile.is_solid():
-			my_tile.rotate90()
+		my_tile.rotate90()
 		
 		var x := i % dims.x
 		var y := i / dims.x
-		var dest_gloc := grid_loc + Vector2i(max_y - y, x)
-		world.install_tile(my_tile, dest_gloc)
+		my_tile.set_grid_loc(grid_loc + Vector2i(max_y - y, x))
+		world.install_tile(my_tile)
 
 	dims = Vector2i(dims.y, dims.x)
 	dir = Unit.Direction_rotate90(dir)
 
 
 ## Returns the tile adjusted.
-func add_input(gloc: Vector2i, dir_: Unit.Direction) -> WorldPanel.Tile:
-	assert(is_within(grid_loc + gloc))
-	assert(!input_slots.any(func(x): return x.grid_loc == gloc))
-	assert(!output_slots.any(func(x): return x.grid_loc == gloc))
-
-	var my_tile := get_tile(gloc)
-	assert(my_tile.is_solid())
-
-	var adj_loc := gloc + Unit.Direction_to_grid(dir_)
-	assert(!is_within(grid_loc + adj_loc))
-
-	my_tile.make_input()
-	my_tile.set_dir(dir_)
-	input_slots.push_back(InputSlot.new(my_tile))
-	return my_tile
+func add_input(in_gloc: Vector2i, dir_: Unit.Direction) -> WorldPanel.TlInput:
+	assert(is_within(grid_loc + in_gloc))
+	assert(!input_slots.any(func(x): return x.grid_loc == in_gloc))
+	assert(!output_slots.any(func(x): return x.grid_loc == in_gloc))
+	assert(get_tile(in_gloc) is WorldPanel.TlSolid)
+	# Inputs must be facing out of the unit	
+	assert(!is_within(grid_loc + in_gloc + Unit.Direction_to_grid(dir_)))
+	
+	var new_tile := WorldPanel.TlInput.new(world, self.grid_loc + in_gloc, dir_)
+	world.override_tile(new_tile)
+	input_slots.push_back(InputSlot.new(new_tile))
+	return new_tile
 
 
 ## Returns the tile adjusted.
-func add_output(gloc: Vector2i, dir_: Unit.Direction) -> WorldPanel.Tile:
-	assert(is_within(grid_loc + gloc))
-	assert(!input_slots.any(func(x): return x.grid_loc == gloc))
-	assert(!output_slots.any(func(x): return x.grid_loc == gloc))
+func add_output(out_gloc: Vector2i, dir_: Unit.Direction) -> WorldPanel.TlOutput:
+	assert(is_within(grid_loc + out_gloc))
+	assert(!input_slots.any(func(x): return x.grid_loc == out_gloc))
+	assert(!output_slots.any(func(x): return x.grid_loc == out_gloc))
+	assert(get_tile(out_gloc) is WorldPanel.TlSolid)
+	# Output must be facing out of the unit	
+	assert(!is_within(grid_loc + out_gloc + Unit.Direction_to_grid(dir_)))
+	
+	var new_tile := WorldPanel.TlOutput.new(world, self.grid_loc + out_gloc, dir_)
+	world.override_tile(new_tile)
+	output_slots.push_back(OutputSlot.new(new_tile))
+	return new_tile
 
-	var my_tile := get_tile(gloc)
-	assert(my_tile.is_solid())
 
-	var adj_loc := gloc + Unit.Direction_to_grid(dir_)
-	assert(!is_within(grid_loc + adj_loc))
+## Returns the tile adjusted.
+## The direction is for the input not output, the output is gonna be automatically set to the 
+## reverse direction.
+func add_io(io_gloc: Vector2i, out_dir: Unit.Direction, in_dir: Unit.Direction) -> WorldPanel.Tile:
+	assert(is_within(grid_loc + io_gloc))
+	assert(!input_slots.any(func(x): return x.grid_loc == io_gloc))
+	assert(!output_slots.any(func(x): return x.grid_loc == io_gloc))
+	assert(get_tile(io_gloc) is WorldPanel.TlSolid)
+	# Both input and output should be facing out of the unit.
+	assert(!is_within(grid_loc + io_gloc + Unit.Direction_to_grid(out_dir)))
+	assert(!is_within(grid_loc + io_gloc + Unit.Direction_to_grid(in_dir)))
 
-	my_tile.make_output()
-	my_tile.set_dir(dir_)
+	var my_tile := WorldPanel.TlIO.new(world, self.grid_loc + io_gloc, out_dir, in_dir)
+	world.override_tile(my_tile)
+
+	input_slots.push_back(InputSlot.new(my_tile))
 	output_slots.push_back(OutputSlot.new(my_tile))
 	return my_tile
 
@@ -235,22 +247,20 @@ func add_output(gloc: Vector2i, dir_: Unit.Direction) -> WorldPanel.Tile:
 ## Returns the tile adjusted.
 ## The direction is for the input not output, the output is gonna be automatically set to the 
 ## reverse direction.
-func add_io(gloc: Vector2i, dir_: Unit.Direction) -> WorldPanel.Tile:
-	assert(is_within(grid_loc + gloc))
-	assert(!input_slots.any(func(x): return x.grid_loc == gloc))
-	assert(!output_slots.any(func(x): return x.grid_loc == gloc))
+func add_slider(sl_gloc: Vector2i, dir_: Unit.Direction) -> WorldPanel.Tile:
+	assert(is_within(grid_loc + sl_gloc))
+	assert(!input_slots.any(func(x): return x.grid_loc == sl_gloc))
+	assert(!output_slots.any(func(x): return x.grid_loc == sl_gloc))
+	assert(get_tile(sl_gloc) is WorldPanel.TlSolid)
+	# Both input and output should be facing out of the unit.
+	assert(!is_within(grid_loc + sl_gloc + Unit.Direction_to_grid(dir_)))
+	assert(!is_within(grid_loc + sl_gloc + Unit.Direction_to_grid(Unit.Direction_inv(dir_))))
+	assert(!is_within(grid_loc + sl_gloc + Unit.Direction_to_grid(Unit.Direction_rotate90(dir_))))
+	assert(!is_within(grid_loc + sl_gloc + Unit.Direction_to_grid(Unit.Direction_rotate270(dir_))))
 
-	var my_tile := get_tile(gloc)
-	assert(my_tile.is_solid())
+	var my_tile := WorldPanel.TlSlider.new(world, self.grid_loc + sl_gloc, dir_)
+	world.override_tile(my_tile)
 
-	var adj_loc1 := gloc + Unit.Direction_to_grid(dir_)
-	assert(!is_within(grid_loc + adj_loc1))
-	
-	var adj_loc2 := gloc + Unit.Direction_to_grid(Unit.Direction_inv(dir_))
-	assert(!is_within(grid_loc + adj_loc2))
-
-	my_tile.make_io()
-	my_tile.set_dir(dir_, true)
 	input_slots.push_back(InputSlot.new(my_tile))
 	output_slots.push_back(OutputSlot.new(my_tile))
 	return my_tile
@@ -343,12 +353,8 @@ class Slot:
 
 
 class InputSlot extends Slot:
-	func _init(tile_: WorldPanel.Tile) -> void:
-		super(tile_)
-		assert(tile_.is_input())
+	pass
 
 
 class OutputSlot extends Slot:
-	func _init(tile_: WorldPanel.Tile) -> void:
-		super(tile_)
-		assert(tile_.is_output())
+	pass

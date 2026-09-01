@@ -13,8 +13,7 @@ var tracked_item: Item
 var _state_machine: StateMachine = StateMachine.new(_handle_default)
 
 
-static func from_output(world_: WorldPanel, output: WorldPanel.Tile) -> CmdSlide:
-	assert(output.is_output())
+static func from_output(world_: WorldPanel, output: WorldPanel.TlOutput) -> CmdSlide:
 	return CmdSlide.new(world_, output.get_grid_loc(), output.get_dir())
 
 
@@ -68,7 +67,7 @@ func get_grid_to() -> Vector2i:
 
 func _handle_default() -> void:
 	assert(tracked_item == null)
-	var src_tile := world.get_tile(grid_from)
+	var src_tile := world.get_tile(grid_from) as WorldPanel.TlHolder
 	if !src_tile.has_item():
 		pause_this_tick()
 		return

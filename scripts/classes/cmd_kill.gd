@@ -9,7 +9,7 @@ func _init(world_: WorldPanel, gloc: Vector2i) -> void:
 
 
 func on_tick() -> void:
-	var my_tile := world.get_tile(grid_loc)
+	var my_tile := world.get_tile(grid_loc) as WorldPanel.TlHolder
 	if !my_tile.has_item():
 		pause_this_tick()
 		return

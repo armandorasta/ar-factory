@@ -33,7 +33,7 @@ func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, update_type_: Upd
 
 
 func build_tiles() -> void:
-	add_io(Vector2i.ZERO, dir)
+	add_io(Vector2i.ZERO, dir, Unit.Direction_inv(dir))
 
 
 func pend_new_commands() -> void:
