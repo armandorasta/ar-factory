@@ -33,7 +33,7 @@ func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, update_type_: Upd
 
 
 func build_tiles() -> void:
-	add_io(Vector2i.ZERO, dir, Unit.Direction_inv(dir))
+	add_io(Vector2i.ZERO, _dir, Unit.Direction_inv(_dir))
 
 
 func pend_new_commands() -> void:
@@ -44,5 +44,5 @@ func pend_new_commands() -> void:
 		pause_this_tick()
 		return
 
-	pend_cmd(CmdUpdate.new(world, grid_loc, update_type))
-	pend_cmd(CmdSlide.new(world, grid_loc, dir))
+	pend_cmd(CmdUpdate.new(world, grid_loc, func(x): return apply(update_type, x)))
+	pend_cmd(CmdSlide.new(world, grid_loc, _dir))

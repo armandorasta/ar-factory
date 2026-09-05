@@ -1,0 +1,65 @@
+[gd_scene format=3 uid="uid://dhhto25kxu7ou"]
+
+[ext_resource type="Script" uid="uid://d0768tkbs2yui" path="res://scripts/main_menu.gd" id="1_l6cm7"]
+
+[node name="MainMenu" type="Control" unique_id=2126389932]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_l6cm7")
+
+[node name="HBoxContainer" type="HBoxContainer" parent="." unique_id=391960947]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="HBoxContainer" unique_id=1110064999]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 50
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 50
+
+[node name="Panel" type="Panel" parent="HBoxContainer/MarginContainer" unique_id=1214172096]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+
+[node name="CenterContainer" type="CenterContainer" parent="HBoxContainer/MarginContainer/Panel" unique_id=191765929]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="HBoxContainer/MarginContainer/Panel/CenterContainer" unique_id=1452986684]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="EditButt" type="Button" parent="HBoxContainer/MarginContainer/Panel/CenterContainer/VBoxContainer" unique_id=1076828998]
+custom_minimum_size = Vector2(250, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "EDIT
+"
+
+[node name="PlayButt" type="Button" parent="HBoxContainer/MarginContainer/Panel/CenterContainer/VBoxContainer" unique_id=570972533]
+custom_minimum_size = Vector2(250, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "PLAY"
+
+[node name="Label" type="Label" parent="HBoxContainer" unique_id=611763287]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.64360553, 0.40755206, 1)
+theme_override_font_sizes/font_size = 80
+text = "arFactory"
+horizontal_alignment = 1
+vertical_alignment = 1

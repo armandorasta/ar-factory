@@ -5,13 +5,14 @@ class_name CmdAwait extends Command
 var grid_loc: Vector2i
 
 
-func _init(world_: WorldPanel, gloc: Vector2i) -> void:
-	super(world_, 1)
+func _init(gloc: Vector2i) -> void:
+	super(1)
 	self.grid_loc = gloc
 
 
-func on_tick() -> void:
-	var my_tile := world.get_tile(grid_loc) as WorldPanel.TlHolder
+func on_tick(lv: Level) -> void:
+	assert(lv.world.get_tile(grid_loc) is WorldPanel.TlHolder)
+	var my_tile := lv.world.get_tile(grid_loc) as WorldPanel.TlHolder
 	if !my_tile.has_item() || !my_tile.get_item().is_stationary():
 		pause_this_tick()
 		return

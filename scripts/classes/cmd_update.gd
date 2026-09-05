@@ -3,21 +3,22 @@ class_name CmdUpdate extends Command
 const ItemScene := preload("res://scenes/item.tscn")
 
 var grid_loc: Vector2i
-var update_type: UNUpdater.UpdateType
+var callable: Callable
 
 
-func _init(world_: WorldPanel, gloc: Vector2i, up_t: UNUpdater.UpdateType) -> void:
-	super(world_, 0)
+## `what_to_do` the old value and returns the new value to be assigned to the item.
+func _init(gloc: Vector2i, what_to_do: Callable) -> void:
+	super(0)
 	self.grid_loc = gloc
-	self.update_type = up_t
+	self.callable = what_to_do
 
 
-func on_tick() -> void:
-	var my_tile := world.get_tile(grid_loc) as WorldPanel.TlHolder
+func on_tick(lv: Level) -> void:
+	assert(lv.world.get_tile(grid_loc) is WorldPanel.TlHolder)
+	var my_tile := lv.world.get_tile(grid_loc) as WorldPanel.TlHolder
 	if !my_tile.has_item():
 		pause_this_tick()
 		return
 	
 	var it := my_tile.get_item()
-	var updated_value := UNUpdater.apply(update_type, it.get_value())
-	it.set_value(updated_value)
+	it.set_value(callable.call(it.get_value()))

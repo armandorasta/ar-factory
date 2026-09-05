@@ -17,9 +17,9 @@ func set_state(next_state_callable: Callable) -> void:
 
 
 ## Same as `set_state(something);` `call_next_state()`
-func set_state_and_call(next_state_callable: Callable) -> void:
+func set_state_and_call(next_state_callable: Callable, args = null) -> void:
 	set_state(next_state_callable)
-	call_next_state()
+	call_next_state(args)
 
 
 ## Returns the callable to be called by `call_next_state`.
@@ -36,8 +36,8 @@ func set_default_state(next_state_callable: Callable) -> void:
 	_default_callable = next_state_callable
 
 
-func call_next_state():
-	return _next_callable.call()
+func call_next_state(args = null):
+	return _next_callable.call(args)
 
 
 func is_in_default_state() -> bool:

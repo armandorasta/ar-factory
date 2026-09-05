@@ -14,7 +14,7 @@ func setup(world_: WorldPanel, gloc: Vector2i, sequence: PackedInt32Array) -> vo
 
 
 func build_tiles() -> void:
-	add_input(Vector2i.ZERO, dir)
+	add_input(Vector2i.ZERO, _dir)
 
 
 func pend_new_commands() -> void:

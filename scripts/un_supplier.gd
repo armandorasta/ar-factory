@@ -13,7 +13,7 @@ func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, sequence: Array[i
 
 
 func build_tiles() -> void:
-	output_tile = add_output(Vector2i(1, 1), dir)
+	output_tile = add_output(Vector2i(1, 1), _dir)
 
 
 func pend_new_commands() -> void:

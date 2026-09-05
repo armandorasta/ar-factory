@@ -6,33 +6,25 @@ const UNSupplierScene := preload("res://scenes/un_supplier.tscn")
 const UNUpdaterScene := preload("res://scenes/un_updater.tscn")
 const UNBinScene := preload("res://scenes/un_bin.tscn")
 const UNDemanderScene := preload("res://scenes/un_demander.tscn")
+const UNCombinerScene := preload("res://scenes/un_combiner.tscn")
+const UNClonerScene := preload("res://scenes/un_cloner.tscn")
 
 var debug_font: Font = load("res://resources/fonts/AnonymousPro-Regular.ttf")
 
-var dims := Vector2i(20, 15)
+var dims := Vector2i(15, 10)
 var cell_width: float = 100.0
 
-## Simulation
-var default_tick_millis: float = 300.0
-var tick_timer: Timer
-var tick_count: int = 0 # Number of ticks since the start.
-
-var _tick_millis: float
 var _units: Array[Unit] = []
 var _tiles: Array[Tile] = []
 var blocked_slide_cmds: Array[CmdSlide] = []
 
 
-func get_tick_rate() -> float:
-	return 1000.0 / _tick_millis
-
-
 func has_tile(gloc: Vector2i) -> bool:
-	return _tiles[gloc.y * dims.x + gloc.x] != null
+	return is_within(gloc) && _tiles[grid_to_index(gloc)] != null
 
 
 func get_tile(gloc: Vector2i) -> Tile:
-	return _tiles[gloc.y * dims.x + gloc.x]
+	return null if !is_within(gloc) else _tiles[grid_to_index(gloc)]
 
 
 func get_unit(gloc: Vector2i) -> Unit:
@@ -40,10 +32,6 @@ func get_unit(gloc: Vector2i) -> Unit:
 		if u.has_tile(gloc):
 			return u
 	return null
-
-
-func get_tick_elapsed_millis() -> float:
-	return _tick_millis - tick_timer.time_left*1000
 
 
 func is_within(gloc: Vector2i) -> bool:
@@ -58,13 +46,13 @@ func grid_to_pos(gloc: Vector2i) -> Vector2:
 func pos_to_grid(pos: Vector2) -> Vector2i:
 	return Vector2i(pos / cell_width)
 
-## Does not account for whether the tile is reserved or not.
-func item_can_be_in(gloc: Vector2i) -> bool:
-	if is_within(gloc): 
-		return true
-	if get_tile(gloc).is_free(): 
-		return true
-	return false
+
+func grid_to_index(gloc: Vector2i) -> int:
+	return gloc.y * dims.x + gloc.x
+
+
+func index_to_grid(i: int) -> Vector2i:
+	return Vector2i(i % dims.x, i / dims.x)
 
 
 func item_can_slide(item_g_loc: Vector2i, item_dir: Unit.Direction) -> bool:
@@ -72,45 +60,49 @@ func item_can_slide(item_g_loc: Vector2i, item_dir: Unit.Direction) -> bool:
 	return !dest_tile.is_reserved() && !dest_tile.has_wall(Unit.Direction_inv(item_dir))
 
 
-func install_tile(tile: Tile) -> Tile:
-	var gloc := tile.get_grid_loc()
-	assert(is_within(gloc))
-	assert(!has_tile(gloc))
-	
-	_tiles[gloc.y * dims.x + gloc.x] = tile
+## Adds the passed tile to the world, the tile has to be within boundaries!
+## `is_override` can be used to override an existing tile in the same location, the old tile will be
+## sent to oblivion and not returned.
+func install_tile(tile: Tile, is_override := false) -> Tile:
+	var tile_gloc := tile.get_grid_loc()
+	assert(is_within(tile_gloc))
+	assert(is_override || !has_tile(tile_gloc))
+
+	remove_tile(tile_gloc, !is_override)
+	_tiles[grid_to_index(tile_gloc)] = tile
+	tile.needs_redraw.connect(_on_tile_needs_redraw)
 	return tile
 
 
 ## Removes the tile from the world, and destroys items within it
 func remove_tile(gloc: Vector2i, is_maybe_null := false) -> void:
-	assert(is_maybe_null || has_tile(gloc))
 	assert(is_within(gloc))
+	assert(is_maybe_null || has_tile(gloc))
 
 	if !has_tile(gloc):
 		return
 
-	var i := gloc.y * dims.x + gloc.x
+	var i := grid_to_index(gloc)
 	if _tiles[i] is TlHolder:
 		_tiles[i].destroy_item(true)
 	_tiles[i] = null
 
 
+## Returns the moved tile.
 ## Moves the tile from one location to another, along with the items it contains.
-func move_tile(gfrom: Vector2i, gto: Vector2i, is_maybe_null := false) -> Tile:
+## Same as `extract_tile` followed by `install_tile`.
+func move_tile(gfrom: Vector2i, gto: Vector2i, is_maybe_null := false, is_override := false) -> Tile:
 	assert(is_maybe_null || has_tile(gfrom))
-	assert(gfrom == gto || !has_tile(gto))
+	assert(is_override || gfrom == gto || !has_tile(gto))
 	assert(is_within(gfrom))
 	assert(is_within(gto))
 	
 	if gfrom == gto: # Moving something nowhere?
 		return
 	
-	var isrc  := gfrom.y * dims.x + gfrom.x
-	var idest := gto.y   * dims.x + gto.x
-	var my_tile := _tiles[isrc]
-	_tiles[isrc] = null
+	var my_tile := extract_tile(gfrom, is_maybe_null)
 	my_tile.set_grid_loc_unchecked(gto)
-	_tiles[idest] = my_tile
+	install_tile(my_tile, is_override)
 	return my_tile
 
 
@@ -119,20 +111,11 @@ func extract_tile(gloc: Vector2i, is_maybe_null := false) -> Tile:
 	assert(is_maybe_null || has_tile(gloc))
 	assert(is_within(gloc))
 
-	var i := gloc.y * dims.x + gloc.x
+	var i := grid_to_index(gloc)
 	var my_tile := _tiles[i]
 	_tiles[i] = null
+	my_tile.needs_redraw.disconnect(_on_tile_needs_redraw)
 	return my_tile
-
-
-## Replaces the tile in the location of the tile passed in with it. Same as `remove_tile` followed
-## by `install_tile`.
-## `is_maybe_null` means the old tile might be null, the one passed in can't be null!
-func override_tile(tile: Tile, is_maybe_null := false) -> void:
-	var gloc := tile.get_grid_loc()
-	assert(is_maybe_null || has_tile(gloc))
-	remove_tile(gloc, is_maybe_null)
-	install_tile(tile)
 
 
 ## Swaps two tiles, or one tile with itself.
@@ -143,41 +126,25 @@ func swap_tiles(gloc1: Vector2i, gloc2: Vector2i, is_maybe_null := false) -> voi
 	
 	if gloc1 == gloc2:
 		return
-	
-	var i1 := gloc1.y * dims.x + gloc1.x
-	var i2 := gloc2.y * dims.x + gloc2.x
 
-	# Swapping 2 nulls? we aint swapping nothin'
-	if _tiles[i1] == null && _tiles[i2] == null:
-		return
-	
-	if _tiles[i1] == null:
-		move_tile(gloc2, gloc1)
-		return
-	
-	if _tiles[i2] == null:
-		move_tile(gloc1, gloc2)
-		return
-	
-	# Swaps the grid_locs
-	var loc1 := _tiles[i1].get_grid_loc()
-	_tiles[i1].set_grid_loc_unchecked(_tiles[i2].get_grid_loc())
-	_tiles[i2].set_grid_loc_unchecked(loc1)
-	
-	# Swap the locations on the array
-	var temp_tile := _tiles[i1]
-	_tiles[i1] = _tiles[i2]
-	_tiles[i2] = temp_tile
+	var tl1 := extract_tile(gloc1, is_maybe_null)
+	var tl2 := extract_tile(gloc2, is_maybe_null)
+	if tl1 != null: 
+		tl1.set_grid_loc_unchecked(gloc2)
+		install_tile(tl1)
+	if tl2 != null: 
+		tl2.set_grid_loc_unchecked(gloc1)
+		install_tile(tl2)
 
 
 ## Returns the item just added.
-func add_item(gloc: Vector2i, value: int) -> Item:
+func spawn_item(gloc: Vector2i, value: int) -> Item:
 	var my_tile := get_tile(gloc)
 	assert(!my_tile.is_reserved()) # Might have to change this to `has_item`, but who knows.
 	var new_item := ItemScene.instantiate()
 	add_child(new_item)
 	new_item.setup(self, gloc, value)
-	my_tile.set_item(new_item)
+	my_tile.set_item_unchecked(new_item)
 	return new_item
 
 
@@ -187,7 +154,7 @@ func clone_item(g_from: Vector2i, g_to: Vector2i, is_maybe_null: bool = false,
 ) -> Item:
 	assert(is_maybe_null || get_tile(g_from).has_item())
 	assert(is_override || !get_tile(g_to).has_item())
-	return add_item(g_to, get_tile(g_from).get_item().value)
+	return spawn_item(g_to, get_tile(g_from).get_item().get_value())
 
 
 ## Returns the teleported item.
@@ -198,7 +165,7 @@ func teleport_item(g_from: Vector2i, g_to: Vector2i, is_maybe_null: bool = false
 	var dest_tile := get_tile(g_to)
 	assert(is_maybe_null || src_tile.has_item())
 	assert(is_override || !dest_tile.has_item())
-	dest_tile.set_item(src_tile.extract_item())
+	dest_tile.set_item_unchecked(src_tile.extract_item())
 	return dest_tile.get_item()
 
 
@@ -225,17 +192,6 @@ func on_tick() -> void:
 		u.handle_cmd_tick()
 
 	_handle_slide_cmd_overlapping() # Overlap slide commands
-	
-	tick_count += 1
-	queue_redraw()
-
-
-func set_tick_rate(rate_per_second: float) -> void:
-	_tick_millis = 1000.0 / rate_per_second
-
-
-func reset_tick_rate() -> void:
-	_tick_millis = default_tick_millis
 
 
 func clean_up() -> void:
@@ -246,16 +202,11 @@ func clean_up() -> void:
 		if tile is TlHolder:
 			tile.destroy_item(true)
 	
-	tick_count = 0
 	blocked_slide_cmds.clear()
 
 
 func _ready() -> void:
 	size = cell_width * dims
-
-	tick_timer = Timer.new()
-	tick_timer.one_shot = true
-	add_child(tick_timer)
 
 	for i in dims.x * dims.y:
 		_tiles.push_back(null)
@@ -264,7 +215,7 @@ func _ready() -> void:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2(), size), Color(0, 0.1, 0) if tick_count % 2 == 1 else Color(0, 0.11, 0))
+	draw_rect(Rect2(Vector2(), size), Color(0, 0.1, 0))
 
 	for i in range(1, dims.x):
 		draw_line(Vector2(i * cell_width, 0), Vector2(i * cell_width, size.y), Color(0, 0.18, 0))
@@ -279,21 +230,36 @@ func _draw() -> void:
 				get_tile(tile_gloc).debug_draw(self)
 	
 	for unit in _units:
-		draw_rect(Rect2(grid_to_pos(unit.grid_loc), cell_width*unit.dims), Color.BLACK, false, -2.0)
+		draw_rect(Rect2(grid_to_pos(unit.grid_loc), cell_width*unit._dims), Color.BLACK, false, -2.0)
 		draw_string(debug_font, unit.position + Vector2(0.0, 15.0), unit.get_script().get_global_name(), HORIZONTAL_ALIGNMENT_LEFT, cell_width, 16, Color.BLACK)
 
 
 func _place_some_units() -> void:
 	_place_supplier(Vector2i(0, 5), Unit.Direction.SOUTH, 1, [1, 2, 3])
-	_place_slider(Vector2i(1, 7), Unit.Direction.SOUTH)
-	_place_slider(Vector2i(1, 8), Unit.Direction.EAST)
-	_place_slider(Vector2i(2, 8), Unit.Direction.NORTH)
-	_place_slider(Vector2i(2, 7), Unit.Direction.WEST)
-	# _place_supplier(Vector2i(0, 10), Unit.Direction.NORTH, 1, [1, 2, 3])
+	_place_slider(Vector2i(1, 7), Unit.Direction.EAST)
+	_place_slider(Vector2i(2, 7), Unit.Direction.EAST)
+	_place_slider(Vector2i(3, 7), Unit.Direction.EAST)
+	_place_cloner(Vector2i(4, 6), Unit.Direction.NORTH, 2)
+	_place_slider(Vector2i(4, 7), Unit.Direction.NORTH)
+	_place_slider(Vector2i(4, 5), Unit.Direction.NORTH)
+	_place_slider(Vector2i(4, 4), Unit.Direction.NORTH)
+	_place_slider(Vector2i(5, 5), Unit.Direction.NORTH)
+	_place_slider(Vector2i(5, 4), Unit.Direction.NORTH)
+	_place_combiner(Vector2i(4, 2), Unit.Direction.NORTH, 2, UNCombiner.Operation.ADD)
+	_place_slider(Vector2i(5, 1), Unit.Direction.EAST)
+	_place_slider(Vector2i(6, 1), Unit.Direction.EAST)
+	_place_demander(Vector2i(7, 1), Unit.Direction.WEST, [2, 4, 6])
+	# _place_supplier(Vector2i(0, 9), Unit.Direction.NORTH, 1, [1, 2, 3])
+	# _place_slider(Vector2i(1, 8), Unit.Direction.EAST)
 	# _place_slider(Vector2i(2, 8), Unit.Direction.EAST)
 	# _place_slider(Vector2i(3, 8), Unit.Direction.EAST)
 	# _place_slider(Vector2i(4, 8), Unit.Direction.EAST)
-	_place_demander(Vector2i(5, 8), Unit.Direction.WEST, [1, 2, 3])
+	# _place_slider(Vector2i(5, 8), Unit.Direction.NORTH)
+	# _place_slider(Vector2i(5, 7), Unit.Direction.NORTH)
+	# _place_combiner(Vector2i(4, 5), Unit.Direction.NORTH, 5, UNCombiner.Operation.DIV)
+	# _place_slider(Vector2i(5, 4), Unit.Direction.NORTH)
+	# _place_slider(Vector2i(5, 3), Unit.Direction.NORTH)
+	# _place_bin(Vector2i(9, 8))
 
 	_units.shuffle()
 	
@@ -308,44 +274,62 @@ func _place_some_units() -> void:
 	# _place_slider(Vector2i(1, 1), Unit.Direction.WEST)
 	
 
-func _place_supplier(loc: Vector2i, dir: Unit.Direction, rate: int, seq: Array[int]) -> void:
+func _place_supplier(gloc: Vector2i, dir: Unit.Direction, rate: int, seq: Array[int]) -> void:
 	var my_supp := UNSupplierScene.instantiate()
 	_units.push_back(my_supp)
 	add_child(my_supp)
-	my_supp.setup(self, loc, rate, seq)
+	my_supp.setup(self, gloc, rate, seq)
 	my_supp.set_dir(dir)
 
 
-func _place_slider(loc: Vector2i, dir: Unit.Direction) -> void:
+func _place_slider(gloc: Vector2i, dir: Unit.Direction) -> void:
 	var my_bus := UNSliderScene.instantiate()
 	_units.push_back(my_bus)
 	add_child(my_bus)
-	my_bus.setup(self, loc, 1)
+	my_bus.setup(self, gloc, 1)
 	my_bus.set_dir(dir)
 
 
-func _place_updater(loc: Vector2i, dir: Unit.Direction, rate: int, up_t: 
+func _place_updater(gloc: Vector2i, dir: Unit.Direction, rate: int, up_t: 
 	UNUpdater.UpdateType
 ) -> void:
 	var doub := UNUpdaterScene.instantiate()
 	_units.push_back(doub)
 	add_child(doub)
-	doub.setup(self, loc, rate, up_t)
+	doub.setup(self, gloc, rate, up_t)
 	doub.set_dir(dir)
 
 
-func _place_bin(loc: Vector2i) -> void:
+func _place_bin(gloc: Vector2i) -> void:
 	var bin := UNBinScene.instantiate()
 	_units.push_back(bin)
 	add_child(bin)
-	bin.setup(self, loc)
+	bin.setup(self, gloc)
 
-func _place_demander(loc: Vector2i, dir: Unit.Direction, seq: Array[int]) -> void:
+
+func _place_demander(gloc: Vector2i, dir: Unit.Direction, seq: Array[int]) -> void:
 	var dem := UNDemanderScene.instantiate()
 	_units.push_back(dem)
 	add_child(dem)
-	dem.setup(self, loc, seq)
+	dem.setup(self, gloc, seq)
 	dem.set_dir(dir)
+
+
+func _place_combiner(gloc: Vector2i, dir: Unit.Direction, rate: int, op: UNCombiner.Operation) -> void:
+	var comb := UNCombinerScene.instantiate()
+	_units.push_back(comb)
+	add_child(comb)
+	comb.setup(self, gloc, rate, op)
+	comb.set_dir(dir)
+
+
+func _place_cloner(gloc: Vector2i, dir: Unit.Direction, rate: int) -> void:
+	var cloner := UNClonerScene.instantiate()
+	_units.push_back(cloner)
+	add_child(cloner)
+	cloner.setup(self, gloc, rate)
+	cloner.set_dir(dir)
+
 
 
 ## Called after handling all ticks of pending commands
@@ -356,7 +340,7 @@ func _handle_slide_cmd_overlapping() -> void:
 	while 1 + 1 == 2:
 		var dirty_index := -1
 		for i in blocked_slide_cmds.size():
-			if blocked_slide_cmds[i].is_updated_this_pass():
+			if blocked_slide_cmds[i].is_updated_this_pass(self):
 				dirty_index = i
 				break
 		if dirty_index == -1: # None has updated? it's over.
@@ -366,38 +350,57 @@ func _handle_slide_cmd_overlapping() -> void:
 	blocked_slide_cmds.clear()
 
 
+## Silly little function... Needed because disconnection requires a reference to the callable, 
+## otherwise I would have to disconnect everything, which I feel might bite me in the butt later.
+func _on_tile_needs_redraw() -> void:
+	queue_redraw()
+
+
 #region Tile CLASSES
 
 @abstract class Tile:
 	const DEFAULT_DIR: Unit.Direction = Unit.Direction.EAST
 
-	var _world: WorldPanel
+	signal needs_redraw()
+
 	var _grid_loc: Vector2i
 
-	func _init(world_: WorldPanel, gloc: Vector2i) -> void:
-		self._world = world_
+	func _init(gloc: Vector2i) -> void:
 		self._grid_loc = gloc
 
 
-	## `movement_dir` is the direction of the movement, not the direction of the edge of the tile.
-	## If an item is sliding in from the west moving east, `Direction.EAST` should passed, not 
-	## `Direction.WEST`.
-	@abstract func can_enter_in_dir(_movement_dir: Unit.Direction) -> bool
+	#region TILE ABSTRACT
 
-	## Items are not allowed to slide into reserved tiles.
-	@abstract func is_reserved() -> bool
-	@abstract func set_reserved(to_what: bool) -> void
-	
+	## `movement_dir` is the direction of the movement, not the direction of the edge of the tile.
+	## If an item is sliding in from the west moving east, `movement_dir` will be `Direction.EAST`, 
+	## not `Direction.WEST`.
+	@abstract func can_item_enter_in_dir(item: Item, movement_dir: Unit.Direction) -> bool
+
+	@abstract func has_input_in_dir(dir: Unit.Direction) -> bool
+	@abstract func has_output_in_dir(dir: Unit.Direction) -> bool
+
 	## Used for debug drawing.
 	@abstract func type_to_col() -> Color
+
+	#endregion
+
+
+	#region SHORTHANDS
+	# Normally these would need you to down-cast, so instead they all return false or do nothing
+	# saving you a line or two.
+	
+	## Items are not allowed to slide into reserved tiles.
+	func is_reserved() -> bool: return true
+	func set_reserved(_to_what: bool) -> void: pass
 
 	## For `TlIO` this is an alias for `get_output_dir`.
 	func get_dir() -> Unit.Direction: 
 		return DEFAULT_DIR
 	
 	## For `TlIO` this is an alias for `set_output_dir`.
+	## This forces a redraw no matter what.
 	func set_dir(_new_dir: Unit.Direction) -> void: 
-		pass
+		needs_redraw.emit()
 	
 	## Rotates the unit 90 degrees clockwise. `rotate270` just calls this 3 times.
 	func rotate90() -> void:
@@ -410,33 +413,58 @@ func _handle_slide_cmd_overlapping() -> void:
 		rotate90()
 		rotate90()
 	
+	## Shorthand for `tile is WorldPanel.TlHolder && tile.has_item()`.
+	func has_item() -> bool: return false
+	
+	## Always returns null for tiles that are not `TlHolder`
+	func get_item() -> Item: return null
+
+	# No set_item of course, adding that would have caused so many disasters, god damn...
+
+	#endregion
+
+
+	#region TILE NORMAL
+	# These are never or rarely overriden by sub classes
 
 	func get_grid_loc() -> Vector2i:
 		return _grid_loc
 
 
-	## Use `WorldPanel.move_tile()` instead, this doesn't actually move the tile!
-	func set_grid_loc(gloc: Vector2i) -> void:
-		assert(!_world.has_tile(gloc))
-		set_grid_loc_unchecked(gloc)
-
-
-	## Use `WorldPanel.move_tile()` instead
+	## Use this if the tile is floating, otherwise use `WorldPanel.move_tile()` instead
 	func set_grid_loc_unchecked(gloc: Vector2i) -> void:
 		_grid_loc = gloc
 
 	
-	func debug_draw(world: WorldPanel) -> void:
-		var my_pos := world.grid_to_pos(_grid_loc)
-		world.draw_rect(Rect2(my_pos, Vector2.ONE * world.cell_width), type_to_col())
+	func debug_draw(world_: WorldPanel) -> void:
+		var my_pos := world_.grid_to_pos(_grid_loc)
+		world_.draw_rect(Rect2(my_pos, Vector2.ONE * world_.cell_width), type_to_col())
+		for d in Unit.Direction.LAST + 1:
+			var gdir := Unit.Direction_to_grid(d)
+			if !(has_output_in_dir(d) || has_input_in_dir(d)):
+				continue
+
+			var edge_pos := my_pos + world_.cell_width * (0.5 * Vector2.ONE + 0.4 * gdir)
+			var my_col := Color.DARK_RED if has_input_in_dir(d) else Color.DARK_GREEN
+			
+			var my_scale := 0.15
+			if has_input_in_dir(d) && !(
+				world_.has_tile(_grid_loc + gdir) &&
+				world_.get_tile(_grid_loc + gdir).has_output_in_dir(Unit.Direction_inv(d))
+			): # Unconnected input?
+				my_scale *= 0.5
+				my_col.a = 0.3
+
+			var w := world_.cell_width * my_scale
+			world_.draw_rect(Rect2(edge_pos - w*0.5 * Vector2.ONE, w*Vector2.ONE), my_col, false)
+			# world.draw_circle(edge_pos, world.cell_width * my_scale, my_col, false)
+
+	#endregion
 
 
 @abstract class TlHolder extends Tile:
 	var _item: Item = null
 	var _is_reserved: bool = false
-	
-	func _init(world_: WorldPanel, gloc: Vector2i) -> void:
-		super(world_, gloc)
 
 
 	func is_reserved() -> bool:
@@ -456,7 +484,9 @@ func _handle_slide_cmd_overlapping() -> void:
 		return _item
 	
 
-	func set_item(new_item: Item, is_override := false) -> void:
+	## Never use this directly! use `WorldPanel.spawn_item`
+	func set_item_unchecked(new_item: Item, is_override := false) -> void:
+		assert(new_item.get_parent() is WorldPanel)
 		assert(is_override || !has_item())
 		destroy_item(true)
 
@@ -482,22 +512,21 @@ func _handle_slide_cmd_overlapping() -> void:
 
 
 class TlSolid extends Tile:
-	func _init(world_: WorldPanel, gloc: Vector2i) -> void:
-		super(world_, gloc)
-
-
 	func is_reserved() -> bool:return true
 	func set_reserved(_to_what: bool) -> void: pass
 	func type_to_col() -> Color: return Color.DARK_GRAY
-	func can_enter_in_dir(_movement_dir: Unit.Direction) -> bool: return false
+	func can_item_enter_in_dir(_item: Item, _movement_dir: Unit.Direction) -> bool: return false
+	func has_input_in_dir(_dir: Unit.Direction) -> bool: return false
+	func has_output_in_dir(_dir: Unit.Direction) -> bool: return false
+
 	
 
 class TlInput extends TlHolder:
 	var _dir: Unit.Direction = Unit.Direction.EAST
 
 
-	func _init(world_: WorldPanel, gloc: Vector2i, dir_ := DEFAULT_DIR) -> void:
-		super(world_, gloc)
+	func _init(gloc: Vector2i, dir_ := DEFAULT_DIR) -> void:
+		super(gloc)
 		self._dir = dir_
 
 
@@ -511,29 +540,24 @@ class TlInput extends TlHolder:
 	
 	func set_dir(new_dir: Unit.Direction) -> void:
 		_dir = new_dir
-		_world.queue_redraw()
+		needs_redraw.emit()
 
 
-	func can_enter_in_dir(movement_dir: Unit.Direction) -> bool: 
+	func can_item_enter_in_dir(_it: Item, movement_dir: Unit.Direction) -> bool: 
 		return movement_dir == Unit.Direction_inv(_dir)
 
 	
-	func debug_draw(world: WorldPanel) -> void:
-		super(world)
-		var my_pos := world.grid_to_pos(_grid_loc)
-		var edge_pos := (my_pos
-			+ (0.5*world.cell_width) * Vector2.ONE
-			+ (0.4*world.cell_width) * Unit.Direction_to_grid(_dir))
-		# world.draw_circle(edge_pos, world.cell_width * 0.1, Color.BLACK)
-		world.draw_circle(edge_pos, world.cell_width * 0.1, Color.DARK_RED, false)
+	func has_output_in_dir(_d: Unit.Direction) -> bool: return false
+	func has_input_in_dir(dir_: Unit.Direction) -> bool:
+		return dir_ == self._dir
 		
 
 class TlOutput extends TlHolder:
 	var _dir: Unit.Direction = Unit.Direction.EAST
 
 
-	func _init(world_: WorldPanel, gloc: Vector2i, dir_ := DEFAULT_DIR) -> void:
-		super(world_, gloc)
+	func _init(gloc: Vector2i, dir_ := DEFAULT_DIR) -> void:
+		super(gloc)
 		self._dir = dir_
 
 
@@ -547,21 +571,16 @@ class TlOutput extends TlHolder:
 	
 	func set_dir(new_dir: Unit.Direction) -> void:
 		_dir = new_dir
-		_world.queue_redraw()
+		needs_redraw.emit()
 
 
-	func can_enter_in_dir(movement_dir: Unit.Direction) -> bool: 
+	func can_item_enter_in_dir(_it: Item, movement_dir: Unit.Direction) -> bool: 
 		return movement_dir == Unit.Direction_inv(_dir)
 
-	
-	func debug_draw(world: WorldPanel) -> void:
-		super(world)
-		var my_pos := world.grid_to_pos(_grid_loc)
-		var edge_pos := (my_pos
-			+ (0.5*world.cell_width) * Vector2.ONE
-			+ (0.4*world.cell_width) * Unit.Direction_to_grid(_dir))
-		# world.draw_circle(edge_pos, world.cell_width * 0.1, Color.BLACK)
-		world.draw_circle(edge_pos, world.cell_width * 0.1, Color.DARK_GREEN, false)
+
+	func has_input_in_dir(_d: Unit.Direction) -> bool: return false
+	func has_output_in_dir(dir_: Unit.Direction) -> bool:
+		return dir_ == self._dir
 
 
 class TlIO extends TlHolder:
@@ -569,8 +588,9 @@ class TlIO extends TlHolder:
 	var _input_dir: Unit.Direction
 
 
-	func _init(world_: WorldPanel, gloc: Vector2i, out_dir: Unit.Direction, in_dir: Unit.Direction) -> void:
-		super(world_, gloc)
+	func _init(gloc: Vector2i, out_dir: Unit.Direction, in_dir: Unit.Direction) -> void:
+		super(gloc)
+		assert(out_dir != in_dir)
 		self._output_dir = out_dir
 		self._input_dir = in_dir
 
@@ -594,10 +614,18 @@ class TlIO extends TlHolder:
 		_output_dir = Unit.Direction_rotate90(_output_dir)
 
 
-	func can_enter_in_dir(movement_dir: Unit.Direction) -> bool: 
+	func can_item_enter_in_dir(_it: Item, movement_dir: Unit.Direction) -> bool: 
 		return movement_dir == Unit.Direction_inv(_input_dir)
 
 	
+	func has_input_in_dir(dir_: Unit.Direction) -> bool:
+		return dir_ == _input_dir
+
+
+	func has_output_in_dir(dir_: Unit.Direction) -> bool:
+		return dir_ == _output_dir
+	
+
 	func get_output_dir() -> Unit.Direction:
 		return _output_dir
 	
@@ -611,36 +639,20 @@ class TlIO extends TlHolder:
 		_output_dir = new_dir
 		if is_set_in_to_inv:
 			_input_dir = Unit.Direction_inv(new_dir)
-		_world.queue_redraw()
+		needs_redraw.emit()
 
 
 	func set_input_dir(new_dir: Unit.Direction) -> void:
 		assert(new_dir != _output_dir)
 		_input_dir = new_dir
-		_world.queue_redraw()
-
-	
-	func debug_draw(world: WorldPanel) -> void:
-		super(world)
-		var my_pos := world.grid_to_pos(_grid_loc)
-		var out_edge_pos := (my_pos
-			+ (0.5*world.cell_width) * Vector2.ONE
-			+ (0.4*world.cell_width) * Unit.Direction_to_grid(_output_dir))
-		var in_edge_pos := (my_pos
-			+ (0.5*world.cell_width) * Vector2.ONE
-			+ (0.4*world.cell_width) * Unit.Direction_to_grid(_input_dir))
-
-		# world.draw_circle(out_edge_pos, world.cell_width * 0.1, Color.BLACK)
-		world.draw_circle(out_edge_pos, world.cell_width * 0.1, Color.DARK_GREEN, false)
-		# world.draw_circle(in_edge_pos, world.cell_width * 0.1, Color.BLACK)
-		world.draw_circle(in_edge_pos, world.cell_width * 0.1, Color.DARK_RED, false)
+		needs_redraw.emit()
 
 
 class TlSlider extends TlHolder:
 	var _dir: Unit.Direction
 
-	func _init(world_: WorldPanel, gloc: Vector2i, dir_: Unit.Direction) -> void:
-		super(world_, gloc)
+	func _init(gloc: Vector2i, dir_: Unit.Direction) -> void:
+		super(gloc)
 		self._dir = dir_
 	
 
@@ -650,22 +662,42 @@ class TlSlider extends TlHolder:
 	
 	func set_dir(new_dir: Unit.Direction) -> void:
 		_dir = new_dir
-		_world.queue_redraw()
+		needs_redraw.emit()
 
 
-	func can_enter_in_dir(movement_dir: Unit.Direction) -> bool:
+	func can_item_enter_in_dir(_it: Item, movement_dir: Unit.Direction) -> bool: 
 		return movement_dir != Unit.Direction_inv(_dir)
+
+
+	func has_input_in_dir(dir: Unit.Direction) -> bool:
+		return dir != self._dir
+
+	
+	func has_output_in_dir(dir: Unit.Direction) -> bool:
+		return dir == self._dir
 
 	
 	func type_to_col() -> Color:
 		return Color.LIGHT_PINK
 
 
-	func debug_draw(world: WorldPanel) -> void:
-		super(world)
-		var my_pos := world.grid_to_pos(_grid_loc)
-		var edge_pos := (my_pos
-			+ (0.5*world.cell_width) * Vector2.ONE
-			+ (0.4*world.cell_width) * Unit.Direction_to_grid(_dir))
-		# world.draw_circle(edge_pos, world.cell_width * 0.1, Color.BLACK)
-		world.draw_circle(edge_pos, world.cell_width * 0.1, Color.HOT_PINK, false)
+class TlBlackhole extends TlHolder:
+	func _init(gloc: Vector2i) -> void:
+		super(gloc)
+	
+
+	func can_item_enter_in_dir(_it: Item, _movement_dir: Unit.Direction) -> bool:
+		## Can enter from any direction
+		return true
+
+	
+	## All directions.
+	func has_input_in_dir(_dir: Unit.Direction) -> bool: return true
+	## No outputs.
+	func has_output_in_dir(_dir: Unit.Direction) -> bool: return false
+
+	
+	func type_to_col() -> Color:
+		return Color.BROWN
+
+#endregion

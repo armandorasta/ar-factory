@@ -7,7 +7,7 @@ func setup(world_: WorldPanel, gloc: Vector2i) -> void:
 
 
 func build_tiles() -> void:
-	add_input(Vector2i.ZERO, Unit.Direction.WEST)
+	add_blackhole(Vector2i.ZERO)
 
 
 func pend_new_commands() -> void:

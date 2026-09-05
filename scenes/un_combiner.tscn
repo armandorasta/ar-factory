@@ -1,6 +1,6 @@
-[gd_scene format=3 uid="uid://cuiklwu3pepi8"]
+[gd_scene format=3 uid="uid://11uh28tktvc1"]
 
-[ext_resource type="Script" uid="uid://db2aaanbfvp7x" path="res://scripts/un_updater.gd" id="1_f12t3"]
+[ext_resource type="Script" uid="uid://br5xvppq8hy1s" path="res://scripts/un_combiner.gd" id="1_m57tg"]
 
 [sub_resource type="Gradient" id="Gradient_t7ha2"]
 offsets = PackedFloat32Array(0)
@@ -11,8 +11,8 @@ gradient = SubResource("Gradient_t7ha2")
 width = 128
 height = 128
 
-[node name="Updater" type="Node2D" unique_id=2081016730]
-script = ExtResource("1_f12t3")
+[node name="Combiner" type="Node2D" unique_id=2081016730]
+script = ExtResource("1_m57tg")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=691290124]
 texture = SubResource("GradientTexture2D_4xhep")

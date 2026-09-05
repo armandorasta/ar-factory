@@ -6,15 +6,16 @@ var grid_loc: Vector2i
 var value: int
 
 
-func _init(world_: WorldPanel, gloc: Vector2i, val: int) -> void:
-	super(world_, 1)
+func _init(gloc: Vector2i, val: int) -> void:
+	super(0)
 	self.grid_loc = gloc
 	self.value = val
 
 
-func on_tick() -> void:
-	if world.get_tile(grid_loc).is_reserved():
+func on_tick(lv: Level) -> void:
+	assert(lv.world.get_tile(grid_loc) is WorldPanel.TlHolder)
+	if lv.world.get_tile(grid_loc).is_reserved():
 		pause_this_tick()
 		return
 	
-	world.add_item(grid_loc, value)
+	lv.world.spawn_item(grid_loc, value)

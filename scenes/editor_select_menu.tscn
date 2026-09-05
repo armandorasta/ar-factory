@@ -1,0 +1,61 @@
+[gd_scene format=3 uid="uid://k52jlmlygu0k"]
+
+[ext_resource type="Script" uid="uid://wm1ggb1grmm7" path="res://scripts/editor_select_menu.gd" id="1_1s3mw"]
+
+[node name="EditorSelectMenu" type="Control" unique_id=2126389932]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_1s3mw")
+
+[node name="Panel" type="Panel" parent="." unique_id=1214172096]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel" unique_id=1904969391]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="Panel/VBoxContainer" unique_id=754633976]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Panel/VBoxContainer/MarginContainer" unique_id=185914280]
+layout_mode = 2
+
+[node name="BackButt" type="Button" parent="Panel/VBoxContainer/MarginContainer/HBoxContainer" unique_id=72440621]
+custom_minimum_size = Vector2(100, 40)
+layout_mode = 2
+text = "BACK"
+
+[node name="AddButt" type="Button" parent="Panel/VBoxContainer/MarginContainer/HBoxContainer" unique_id=389860778]
+custom_minimum_size = Vector2(150, 40)
+layout_mode = 2
+text = "NEW LEVEL"
+
+[node name="MarginContainer2" type="MarginContainer" parent="Panel/VBoxContainer" unique_id=1389572271]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 6
+
+[node name="GridContainer" type="GridContainer" parent="Panel/VBoxContainer/MarginContainer2" unique_id=1781546434]
+layout_mode = 2
+size_flags_vertical = 3
