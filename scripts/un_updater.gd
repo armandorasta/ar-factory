@@ -23,8 +23,8 @@ static func apply(up_t: UpdateType, val: int) -> int:
 
 
 ## Must be called after _ready
-func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, update_type_: UpdateType) -> void:
-	super.init(world_, TickType.ON_DEMAND, work_rate, gloc, Vector2i.ONE)
+func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, init_dir: Direction, update_type_: UpdateType) -> void:
+	super.init(world_, TickType.ON_DEMAND, work_rate, gloc, Vector2i.ONE, init_dir)
 	self.update_type = update_type_
 	match update_type:
 		UpdateType.DOUBLE   : label.text = "2x"
@@ -44,5 +44,5 @@ func pend_new_commands() -> void:
 		pause_this_tick()
 		return
 
-	pend_cmd(CmdUpdate.new(world, grid_loc, func(x): return apply(update_type, x)))
-	pend_cmd(CmdSlide.new(world, grid_loc, _dir))
+	pend_cmd(CmdUpdate.new(grid_loc, func(x): return apply(update_type, x)))
+	pend_cmd(CmdSlide.new(grid_loc, _dir))

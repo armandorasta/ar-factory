@@ -3,7 +3,7 @@ class_name UNBin extends Unit
 
 ## Must be called after _ready
 func setup(world_: WorldPanel, gloc: Vector2i) -> void:
-	super.init(world_, TickType.ON_DEMAND, 1, gloc, Vector2.ONE)
+	super.init(world_, TickType.ON_DEMAND, 1, gloc, Vector2.ONE, Direction.EAST)
 
 
 func build_tiles() -> void:
@@ -18,4 +18,4 @@ func pend_new_commands() -> void:
 		pause_this_tick()
 		return
 	
-	pend_cmd(CmdKill.new(world, grid_loc))
+	pend_cmd(CmdKill.new(grid_loc))

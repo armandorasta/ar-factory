@@ -8,6 +8,7 @@ const UNBinScene := preload("res://scenes/un_bin.tscn")
 const UNDemanderScene := preload("res://scenes/un_demander.tscn")
 const UNCombinerScene := preload("res://scenes/un_combiner.tscn")
 const UNClonerScene := preload("res://scenes/un_cloner.tscn")
+const UNBranchScene := preload("res://scenes/un_branch.tscn")
 
 var debug_font: Font = load("res://resources/fonts/AnonymousPro-Regular.ttf")
 
@@ -70,7 +71,7 @@ func install_tile(tile: Tile, is_override := false) -> Tile:
 
 	remove_tile(tile_gloc, !is_override)
 	_tiles[grid_to_index(tile_gloc)] = tile
-	tile.needs_redraw.connect(_on_tile_needs_redraw)
+	tile.needs_redraw.connect(_On_tile_needs_redraw)
 	return tile
 
 
@@ -114,7 +115,7 @@ func extract_tile(gloc: Vector2i, is_maybe_null := false) -> Tile:
 	var i := grid_to_index(gloc)
 	var my_tile := _tiles[i]
 	_tiles[i] = null
-	my_tile.needs_redraw.disconnect(_on_tile_needs_redraw)
+	my_tile.needs_redraw.disconnect(_On_tile_needs_redraw)
 	return my_tile
 
 
@@ -161,26 +162,26 @@ func clone_item(g_from: Vector2i, g_to: Vector2i, is_maybe_null: bool = false,
 func teleport_item(g_from: Vector2i, g_to: Vector2i, is_maybe_null: bool = false, 
 	is_override: bool = false
 ) -> Item:
-	var src_tile := get_tile(g_from)
+	assert(is_maybe_null || get_tile(g_from).has_item())
+	assert(g_from == g_to || is_override || !get_tile(g_to).has_item())
 	var dest_tile := get_tile(g_to)
-	assert(is_maybe_null || src_tile.has_item())
-	assert(is_override || !dest_tile.has_item())
-	dest_tile.set_item_unchecked(src_tile.extract_item())
+	dest_tile.set_item_unchecked(get_tile(g_from).extract_item())
 	return dest_tile.get_item()
 
 
-func do_per_frame(dt: float) -> void:
+func do_per_frame(dt: float, lv: Level) -> void:
 	for u in _units:
-		u.do_per_frame(dt)
+		u.do_per_frame(dt, lv)
 
 
-func on_tick() -> void:
+func on_tick(lv: Level) -> void:
+	assert(lv.world == self)
 	for tile in _tiles:
-		if tile is TlHolder:
-			var holder := tile as TlHolder
-			if holder.has_item():
-				tile.get_item().cant_move_this_tick = false
+		if tile != null && tile.has_item():
+			tile.get_item().reset_movement_flag()
 
+	# THIS LOOP HAS TO HAPPEN BEFORE PENDING NEW COMMANDS!
+	# Otherwise commands with 0 or 1 ticks will just get skipped.
 	for u in _units: # Preprocess all units first
 		u.preprocess_tick()
 
@@ -189,9 +190,9 @@ func on_tick() -> void:
 		u.pend_new_commands()
 
 	for u in _units: # Process commands
-		u.handle_cmd_tick()
+		u.handle_cmd_tick(lv)
 
-	_handle_slide_cmd_overlapping() # Overlap slide commands
+	_Handle_slide_cmd_overlapping() # Overlap slide commands
 
 
 func clean_up() -> void:
@@ -211,7 +212,7 @@ func _ready() -> void:
 	for i in dims.x * dims.y:
 		_tiles.push_back(null)
 
-	_place_some_units()
+	_Place_some_units()
 
 
 func _draw() -> void:
@@ -234,113 +235,95 @@ func _draw() -> void:
 		draw_string(debug_font, unit.position + Vector2(0.0, 15.0), unit.get_script().get_global_name(), HORIZONTAL_ALIGNMENT_LEFT, cell_width, 16, Color.BLACK)
 
 
-func _place_some_units() -> void:
-	_place_supplier(Vector2i(0, 5), Unit.Direction.SOUTH, 1, [1, 2, 3])
-	_place_slider(Vector2i(1, 7), Unit.Direction.EAST)
-	_place_slider(Vector2i(2, 7), Unit.Direction.EAST)
-	_place_slider(Vector2i(3, 7), Unit.Direction.EAST)
-	_place_cloner(Vector2i(4, 6), Unit.Direction.NORTH, 2)
-	_place_slider(Vector2i(4, 7), Unit.Direction.NORTH)
-	_place_slider(Vector2i(4, 5), Unit.Direction.NORTH)
-	_place_slider(Vector2i(4, 4), Unit.Direction.NORTH)
-	_place_slider(Vector2i(5, 5), Unit.Direction.NORTH)
-	_place_slider(Vector2i(5, 4), Unit.Direction.NORTH)
-	_place_combiner(Vector2i(4, 2), Unit.Direction.NORTH, 2, UNCombiner.Operation.ADD)
-	_place_slider(Vector2i(5, 1), Unit.Direction.EAST)
-	_place_slider(Vector2i(6, 1), Unit.Direction.EAST)
-	_place_demander(Vector2i(7, 1), Unit.Direction.WEST, [2, 4, 6])
-	# _place_supplier(Vector2i(0, 9), Unit.Direction.NORTH, 1, [1, 2, 3])
-	# _place_slider(Vector2i(1, 8), Unit.Direction.EAST)
-	# _place_slider(Vector2i(2, 8), Unit.Direction.EAST)
-	# _place_slider(Vector2i(3, 8), Unit.Direction.EAST)
-	# _place_slider(Vector2i(4, 8), Unit.Direction.EAST)
-	# _place_slider(Vector2i(5, 8), Unit.Direction.NORTH)
-	# _place_slider(Vector2i(5, 7), Unit.Direction.NORTH)
-	# _place_combiner(Vector2i(4, 5), Unit.Direction.NORTH, 5, UNCombiner.Operation.DIV)
-	# _place_slider(Vector2i(5, 4), Unit.Direction.NORTH)
-	# _place_slider(Vector2i(5, 3), Unit.Direction.NORTH)
-	# _place_bin(Vector2i(9, 8))
+func _Place_some_units() -> void:
+	_Place_supplier(Vector2i(0, 6), Unit.Direction.EAST, 1, [1, 2, 3, 4, 5, 6])
+	_Place_slider(Vector2i(2, 7), Unit.Direction.EAST)
+	_Place_slider(Vector2i(3, 7), Unit.Direction.EAST)
+	_Place_branch(Vector2i(4, 7), Unit.Direction.EAST, 2, 5)
+	_Place_bin(Vector2i(5, 8))
+	_Place_slider(Vector2i(5, 7), Unit.Direction.EAST)
+	_Place_slider(Vector2i(6, 7), Unit.Direction.EAST)
+	_Place_slider(Vector2i(7, 7), Unit.Direction.EAST)
+	_Place_slider(Vector2i(8, 7), Unit.Direction.EAST)
+	_Place_demander(Vector2i(9, 7), Unit.Direction.EAST, [5, 6])
+	# _Place_cloner(Vector2i(4, 7), Unit.Direction.EAST, 2)
+	# _Place_slider(Vector2i(5, 7), Unit.Direction.EAST)
+	# _Place_slider(Vector2i(5, 8), Unit.Direction.EAST)
+	# _Place_combiner(Vector2i(6, 7), Unit.Direction.EAST, 2, UNCombiner.Operation.ADD)
+	# _Place_slider(Vector2i(8, 8), Unit.Direction.EAST)
+	# _Place_slider(Vector2i(9, 8), Unit.Direction.EAST)
 
-	_units.shuffle()
-	
-	# _place_slider(Vector2i(2, 3), Unit.Direction.EAST)
-	# _place_updater(Vector2i(3, 3), Unit.Direction.EAST, 1, UNUpdater.UpdateType.DOUBLE)
-	# _place_demander(Vector2i(4, 3), Unit.Direction.WEST, [2, 4, 6])
-	# _place_slider(Vector2i(3, 3), Unit.Direction.NORTH)
-	# _place_slider(Vector2i(3, 2), Unit.Direction.NORTH)
-	# _place_slider(Vector2i(3, 1), Unit.Direction.WEST)
-	# # _place_slider(Vector2i(2, 1), Unit.Direction.WEST)
-	# _place_updater(Vector2i(2, 1), Unit.Direction.WEST, 1, UNUpdater.UpdateType.DOUBLE)
-	# _place_slider(Vector2i(1, 1), Unit.Direction.WEST)
-	
+	_units.shuffle()	
 
-func _place_supplier(gloc: Vector2i, dir: Unit.Direction, rate: int, seq: Array[int]) -> void:
+
+func _Place_supplier(gloc: Vector2i, dir: Unit.Direction, rate: int, seq: Array[int]) -> void:
 	var my_supp := UNSupplierScene.instantiate()
 	_units.push_back(my_supp)
 	add_child(my_supp)
-	my_supp.setup(self, gloc, rate, seq)
-	my_supp.set_dir(dir)
+	my_supp.setup(self, gloc, rate, dir, seq)
 
 
-func _place_slider(gloc: Vector2i, dir: Unit.Direction) -> void:
+func _Place_slider(gloc: Vector2i, dir: Unit.Direction) -> void:
 	var my_bus := UNSliderScene.instantiate()
 	_units.push_back(my_bus)
 	add_child(my_bus)
-	my_bus.setup(self, gloc, 1)
-	my_bus.set_dir(dir)
+	my_bus.setup(self, gloc, 1, dir)
 
 
-func _place_updater(gloc: Vector2i, dir: Unit.Direction, rate: int, up_t: 
+func _Place_updater(gloc: Vector2i, dir: Unit.Direction, rate: int, up_t: 
 	UNUpdater.UpdateType
 ) -> void:
 	var doub := UNUpdaterScene.instantiate()
 	_units.push_back(doub)
 	add_child(doub)
-	doub.setup(self, gloc, rate, up_t)
-	doub.set_dir(dir)
+	doub.setup(self, gloc, rate, dir, up_t)
 
 
-func _place_bin(gloc: Vector2i) -> void:
+func _Place_bin(gloc: Vector2i) -> void:
 	var bin := UNBinScene.instantiate()
 	_units.push_back(bin)
 	add_child(bin)
 	bin.setup(self, gloc)
 
 
-func _place_demander(gloc: Vector2i, dir: Unit.Direction, seq: Array[int]) -> void:
+func _Place_demander(gloc: Vector2i, dir: Unit.Direction, seq: Array[int]) -> void:
 	var dem := UNDemanderScene.instantiate()
 	_units.push_back(dem)
 	add_child(dem)
-	dem.setup(self, gloc, seq)
-	dem.set_dir(dir)
+	dem.setup(self, gloc, dir, seq)
 
 
-func _place_combiner(gloc: Vector2i, dir: Unit.Direction, rate: int, op: UNCombiner.Operation) -> void:
+func _Place_combiner(gloc: Vector2i, dir: Unit.Direction, rate: int, op: UNCombiner.Operation) -> void:
 	var comb := UNCombinerScene.instantiate()
 	_units.push_back(comb)
 	add_child(comb)
-	comb.setup(self, gloc, rate, op)
-	comb.set_dir(dir)
+	comb.setup(self, gloc, rate, dir, op)
 
 
-func _place_cloner(gloc: Vector2i, dir: Unit.Direction, rate: int) -> void:
+func _Place_cloner(gloc: Vector2i, dir: Unit.Direction, rate: int) -> void:
 	var cloner := UNClonerScene.instantiate()
 	_units.push_back(cloner)
 	add_child(cloner)
-	cloner.setup(self, gloc, rate)
-	cloner.set_dir(dir)
+	cloner.setup(self, gloc, rate, dir)
+
+
+func _Place_branch(gloc: Vector2i, dir: Unit.Direction, rate: int, min_val: int) -> void:
+	var bra := UNBranchScene.instantiate()
+	_units.push_back(bra)
+	add_child(bra)
+	bra.setup(self, gloc, rate, dir, min_val)
 
 
 
 ## Called after handling all ticks of pending commands
-func _handle_slide_cmd_overlapping() -> void:
+func _Handle_slide_cmd_overlapping() -> void:
 	# Slide command overlapping.
 	# If any update happens in a pass, end that pass and start over,
 	# repeat until a full pass happens with no updates.
 	while 1 + 1 == 2:
 		var dirty_index := -1
 		for i in blocked_slide_cmds.size():
-			if blocked_slide_cmds[i].is_updated_this_pass(self):
+			if blocked_slide_cmds[i].handle_overlapping_pass(self):
 				dirty_index = i
 				break
 		if dirty_index == -1: # None has updated? it's over.
@@ -352,7 +335,7 @@ func _handle_slide_cmd_overlapping() -> void:
 
 ## Silly little function... Needed because disconnection requires a reference to the callable, 
 ## otherwise I would have to disconnect everything, which I feel might bite me in the butt later.
-func _on_tile_needs_redraw() -> void:
+func _On_tile_needs_redraw() -> void:
 	queue_redraw()
 
 
@@ -405,9 +388,15 @@ func _on_tile_needs_redraw() -> void:
 	## Rotates the unit 90 degrees clockwise. `rotate270` just calls this 3 times.
 	func rotate90() -> void:
 		set_dir(Unit.Direction_rotate90(get_dir()))
-	
+
 	## Implemented in terms of `rotate90` by default, this way I only need to implement 1 instead of
-	## 2 functions.
+	## 3 functions.
+	func rotate180() -> void:
+		rotate90()
+		rotate90()
+
+	## Implemented in terms of `rotate90` by default, this way I only need to implement 1 instead of
+	## 3 functions.
 	func rotate270() -> void:
 		rotate90()
 		rotate90()

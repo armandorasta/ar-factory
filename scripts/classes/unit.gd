@@ -82,8 +82,11 @@ static func Direction_rotate270(my_dir: Direction) -> Direction:
 
 
 func init(world_: WorldPanel, tick_type_: TickType, work_rate: int, gloc: Vector2i, 
-	dims_: Vector2i
+	dims_: Vector2i, init_dir: Direction
 ) -> void:
+	assert(Rect2i(Vector2i.ZERO, world_.dims - gloc).has_point(_dims))
+	assert(init_dir in [Direction.EAST, Direction.WEST])
+
 	self.world = world_
 	self._tick_type = tick_type_
 	self.rate = work_rate
@@ -97,7 +100,6 @@ func init(world_: WorldPanel, tick_type_: TickType, work_rate: int, gloc: Vector
 	# sprite.apply_scale((world_.cell_width/128.0) * dims_)
 	# sprite.translate(world_.cell_width * 0.5 * Vector2.ONE)
 	
-	assert(Rect2i(Vector2i.ZERO, world.dims - gloc).has_point(_dims))
 	for y in dims_.y:
 		for x in dims_.x:
 			var my_loc := gloc + Vector2i(x, y)
@@ -105,6 +107,7 @@ func init(world_: WorldPanel, tick_type_: TickType, work_rate: int, gloc: Vector
 			world.install_tile(WorldPanel.TlSolid.new(my_loc))
 	
 	build_tiles()
+	set_dir(init_dir)
 
 
 ## Used to specify:
@@ -164,22 +167,62 @@ func is_just_awaiting_out_sliding_anim() -> bool:
 		_pending_cmds.all(func(x: CmdSlide): return x.is_awaiting_anim())
 	)
 
-
-func set_dir(new_dir: Direction) -> void:
-	while _dir != new_dir:
-		rotate_90()
-
-
-func rotate_90() -> void:	
-	# All asserts
+## Returns true if the unit has enough space for version of itself rotated 90 degrees clockwise or 
+## counter-clockwise.
+## Rotating 180 degrees needs no check as it takes the same space as not rotating.
+func has_space_for_rotate90() -> bool:
 	if _dims.x > _dims.y:
 		for y in range(_dims.y, _dims.x):
 			for x in _dims.y:
-				assert(!world.has_tile(grid_loc + Vector2i(x, y)))
-	elif _dims.y > _dims.x:
+				if world.has_tile(grid_loc + Vector2i(x, y)):
+					return false
+	else:
 		for y in _dims.x:
 			for x in range(_dims.x, _dims.y):
-				assert(!world.has_tile(grid_loc + Vector2i(x, y)))
+				if world.has_tile(grid_loc + Vector2i(x, y)):
+					return false
+	
+	return true
+
+
+## Returns true if the unit can face that direction, by default units can only face east and west,
+## but this behaviour can be changed by overriding this function.
+func is_valid_dir(d: Direction) -> bool:
+	return d == Direction.EAST || d == Direction.WEST
+
+
+func set_dir(new_dir: Direction) -> void:
+	assert(is_valid_dir(new_dir))
+	if new_dir == _dir:
+		return
+	elif new_dir == Direction_inv(_dir):
+		inv_dir()
+	elif new_dir == Direction_rotate90(_dir):
+		rotate_90()
+	else:
+		rotate_90()
+		rotate_90()
+		rotate_90()
+
+
+## Reverses the direction of the unit.
+func inv_dir() -> void:
+	# (new.x, new.y) = (max_x - old.x, max_y - old.y)
+	for y in _dims.y / 2:
+		for x in _dims.x:
+			var my_tile := world.get_tile(Vector2i(x, y))
+			my_tile.inv_dir()
+			
+			world.swap_tiles(grid_loc, (_dims - Vector2i.ONE) - grid_loc)
+
+	_dir = Unit.Direction_inv(_dir)
+
+
+## Rotates the unit by 90 degrees clockwise, by default this operation is not supported, but this 
+## can be changed by overriding [method is_valid_dir].
+func rotate_90() -> void:
+	assert(is_valid_dir(Direction_rotate90(_dir)))
+	assert(has_space_for_rotate90())
 
 	# Collect all the tiles and remove them from the world.
 	var all_tiles: Array[WorldPanel.Tile] = []
@@ -209,6 +252,7 @@ func add_input(in_gloc: Vector2i, dir_: Unit.Direction) -> WorldPanel.TlInput:
 	assert(get_tile(in_gloc) is WorldPanel.TlSolid)
 	# Inputs must be facing out of the unit	
 	assert(!is_within(grid_loc + in_gloc + Unit.Direction_to_grid(dir_)))
+	assert(dir_ != Direction.EAST)
 	
 	var new_tile := WorldPanel.TlInput.new(self.grid_loc + in_gloc, dir_)
 	world.install_tile(new_tile, true)
@@ -223,6 +267,7 @@ func add_output(out_gloc: Vector2i, dir_: Unit.Direction) -> WorldPanel.TlOutput
 	assert(get_tile(out_gloc) is WorldPanel.TlSolid)
 	# Output must be facing out of the unit	
 	assert(!is_within(grid_loc + out_gloc + Unit.Direction_to_grid(dir_)))
+	assert(dir_ != Direction.WEST)
 	
 	var new_tile := WorldPanel.TlOutput.new(self.grid_loc + out_gloc, dir_)
 	world.install_tile(new_tile, true)
@@ -233,12 +278,14 @@ func add_output(out_gloc: Vector2i, dir_: Unit.Direction) -> WorldPanel.TlOutput
 ## IO tiles are an input tile and output tile combined in one, they let items slide in in one 
 ## direction, and let them slide out in another, the 2 directions may not coincide.
 func add_io(io_gloc: Vector2i, out_dir: Unit.Direction, in_dir: Unit.Direction) -> WorldPanel.Tile:
-	assert(out_dir != in_dir)
 	assert(is_within(grid_loc + io_gloc))
 	assert(get_tile(io_gloc) is WorldPanel.TlSolid)
 	# Both input and output should be facing out of the unit.
 	assert(!is_within(grid_loc + io_gloc + Unit.Direction_to_grid(out_dir)))
 	assert(!is_within(grid_loc + io_gloc + Unit.Direction_to_grid(in_dir)))
+	assert(out_dir != in_dir)
+	assert(in_dir != Direction.EAST)
+	assert(out_dir != Direction.WEST)
 
 	var new_tile := WorldPanel.TlIO.new(self.grid_loc + io_gloc, out_dir, in_dir)
 	world.install_tile(new_tile, true)
@@ -252,13 +299,14 @@ func add_slider(sl_gloc: Vector2i, dir_: Unit.Direction) -> WorldPanel.Tile:
 	var net_gloc := self.grid_loc + sl_gloc
 	assert(is_within(net_gloc))
 	assert(get_tile(sl_gloc) is WorldPanel.TlSolid)
+
 	# Output and at least one input must be facing out of the unit, otherwise just use input or output.
-	assert(!is_within(net_gloc + Unit.Direction_to_grid(dir_)))
-	assert(
-		!is_within(net_gloc + Unit.Direction_to_grid(Unit.Direction_inv(dir_))) ||
-		!is_within(net_gloc + Unit.Direction_to_grid(Unit.Direction_rotate90(dir_))) ||
-		!is_within(net_gloc + Unit.Direction_to_grid(Unit.Direction_rotate270(dir_)))
-	)
+	# assert(!is_within(net_gloc + Unit.Direction_to_grid(dir_)))
+	# assert(
+	# 	!is_within(net_gloc + Unit.Direction_to_grid(Unit.Direction_inv(dir_))) ||
+	# 	!is_within(net_gloc + Unit.Direction_to_grid(Unit.Direction_rotate90(dir_))) ||
+	# 	!is_within(net_gloc + Unit.Direction_to_grid(Unit.Direction_rotate270(dir_)))
+	# )
 
 	var new_tile := WorldPanel.TlSlider.new(net_gloc, dir_)
 	world.install_tile(new_tile, true)
@@ -285,9 +333,9 @@ func add_blackhole(black_gloc: Vector2i) -> WorldPanel.Tile:
 	return new_tile
 
 
-## This HAS to be called before `pend_new_commands`, because it increments the tick counter.
+## This HAS to be called before [method pend_new_commands], because it increments the tick counter.
 func preprocess_tick() -> void:
-	if !_pending_cmds.is_empty():
+	if has_pending_cmds():
 		for cmd in _pending_cmds:
 			cmd.count_this_tick()
 		
@@ -321,14 +369,16 @@ func pend_cmd(cmd: Command) -> void:
 	_pending_cmds.push_back(cmd)
 
 
-func do_per_frame(dt: float) -> void:
+func do_per_frame(dt: float, lv: Level) -> void:
+	assert(lv.world == self.world)
 	for cmd in _pending_cmds:
-		cmd.do_per_frame(dt)
+		cmd.do_per_frame(dt, lv)
 
 
-func handle_cmd_tick() -> void:
+func handle_cmd_tick(lv: Level) -> void:
+	assert(lv.world == self.world)
 	for cmd in _pending_cmds:
-		cmd.on_tick()
+		cmd.on_tick(lv)
 
 
 func reset() -> void:

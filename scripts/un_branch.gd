@@ -1,12 +1,16 @@
-class_name UNCloner extends Unit
+class_name UNBranch extends Unit
+
+var Val: int
 
 var io0: WorldPanel.TlIO
 var out0: WorldPanel.TlOutput
 
 
 ## Must be called after _ready
-func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, init_dir: Direction) -> void:
+func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, init_dir: Direction, cmp_val: int) -> void:
 	super.init(world_, TickType.ON_DEMAND, work_rate, gloc, Vector2i(1, 2), init_dir)
+	assert(Item.MIN_VALUE <= cmp_val && cmp_val <= Item.MAX_VALUE)
+	self.Val = cmp_val
 
 
 func build_tiles() -> void:
@@ -22,6 +26,5 @@ func pend_new_commands() -> void:
 		pause_this_tick()
 		return
 
-	pend_cmd(CmdClone.from_tiles(io0, [out0]))
-	pend_cmd(CmdSlide.from_tiles(io0, _dir))
-	pend_cmd(CmdSlide.from_tiles(out0, _dir))
+	pend_cmd(CmdCondSlide.from_tiles(io0, io0, _dir, out0, _dir, 
+		func(tl): return tl.get_item().get_value() >= self.Val))

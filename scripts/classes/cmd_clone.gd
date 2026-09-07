@@ -7,7 +7,11 @@ var dest_grid_locs: Array[Vector2i] = []
 
 
 static func from_tiles(src_tile: WorldPanel.TlHolder, dest_tiles: Array[WorldPanel.TlHolder]) -> CmdClone:
-	return CmdClone.new(src_tile.get_grid_loc(), dest_tiles.map(func(x): return x.get_grid_loc()))
+	var arr: Array[Vector2i] = []
+	for tl in dest_tiles:
+		arr.push_back(tl.get_grid_loc())
+	
+	return CmdClone.new(src_tile.get_grid_loc(), arr)
 
 
 func _init(src_loc: Vector2i, dest_locs: Array[Vector2i]) -> void:
@@ -26,7 +30,7 @@ func on_tick(lv: Level) -> void:
 	assert(dest_grid_locs.all(func(x): return lv.world.get_tile(x) is WorldPanel.TlHolder))
 	var src_tile := lv.world.get_tile(src_grid_loc) as WorldPanel.TlHolder
 	# Wait for an item to show up, and make sure it's not mid-animation.
-	if !src_tile.has_item() || !src_tile.get_item().is_stationary(): 
+	if !src_tile.has_item() || src_tile.get_item().is_mid_animation(): 
 		pause_this_tick()
 		return
 

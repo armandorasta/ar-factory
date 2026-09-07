@@ -6,27 +6,27 @@ var _seq: PackedInt32Array
 var _index: int = -1
 
 ## Must be called after _ready
-func setup(world_: WorldPanel, gloc: Vector2i, sequence: PackedInt32Array) -> void:
-	super.init(world_, TickType.STEADY, 1, gloc, Vector2i.ONE)
+func setup(world_: WorldPanel, gloc: Vector2i, init_dir: Direction, sequence: PackedInt32Array) -> void:
+	super.init(world_, TickType.STEADY, 1, gloc, Vector2i.ONE,init_dir)
 	self._seq = sequence
 
 	_update_text()
 
 
 func build_tiles() -> void:
-	add_input(Vector2i.ZERO, _dir)
+	add_input(Vector2i.ZERO, Direction.WEST)
 
 
 func pend_new_commands() -> void:
+	if has_pending_cmds():
+		pause_this_tick()
+		return
+	
 	if _is_done_with_seq():
 		print("Done!!1!!")
 		return
 
-	if has_pending_cmds():
-		pause_this_tick()
-		return
-
-	pend_cmd(CmdDemand.new(world, grid_loc, _pop_next_value()))
+	pend_cmd(CmdDemand.new(grid_loc, _pop_next_value()))
 
 
 func reset() -> void:

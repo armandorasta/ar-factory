@@ -51,7 +51,7 @@ func _process(dt: float) -> void:
 		PlayMode.OFF: pass
 		PlayMode.DEBUG: pass
 		PlayMode.PLAY:
-			world.do_per_frame(dt)
+			world.do_per_frame(dt, self)
 
 
 ## Returns the number of ticks passed since the play button was pressed.
@@ -78,15 +78,15 @@ func reset_tick_rate() -> void:
 
 
 func _on_tick() -> void:
-	world.on_tick()
-	ticks_label.text = "ticks: %d" % world._tick_count
+	world.on_tick(self)
+	ticks_label.text = "ticks: %d" % _tick_count
 	_tick_count += 1
 
 
 func _on_tick_timer_time_out() -> void:
 	assert(_play_mode != PlayMode.OFF)
 	_on_tick()
-	_tick_timer.start(world._tick_millis * 0.001)
+	_tick_timer.start(_tick_millis * 0.001)
 
 
 func _on_play_butt_pressed() -> void:
@@ -113,8 +113,8 @@ func _on_debug_butt_pressed() -> void:
 
 
 func _on_speed_slider_value_changed(new_val: float) -> void:
-	world.set_tick_rate(new_val)
-	tick_speed_label.text = "%.1f tick/s" % (1000.0/world._tick_millis)
+	set_tick_rate(new_val)
+	tick_speed_label.text = "%.1f tick/s" % (1000.0/_tick_millis)
 
 
 func _sync_butt_states() -> void:

@@ -16,7 +16,7 @@ func _init(gloc: Vector2i, required_val: int) -> void:
 func on_tick(lv: Level) -> void:
 	assert(lv.world.get_tile(grid_loc) is WorldPanel.TlHolder)
 	var my_tile := lv.world.get_tile(grid_loc) as WorldPanel.TlHolder
-	if !my_tile.has_item() || !my_tile.get_item().is_stationary():
+	if !my_tile.has_item() || my_tile.get_item().is_mid_animation():
 		pause_this_tick()
 		return
 

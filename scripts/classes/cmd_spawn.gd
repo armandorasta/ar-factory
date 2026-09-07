@@ -6,6 +6,10 @@ var grid_loc: Vector2i
 var value: int
 
 
+static func from_tiles(tl: WorldPanel.TlHolder, val: int) -> CmdSpawn:
+	return CmdSpawn.new(tl.get_grid_loc(), val)
+
+
 func _init(gloc: Vector2i, val: int) -> void:
 	super(0)
 	self.grid_loc = gloc

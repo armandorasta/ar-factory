@@ -13,10 +13,8 @@ func _init(gloc: Vector2i) -> void:
 func on_tick(lv: Level) -> void:
 	assert(lv.world.get_tile(grid_loc) is WorldPanel.TlHolder)
 	var my_tile := lv.world.get_tile(grid_loc) as WorldPanel.TlHolder
-	if !my_tile.has_item() || !my_tile.get_item().is_stationary():
+	if !my_tile.has_item() || my_tile.get_item().is_mid_animation():
 		pause_this_tick()
 		return
-
-	# The item should be able to move, this means it did not move this tick, which means we are not
-	# sending an item into oblivion mid-animation.
-	assert(!my_tile.get_item().cant_move_this_tick)
+	
+	assert(my_tile.get_item().is_allowed_to_move())

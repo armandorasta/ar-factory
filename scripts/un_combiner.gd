@@ -14,8 +14,8 @@ var in1: WorldPanel.TlInput
 var out: WorldPanel.TlOutput
 
 
-static func apply(op: Operation, lhs: int, rhs: int) -> int:
-	match op:
+static func apply(op_: Operation, lhs: int, rhs: int) -> int:
+	match op_:
 		Operation.ADD: return lhs + rhs
 		Operation.SUB: return lhs - rhs
 		Operation.MUL: return lhs * rhs
@@ -24,8 +24,8 @@ static func apply(op: Operation, lhs: int, rhs: int) -> int:
 
 
 ## Must be called after _ready
-func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, op_: Operation) -> void:
-	super.init(world_, TickType.ON_DEMAND, work_rate, gloc, Vector2i(2, 2))
+func setup(world_: WorldPanel, gloc: Vector2i, work_rate: int, init_dir: Direction, op_: Operation) -> void:
+	super.init(world_, TickType.ON_DEMAND, work_rate, gloc, Vector2i(2, 2), init_dir)
 	self.op = op_
 
 
@@ -43,5 +43,5 @@ func pend_new_commands() -> void:
 		pause_this_tick()
 		return
 
-	pend_cmd(CmdCombine.new(world, [in0, in1], out, func(vals): return apply(op, vals[0], vals[1])))
-	pend_cmd(CmdSlide.new(world, out.get_grid_loc(), _dir))
+	pend_cmd(CmdCombine.from_tiles([in0, in1], out, func(vals): return apply(op, vals[0], vals[1])))
+	pend_cmd(CmdSlide.from_tiles(out, _dir))

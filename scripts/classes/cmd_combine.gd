@@ -8,9 +8,12 @@ var callable: Callable
 
 
 static func from_tiles(src_tls: Array[WorldPanel.TlHolder], dest_tl: WorldPanel.TlHolder, 
-	what_to_do: Callable
-) -> CmdCombine:
-	return CmdCombine.new(src_tls.map(func(x): return x.get_grid_loc()), dest_tl.get_grid_loc(), what_to_do)
+		what_to_do: Callable) -> CmdCombine:
+	var arr: Array[Vector2i] = []
+	for tl in src_tls:
+		arr.push_back(tl.get_grid_loc())
+	
+	return CmdCombine.new(arr, dest_tl.get_grid_loc(), what_to_do)
 
 
 ## `what_to_do` will take values of items in specified locations is the same order of the locations, 
@@ -38,8 +41,8 @@ func on_tick(lv: Level) -> void:
 		pause_this_tick()
 		return
 
+	var values := src_grid_locs.map(func(x): return lv.world.get_tile(x).get_item().get_value())
 	for gloc in src_grid_locs:
 		lv.world.get_tile(gloc).destroy_item()
 	
-	var values := src_grid_locs.map(func(x): return lv.world.get_tile(x).get_item().get_value())
 	lv.world.spawn_item(dest_grid_loc, callable.call(values))
