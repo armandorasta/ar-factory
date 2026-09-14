@@ -1,7 +1,5 @@
 [gd_scene format=3 uid="uid://clavmrbij5nx3"]
 
-[ext_resource type="Script" uid="uid://bk6m1af1qdm1v" path="res://scripts/un_branch.gd" id="1_ltvam"]
-
 [sub_resource type="Gradient" id="Gradient_t7ha2"]
 offsets = PackedFloat32Array(0)
 colors = PackedColorArray(0.037000008, 0.4119333, 0.74, 1)
@@ -12,7 +10,6 @@ width = 128
 height = 128
 
 [node name="Branch" type="Node2D" unique_id=2081016730]
-script = ExtResource("1_ltvam")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=691290124]
 texture = SubResource("GradientTexture2D_4xhep")

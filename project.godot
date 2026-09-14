@@ -10,10 +10,14 @@ config_version=5
 
 [application]
 
-config/name="arFactory"
+config/name="arFactory (C#)"
 run/main_scene="uid://klsj0xfb4qp2"
-config/features=PackedStringArray("4.6", "Forward Plus")
+config/features=PackedStringArray("4.7", "C#", "Forward Plus")
 config/icon="res://resources/icon.svg"
+
+[autoload]
+
+CsScriptLoader="*uid://bb6qht3iamcci"
 
 [display]
 
@@ -23,9 +27,13 @@ window/size/resizable=false
 window/stretch/mode="canvas_items"
 window/vsync/vsync_mode=0
 
+[dotnet]
+
+project/assembly_name="arFactory (C#)"
+
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/gut/plugin.cfg")
+enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg", "res://addons/gut/plugin.cfg")
 
 [input]
 

@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://b6xq57m5popir"]
 
-[ext_resource type="Script" uid="uid://bday6v4mkv3oo" path="res://scripts/item.gd" id="1_s8enn"]
+[ext_resource type="Script" uid="uid://drp0vi5tq6w65" path="res://scripts/Item.cs" id="1_s8enn"]
 [ext_resource type="Texture2D" uid="uid://boh6flaxihb46" path="res://resources/item.png" id="2_s8enn"]
 
 [node name="Item" type="Node2D" unique_id=2081016730]

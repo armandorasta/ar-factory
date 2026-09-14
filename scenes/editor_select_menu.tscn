@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://k52jlmlygu0k"]
 
-[ext_resource type="Script" uid="uid://wm1ggb1grmm7" path="res://scripts/editor_select_menu.gd" id="1_1s3mw"]
+[ext_resource type="Script" uid="uid://0oetou4kbx5w" path="res://scripts/EditorSelectMenu.cs" id="1_1s3mw"]
 
 [node name="EditorSelectMenu" type="Control" unique_id=2126389932]
 layout_mode = 3

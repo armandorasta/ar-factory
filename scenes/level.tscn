@@ -1,9 +1,8 @@
 [gd_scene format=3 uid="uid://klsj0xfb4qp2"]
 
-[ext_resource type="Script" uid="uid://h3n2v38jd6dy" path="res://scripts/level.gd" id="1_jyhfs"]
-[ext_resource type="Script" uid="uid://owr5nboekwgf" path="res://scripts/factory_pan.gd" id="2_jyhfs"]
-[ext_resource type="Script" uid="uid://cx8jra2f0nw2j" path="res://scripts/world_panel.gd" id="2_tbgi4"]
-[ext_resource type="Script" uid="uid://cx77a22wpy1y1" path="res://scripts/cam.gd" id="3_sugp2"]
+[ext_resource type="Script" uid="uid://b4jpngaeplurr" path="res://scripts/Level.cs" id="1_mx8sn"]
+[ext_resource type="Script" uid="uid://b32qsjvwapht7" path="res://scripts/WorldPanel.cs" id="2_mx8sn"]
+[ext_resource type="Script" uid="uid://dli18m8xc1m77" path="res://scripts/Cam.cs" id="3_mx8sn"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0wfyh"]
 bg_color = Color(0.23046875, 0.23046875, 0.23046875, 1)
@@ -15,16 +14,16 @@ border_color = Color(0.8813782, 1, 0.6106771, 1)
 border_blend = true
 
 [node name="Level" type="Node2D" unique_id=1731236255]
-script = ExtResource("1_jyhfs")
+script = ExtResource("1_mx8sn")
 
 [node name="WorldPanel" type="Panel" parent="." unique_id=1258821105]
 offset_right = 1200.0
 offset_bottom = 720.0
-script = ExtResource("2_tbgi4")
+script = ExtResource("2_mx8sn")
 
 [node name="Cam" type="Camera2D" parent="WorldPanel" unique_id=330737528]
 position = Vector2(530, 248)
-script = ExtResource("3_sugp2")
+script = ExtResource("3_mx8sn")
 
 [node name="HUDLayer" type="CanvasLayer" parent="WorldPanel" unique_id=1773833209]
 
@@ -48,7 +47,6 @@ layout_mode = 2
 size_flags_horizontal = 4
 size_flags_vertical = 4
 theme_override_styles/panel = SubResource("StyleBoxFlat_0wfyh")
-script = ExtResource("2_jyhfs")
 
 [node name="MarginContainer" type="MarginContainer" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan" unique_id=1003673875]
 layout_mode = 1
