@@ -35,6 +35,13 @@ project/assembly_name="arFactory (C#)"
 
 enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg", "res://addons/gut/plugin.cfg")
 
+[gdunit4]
+
+settings/test/test_discovery=true
+ui/inspector/tree_view_mode=1
+ui/inspector/tree_sort_mode=1
+ui/toolbar/run_overall=true
+
 [input]
 
 cam_up={

@@ -23,4 +23,7 @@ public partial class CmdAwait(Vector2I gloc) : Command(1)
 
 		Debug.Assert(targetTile.GetItem().IsAllowedToMove());
 	}
+
+	public override string ToString()
+		=> Utilz.AppendToBaseToString(base.ToString(), $"Await[at {GridLoc}]");
 }

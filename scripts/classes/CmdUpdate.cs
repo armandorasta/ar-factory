@@ -24,4 +24,7 @@ public partial class CmdUpdate(Vector2I gloc, Func<int, int> upFunc) : Command(0
 		var it = targetTile.GetItem();
 		it.SetValue(UpdateFunc.Invoke(it.GetValue()));
 	}
+
+	public override string ToString()
+		=> Utilz.AppendToBaseToString(base.ToString(), $"Update[at {GridLoc}]");
 }

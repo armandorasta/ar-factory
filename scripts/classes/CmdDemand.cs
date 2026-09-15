@@ -32,4 +32,7 @@ public partial class CmdDemand(Vector2I gloc, int reqVal) : Command(1)
 			targetTile.SetReserved(true); // Forever until I implement halt.
 		}
 	}
+
+	public override string ToString()
+		=> Utilz.AppendToBaseToString(base.ToString(), $"Demand[at {GridLoc} demand val {Value}]");
 }

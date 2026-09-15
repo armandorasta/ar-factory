@@ -62,4 +62,9 @@ public partial class UnUpdater : Unit
 		PendCmd(CmdUpdate.FromTiles(tl, (val) => Apply(m_UpType, val)));
 		PendCmd(CmdSlide.FromTiles(tl));
 	}
+
+	public override string ToString()
+	{
+		return Utilz.AppendToBaseToString(base.ToString(), $"Updater[{m_UpType}]");
+	}
 }

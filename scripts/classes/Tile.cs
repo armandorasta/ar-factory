@@ -1,4 +1,3 @@
-using ArFactory;
 using Godot;
 
 namespace ArFactory;
@@ -122,5 +121,7 @@ public abstract partial class Tile(Vector2I gloc) : RefCounted
 			world.DrawCircle(edgePos, 0.5f * world.CellWidth * myScale, myCol, false);
 		}
 	}
+
+	public override string ToString() => $"Tile[{m_GridLoc}]";
 }
 

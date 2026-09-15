@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Text;
 using ArFactory;
 using Godot;
 
@@ -87,4 +89,12 @@ public partial class Item : Node2D
 	{
 		m_bMidAnimation = newVal;
 	}
+
+	public override string ToString()
+	{
+		var bui = new StringBuilder($"Item[{GridLoc}, val: {m_Value}");
+		if (IsMidAnimation()) bui.Append(", anim");
+		if (!IsAllowedToMove()) bui.Append(", locked");
+		return bui.Append(']').ToString();
+	} 
 }

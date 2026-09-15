@@ -16,10 +16,12 @@ public partial class CmdCombine : Command
 		=> new(srcTls.Select((tl) => tl.GetGridLoc()), destTl.GetGridLoc(), combFunc);
 
 
-	// `combFunc` will take values of items in specified locations is the same order of the locations, 
-	// and returns the value will be assigned to the generated item.
-	// `destGLoc` can overlap with `srcGLocs`; the old items will be destroyed before the new item is
-	// spawned.
+	/// <summary>
+	/// `combFunc` will take values of items in specified locations is the same order of the locations, 
+	/// and returns the value will be assigned to the generated item.
+	/// `destGLoc` can overlap with `srcGLocs`; the old items will be destroyed before the new item is
+	/// spawned.
+	/// </summary>
 	public CmdCombine(IEnumerable<Vector2I> srcGLocs, Vector2I destGLoc, 
 		Func<IEnumerable<int>, int> combFunc) : base(0)
 	{
@@ -57,4 +59,10 @@ public partial class CmdCombine : Command
 		}
 		lv.World.SpawnItem(DestGridLoc, CombFunc.Invoke(values));
 	}
+
+	public override string ToString()
+	{
+		var myStr = string.Join(", ", SrcGridLocs);
+		return Utilz.AppendToBaseToString(base.ToString(), $"Combine[at [{myStr}] into {DestGridLoc}]");	
+	} 
 }

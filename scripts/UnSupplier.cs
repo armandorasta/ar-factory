@@ -42,6 +42,12 @@ public partial class UnSupplier : Unit
 		PendCmd(CmdSlide.FromTiles(m_Out0, Dir));
 	}
 
+	public override string ToString()
+	{
+		var seqStr = string.Join(", ", m_Sequence);
+		return Utilz.AppendToBaseToString(base.ToString(), $"Supplier[i: {m_Index}, [{seqStr}]]");
+	}
+
 	public override void Reset()
 	{
 		base.Reset();

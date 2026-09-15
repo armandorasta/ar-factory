@@ -88,4 +88,8 @@ public partial class CmdCondSlide : Command
 		m_SlideCmd = null;
 		m_StateFunc = HandleDefault;
 	}
+
+	public override string ToString()
+		=> Utilz.AppendToBaseToString(base.ToString(),
+			$"CondSlide[{SrcGridLoc} ? {TrueGridLoc} -> {TrueDir} : {FalseGridLoc} -> {FalseDir}]");
 }

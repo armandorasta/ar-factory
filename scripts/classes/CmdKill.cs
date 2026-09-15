@@ -20,4 +20,7 @@ public partial class CmdKill(Vector2I gloc) : Command(0)
 
 		targetTile.DestroyItem();
 	}
+
+	public override string ToString()
+		=> Utilz.AppendToBaseToString(base.ToString(), $"Kill[at {GridLoc}]");
 }

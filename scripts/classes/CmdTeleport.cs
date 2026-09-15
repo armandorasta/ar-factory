@@ -23,4 +23,7 @@ public partial class CmdTeleport(Vector2I gfrom, Vector2I gto) : Command(0)
 
 		lv.World.TeleportItem(SrcGridLoc, DestGridLoc);
 	}
+
+	public override string ToString()
+		=> Utilz.AppendToBaseToString(base.ToString(), $"Teleport[from {SrcGridLoc} to {DestGridLoc}]");
 }

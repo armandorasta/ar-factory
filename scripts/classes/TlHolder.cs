@@ -1,3 +1,5 @@
+using System;
+using System.Text;
 using Godot;
 
 namespace ArFactory;
@@ -55,6 +57,14 @@ public abstract partial class TlHolder(Vector2I gloc) : Tile(gloc)
 		m_Item = null;
 		m_bReserved = false;
 		return myItem;
+	}
+
+	public override string ToString()
+	{
+		var bui = new StringBuilder("TlHolder[");
+		bui.Append(m_GridLoc);
+		if (m_Item is not null) bui.Append($", item({m_Item.GetValue()})");
+		return bui.Append(']').ToString();
 	}
 }
 

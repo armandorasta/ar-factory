@@ -21,4 +21,7 @@ public partial class CmdSpawn(Vector2I gloc, int val) : Command(0)
 
 		lv.World.SpawnItem(GridLoc, Value);
 	}
+
+	public override string ToString()
+		=> Utilz.AppendToBaseToString(base.ToString(), $"Spawn[at {GridLoc} with val {Value}]");
 }

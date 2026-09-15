@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Godot;
 
 namespace ArFactory;
@@ -12,6 +13,7 @@ public abstract partial class Unit : Node2D
 		Steady,   // Always counts ticks, even when no item is fed, like sliders.
 		OnDemand, // Counts ticks only when all item slots are filled, like updaters.
 	}
+
 
 	// Nodes
 	public Sprite2D Sprite;
@@ -63,7 +65,10 @@ public abstract partial class Unit : Node2D
 
 	public override void _Ready()
 	{
-		this.Sprite = GetNode<Sprite2D>("Sprite2D");
+		if (HasNode("Sprite2D"))
+		{
+			this.Sprite = GetNode<Sprite2D>("Sprite2D");
+		}
 	}
 
 	// This function is called on the `_Ready` function of sub-classes.
@@ -99,6 +104,13 @@ public abstract partial class Unit : Node2D
 		SetDir(dir);
 	}
 
+	protected void InjectorBaseInit(WorldPanel world)
+	{
+		World = world;
+		m_TickType = TickType.Steady;
+		Position = world.GridToPos(Dims);
+	}
+
 	#region Abstract Interface
 	
 	/// <summary>
@@ -119,6 +131,18 @@ public abstract partial class Unit : Node2D
 
 	#endregion // Abstract Interface
 	#region Public Interface
+
+	public override string ToString()
+	{
+		var bui = new StringBuilder("Unit[");
+		bui.Append(string.Join(", ", [
+			GridLoc, 
+			$"{Dims.X}x{Dims.Y}",
+			Dir,
+			$"{Rate}t/s",
+		]));
+		return bui.Append(']').ToString();
+	}
 
 	/// <summary>
 	/// Returns enclosing Rect2I in grid-space.
@@ -486,23 +510,20 @@ public abstract partial class Unit : Node2D
 			return;
 		}
 
-		// This loop is for zero tick commands, so that an infinite number of them can execute in
-		// the same tick.
-		while (m_PendingCmds.Count > 0)
+		// We have to execute all of them, because so of them are executed in different tiles in
+		// parallel. We will move the resposbility of them not clashing to the commands themselves.
+		foreach (var currCmd in m_PendingCmds)
 		{
-			var currCmd = m_PendingCmds[0];
 			currCmd.OnTick(lv);
-			if (!currCmd.IsDone())
-			{
-				break;
-			}
-			m_PendingCmds.RemoveAt(0);
 		}
-
+		
+		// Count then check for finished commands, that's how the IsDone function is setup.
 		foreach (var cmd in m_PendingCmds)
 		{
 			cmd.CountThisTick();
 		}
+		
+		m_PendingCmds = m_PendingCmds.FindAll((c) => !c.IsDone());
 
 		if (m_PendingCmds.Count == 0)
 		{

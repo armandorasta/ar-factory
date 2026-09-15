@@ -45,4 +45,12 @@ public partial class CmdClone : Command
 			lv.World.CloneItem(SrcGridLoc, dgloc);
 		}
 	}
+
+	public override string ToString()
+	{
+		var myStr = DestGridLocs.Length > 1 
+			? $"[{string.Join(", ", DestGridLocs)}]"
+			: DestGridLocs[0].ToString();
+		return Utilz.AppendToBaseToString(base.ToString(), $"Clone[at {SrcGridLoc} to {myStr}]");	
+	} 
 }

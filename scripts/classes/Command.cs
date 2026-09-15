@@ -28,4 +28,6 @@ public abstract partial class Command(int tickCount) : RefCounted
 	public void CountThisTick() => m_Count += 1;
 	public void PauseThisTick() => m_Count -= 1;
 	public bool IsDone() => m_Count >= m_Ticks;
+
+	public override string ToString() => $"Cmd[{m_Count}/{m_Ticks}]";
 }

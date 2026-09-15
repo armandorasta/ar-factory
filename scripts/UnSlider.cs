@@ -30,4 +30,7 @@ public partial class UnSlider : Unit
 	}
 
 	public override bool CanFaceDir(Direction dir) => true;
+
+	public override string ToString() 
+		=> Utilz.ReplaceBaseNameInToString(base.ToString(), "Slider");
 }

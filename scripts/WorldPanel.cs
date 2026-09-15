@@ -8,14 +8,15 @@ public partial class WorldPanel : Panel
 {
 	// Nodes
 	public static readonly PackedScene ItemScene = GD.Load<PackedScene>("res://scenes/item.tscn");
-	public static readonly PackedScene UnSliderScene = GD.Load<PackedScene>("res://scenes/un_slider.tscn");
 	public static readonly PackedScene UnSupplierScene = GD.Load<PackedScene>("res://scenes/un_supplier.tscn");
+	public static readonly PackedScene UnSliderScene = GD.Load<PackedScene>("res://scenes/un_slider.tscn");
 	public static readonly PackedScene UnUpdaterScene = GD.Load<PackedScene>("res://scenes/un_updater.tscn");
 	public static readonly PackedScene UnBinScene = GD.Load<PackedScene>("res://scenes/un_bin.tscn");
 	public static readonly PackedScene UnDemanderScene = GD.Load<PackedScene>("res://scenes/un_demander.tscn");
 	public static readonly PackedScene UnCombinerScene = GD.Load<PackedScene>("res://scenes/un_combiner.tscn");
 	public static readonly PackedScene UnClonerScene = GD.Load<PackedScene>("res://scenes/un_cloner.tscn");
 	public static readonly PackedScene UnBranchScene = GD.Load<PackedScene>("res://scenes/un_branch.tscn");
+
 
 	// Other statics
 	public static readonly Font DebugFont = GD.Load<Font>("res://resources/fonts/AnonymousPro-Regular.ttf");
@@ -24,8 +25,10 @@ public partial class WorldPanel : Panel
 	// Public interface
 	public readonly Vector2I Dims = new(15, 10);
 	public readonly float CellWidth = 100.0f;
+	// TODO: Make this private!
 	public List<CmdSlide> BlockedSlideCmds = [];
-	
+
+
 	// Privates
 	private List<Unit> m_Units = [];
 	private List<Tile> m_Tiles = [];
@@ -49,16 +52,27 @@ public partial class WorldPanel : Panel
 	public Rect2 GetRect2() => new(Vector2I.Zero, CellWidth * (Vector2)Dims);
 	
 	/// <summary>
-	/// Converts from grid-space to world-space.
+	/// Converts from grid-space to world-space. 
+	/// This function does not bounds checking whatsoever.
 	/// </summary>
 	public Vector2 GridToPos(Vector2I gloc) => CellWidth * (Vector2)gloc; 
 	
 	/// <summary>
 	/// Converts from world-space to grid-space.
+	/// This function does not bounds checking whatsoever.
 	/// </summary>
 	public Vector2I PosToGrid(Vector2 pos) => new((int)(pos.X / CellWidth), (int)(pos.Y / CellWidth));
 	
+	/// <summary>
+	/// Converts a vector in grid-space to an index into an array.
+	/// This function does not bounds checking whatsoever.
+	/// </summary>
 	public int GridToIndex(Vector2I gloc) => gloc.Y * Dims.X + gloc.X;
+
+	/// <summary>
+	/// Converts an index to a vector in grid-space.
+	/// This function does not bounds checking whatsoever.
+	/// </summary>
 	public Vector2I IndexToGrid(int index) => new(index % Dims.X, index / Dims.X);
 
 	/// <summary>
@@ -257,36 +271,28 @@ public partial class WorldPanel : Panel
 		Debug.Assert(lv.World == this);
 		foreach (var tl in m_Tiles)
 		{
-			if (tl != null && tl is TlHolder holder && holder.HasItem())
-			{
-				holder.GetItem(false).ResetMovementFlag();
-			}
+			tl?.GetItem(true)?.ResetMovementFlag();
 		}
 
 		// THIS LOOP HAS TO HAPPEN BEFORE PENDING NEW COMMANDS!
-		// Otherwise commands with 0 or 1 ticks will just get skipped.
 		foreach (var u in m_Units)
 		{
 			u.PreProcessTick();
 		}
 
-		// The above loop should not be moved below this one.
+		// This must happen before HandleCmdTick, otherwise the first tick will handle nothing.
 		foreach (var u in m_Units)
 		{
 			u.PendNewCommands();
 		}
 
 		foreach (var u in m_Units)
-		// for (var i = 0; i < m_Units.Count; ++i)
 		{
-		// 	var u = m_Units[i];
-		// 	if (i == 4)
-		// 	{
-		// 		System.Diagnostics.Debugger.Break();
-		// 	}
 			u.HandleCmdTick(lv);
 		}
 
+		// Must happen after HandleCmdTick, otherwise it will do nothing since BlockSlideCmds is
+		// populated by HandleCmdTick.
 		HandleSlideCmdOverlapping();
 	}
 
@@ -352,18 +358,37 @@ public partial class WorldPanel : Panel
 	[System.Diagnostics.Conditional("DEBUG")]
 	private void PlaceSomeUnits()
 	{
+		// PlaceInjector([
+		// 	new CmdSpawn(new(2, 7), 1),
+		// 	new CmdSpawn(new(2, 7), 2),
+		// 	new CmdSpawn(new(2, 7), 3),
+		// 	new CmdSpawn(new(2, 7), 3),
+		// ]);
+		// PlaceSlider(new(2, 7), Direction.East);
+		// PlaceSlider(new(3, 7), Direction.North);
+		// PlaceSlider(new(3, 6), Direction.East);
+		// PlaceUpdater(new(4, 6), Direction.East, 2, UpdateType.Double);
+		// return;
+
 		PlaceSupplier(new(0, 6), Direction.East, 1, [1, 2, 3, 4, 5, 6]);
 		PlaceSlider(new(2, 7), Direction.East);
 		PlaceSlider(new(3, 7), Direction.North);
 		PlaceSlider(new(3, 6), Direction.East);
-		PlaceUpdater(new(4, 6), Direction.East, 2, UpdateType.Double);
+		PlaceUpdater(new(4, 6), Direction.East, 1, UpdateType.Double);
 		PlaceSlider(new(5, 6), Direction.East);
 		PlaceSlider(new(6, 6), Direction.South);
 		PlaceSlider(new(6, 7), Direction.South);
 		PlaceSlider(new(6, 8), Direction.West);
-		PlaceUpdater(new(5, 8), Direction.West, 2, UpdateType.Double);
+		PlaceUpdater(new(5, 8), Direction.West, 1, UpdateType.Double);
 		PlaceSlider(new(4, 8), Direction.West);
 		PlaceSlider(new(3, 8), Direction.North);
+	}
+
+	public void PlaceInjector(IEnumerable<Command> cmdsToInject)
+	{
+		var myUnit = new UnCmdInjector();
+		AddUnit(myUnit);
+		myUnit.Setup(this, cmdsToInject);
 	}
 
 	public void PlaceSupplier(Vector2I gloc, Direction dir, int rate, IEnumerable<int> seq)

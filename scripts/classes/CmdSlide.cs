@@ -42,12 +42,6 @@ public partial class CmdSlide : Command
 		TrackedItem.Position = srcLoc.Lerp(destLoc, weight);
 	}
 
-	public override void OnTick(Level lv)
-	{
-		Debug.Assert(m_StateFunc != null);
-		m_StateFunc.Invoke(lv);
-	}
-
 	/// <summary>
 	/// If <see cref="TrackedItem"/> can move, it will move it and return true, otherwise it will 
 	/// return false.
@@ -69,6 +63,12 @@ public partial class CmdSlide : Command
 		CountThisTick(); // Undo the pausing because the command has advanced.
 		m_StateFunc = HandleAfterAnimation;
 		return true;
+	}
+
+	public override void OnTick(Level lv)
+	{
+		Debug.Assert(m_StateFunc != null);
+		m_StateFunc.Invoke(lv);
 	}
 
 	private void HandleDefault(Level lv)
@@ -129,4 +129,7 @@ public partial class CmdSlide : Command
 		TrackedItem = null;
 		m_StateFunc = HandleDefault;
 	}
+
+	public override string ToString()
+		=> Utilz.AppendToBaseToString(base.ToString(), $"Slide[at {GridFrom} -> {Dir}]");
 }
