@@ -4,15 +4,15 @@ namespace ArFactory;
 
 public partial class CmdSpawn(Vector2I gloc, int val) : Command(0)
 {
-	public static CmdSpawn FromTiles(TlHolder tl, int val) => new(tl.GetGridLoc(), val);
+	public static CmdSpawn FromTiles(Tile tl, int val) => new(tl.GridLoc, val);
 
 	public Vector2I GridLoc = gloc;
 	public int Value = val;
 
 	public override void OnTick(Level lv)
 	{
-		Debug.AssertIs(lv.World.GetTile(GridLoc), typeof(TlHolder));
-		var targetTile = lv.World.GetTile<TlHolder>(GridLoc);
+		Debug.AssertIs(lv.World.GetTile(GridLoc), typeof(Tile));
+		var targetTile = lv.World.GetTile(GridLoc);
 		if (targetTile.IsReserved())
 		{
 			PauseThisTick();

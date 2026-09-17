@@ -11,19 +11,18 @@ public partial class CmdAwait(Vector2I gloc) : Command(1)
 {
 	public Vector2I GridLoc = gloc;
 	
-	public static CmdAwait FromTiles(TlHolder tl) => new(tl.GetGridLoc());
+	public static CmdAwait FromTiles(Tile tl) => new(tl.GridLoc);
 
 	public override void OnTick(Level lv)
 	{
-		Debug.AssertIs(lv.World.GetTile(GridLoc), typeof(TlHolder));
-		var targetTile = lv.World.GetTile<TlHolder>(GridLoc);
-		if (!targetTile.HasItem() || targetTile.GetItem().IsMidAnimation())
+		var targetTile = lv.World.GetTile(GridLoc);
+		if (!targetTile.HasItem() || targetTile.Item.IsMidAnimation())
 		{
 			PauseThisTick();
 			return;
 		}
 
-		Debug.Assert(targetTile.GetItem().IsAllowedToMove());
+		Debug.Assert(targetTile.Item.IsAllowedToMove());
 	}
 
 	public override string ToString()

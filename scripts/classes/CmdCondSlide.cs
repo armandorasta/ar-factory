@@ -18,9 +18,9 @@ public partial class CmdCondSlide : Command
 	private CmdSlide m_SlideCmd;
 	private Action<Level> m_StateFunc;
 
-	public static CmdCondSlide FromTiles(TlHolder srcTl, TlHolder tlTrue, Direction dirTrue, 
-		TlHolder tlFalse, Direction dirFalse, Func<Tile, bool> checkFunc)
-		=> new(srcTl.GetGridLoc(), tlTrue.GetGridLoc(), dirTrue, tlFalse.GetGridLoc(), dirFalse, 
+	public static CmdCondSlide FromTiles(Tile srcTl, Tile tlTrue, Direction dirTrue, 
+		Tile tlFalse, Direction dirFalse, Func<Tile, bool> checkFunc)
+		=> new(srcTl.GridLoc, tlTrue.GridLoc, dirTrue, tlFalse.GridLoc, dirFalse, 
 			checkFunc);
 
 	public CmdCondSlide(Vector2I srcGLoc, Vector2I gtrue, Direction dirTrue, Vector2I gfalse,
@@ -48,13 +48,13 @@ public partial class CmdCondSlide : Command
 
 	private void HandleDefault(Level lv)
 	{
-		Debug.Assert(lv.World.GetTile(SrcGridLoc) is TlHolder);	
-		Debug.Assert(lv.World.GetTile(TrueGridLoc) is TlHolder);	
-		Debug.Assert(lv.World.GetTile(FalseGridLoc) is TlHolder);
+		Debug.Assert(lv.World.GetTile(SrcGridLoc) is Tile);	
+		Debug.Assert(lv.World.GetTile(TrueGridLoc) is Tile);	
+		Debug.Assert(lv.World.GetTile(FalseGridLoc) is Tile);
 		Debug.Assert(m_SlideCmd == null);
 
-		var srcTile = lv.World.GetTile<TlHolder>(SrcGridLoc);
-		if (!srcTile.HasItem() || srcTile.GetItem().IsMidAnimation())
+		var srcTile = lv.World.GetTile(SrcGridLoc);
+		if (!srcTile.HasItem() || srcTile.Item.IsMidAnimation())
 		{
 			PauseThisTick();
 			return;
@@ -62,12 +62,12 @@ public partial class CmdCondSlide : Command
 
 		if (CheckFunc.Invoke(srcTile))
 		{
-			lv.World.TeleportItem(srcTile.GetGridLoc(), TrueGridLoc);
+			lv.World.TeleportItem(srcTile.GridLoc, TrueGridLoc);
 			m_SlideCmd = new(TrueGridLoc, TrueDir);
 		}
 		else
 		{
-			lv.World.TeleportItem(srcTile.GetGridLoc(), FalseGridLoc);
+			lv.World.TeleportItem(srcTile.GridLoc, FalseGridLoc);
 			m_SlideCmd = new(FalseGridLoc, FalseDir);
 		}
 

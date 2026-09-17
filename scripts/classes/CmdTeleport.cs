@@ -4,18 +4,18 @@ namespace ArFactory;
 
 public partial class CmdTeleport(Vector2I gfrom, Vector2I gto) : Command(0)
 {
-	public static CmdTeleport FromTiles(TlHolder tlFrom, TlHolder tlTo) 
-		=> new(tlFrom.GetGridLoc(), tlTo.GetGridLoc());
+	public static CmdTeleport FromTiles(Tile tlFrom, Tile tlTo) 
+		=> new(tlFrom.GridLoc, tlTo.GridLoc);
 
 	public Vector2I SrcGridLoc = gfrom;
 	public Vector2I DestGridLoc = gto;
 
 	public override void OnTick(Level lv)
 	{
-		Debug.Assert(lv.World.GetTile(SrcGridLoc) is TlHolder);
-		Debug.Assert(lv.World.GetTile(DestGridLoc) is TlHolder);
-		var srcTile = lv.World.GetTile<TlHolder>(SrcGridLoc);
-		if (!srcTile.HasItem() || srcTile.GetItem().IsMidAnimation())
+		Debug.Assert(lv.World.GetTile(SrcGridLoc) is Tile);
+		Debug.Assert(lv.World.GetTile(DestGridLoc) is Tile);
+		var srcTile = lv.World.GetTile(SrcGridLoc);
+		if (!srcTile.HasItem() || srcTile.Item.IsMidAnimation())
 		{
 			PauseThisTick();
 			return;

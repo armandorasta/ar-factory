@@ -16,10 +16,12 @@ public partial class Item : Node2D
 
 
 	// Publics
-	public Vector2I GridLoc;
+	public Vector2I GridLoc => m_GridLoc;
+	public int Value => m_Value;
 
 
 	// Privates
+	private Vector2I m_GridLoc;
 	private bool m_bDisallowMoveThisTick = false;
 	private bool m_bMidAnimation = false;
 	private int m_Value;
@@ -33,7 +35,7 @@ public partial class Item : Node2D
 	
 	public void Setup(WorldPanel world, Vector2I gloc, int val)
 	{
-		GridLoc = gloc;
+		m_GridLoc = gloc;
 		SyncPosWithGrid(world);
 		SetValue(val);
 		Sprite.ApplyScale(world.CellWidth / 200.0f * Vector2.One);
@@ -63,11 +65,27 @@ public partial class Item : Node2D
 		CenterLabel.Text = m_Value.ToString();
 	}
 
-	public void SyncPosWithGrid(WorldPanel world)
+	/// <summary>
+	/// Only use with floating items, otherwise control it through it's parent world and tile.
+	/// </summary>
+	public void SetGridLocUnsafe(Vector2I gloc) 
 	{
-		Position = world.GridToPos(GridLoc);
+		Debug.Assert(IsAllowedToMove());
+		m_GridLoc = gloc; 
 	}
 
+	/// <summary>
+	/// Syncs it's actual position on the grid with it's grid location.
+	/// </summary>
+	public void SyncPosWithGrid(WorldPanel world)
+	{
+		Position = world.GridToPos(m_GridLoc);
+	}
+
+	/// <summary>
+	/// After calling this, changing the grid-loc of the tile crashes the game, until 
+	/// <see cref="ResetMovementFlag"/> is called. Changing the position however is fine.
+	/// </summary>
 	public void DisallowMovementThisTick()
 	{
 		m_bDisallowMoveThisTick = true;
@@ -92,7 +110,7 @@ public partial class Item : Node2D
 
 	public override string ToString()
 	{
-		var bui = new StringBuilder($"Item[{GridLoc}, val: {m_Value}");
+		var bui = new StringBuilder($"Item[{m_GridLoc}, val: {m_Value}");
 		if (IsMidAnimation()) bui.Append(", anim");
 		if (!IsAllowedToMove()) bui.Append(", locked");
 		return bui.Append(']').ToString();

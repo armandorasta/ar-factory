@@ -9,8 +9,8 @@ public partial class CmdClone : Command
 	public Vector2I SrcGridLoc;
 	public Vector2I[] DestGridLocs;
 
-	public static CmdClone FromTiles(TlHolder srcTl, IEnumerable<TlHolder> destTls) 
-		=> new(srcTl.GetGridLoc(), destTls.Select((tl) => tl.GetGridLoc()));
+	public static CmdClone FromTiles(Tile srcTl, IEnumerable<Tile> destTls) 
+		=> new(srcTl.GridLoc, destTls.Select((tl) => tl.GridLoc));
 
 	public CmdClone(Vector2I srcGLoc, IEnumerable<Vector2I> destGLocs) : base(0)
 	{
@@ -25,16 +25,16 @@ public partial class CmdClone : Command
 		// is spawned there immediately instead of waiting for all dest tiles to be free at the same time
 		// first!
 
-		Debug.Assert(lv.World.GetTile(SrcGridLoc) is TlHolder);
-		Debug.Assert(DestGridLocs.All((l) => lv.World.GetTile(l) is TlHolder));
-		var srcTile = lv.World.GetTile(SrcGridLoc) as TlHolder;
-		if (!srcTile.HasItem() || srcTile.GetItem().IsMidAnimation())
+		Debug.Assert(lv.World.GetTile(SrcGridLoc) is Tile);
+		Debug.Assert(DestGridLocs.All((l) => lv.World.GetTile(l) is Tile));
+		var srcTile = lv.World.GetTile(SrcGridLoc) as Tile;
+		if (!srcTile.HasItem() || srcTile.Item.IsMidAnimation())
 		{
 			PauseThisTick();
 			return;
 		}
 
-		if (DestGridLocs.Any((l) => lv.World.GetTile<TlHolder>(l).IsReserved()))
+		if (DestGridLocs.Any((l) => lv.World.GetTile(l).IsReserved()))
 		{
 			PauseThisTick();
 			return;			

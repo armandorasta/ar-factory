@@ -11,7 +11,10 @@ public partial class UnSlider : Unit
 
 	protected override void BuildTiles()
 	{
-		AddSlider(Vector2I.Zero, Direction.East);
+		AddOutput(Vector2I.Zero, Direction.East);
+		AddInput(Vector2I.Zero, Direction.North);
+		AddInput(Vector2I.Zero, Direction.West);
+		AddInput(Vector2I.Zero, Direction.South);
 	}
 
 	public override void PendNewCommands()
@@ -26,7 +29,7 @@ public partial class UnSlider : Unit
 			return;
 		}
 
-		PendCmd(CmdSlide.FromTiles(GetTile(Vector2I.Zero) as TlSlider, Dir));
+		PendCmd(CmdSlide.FromTiles(GetTile(Vector2I.Zero), Dir));
 	}
 
 	public override bool CanFaceDir(Direction dir) => true;

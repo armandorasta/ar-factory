@@ -9,7 +9,7 @@ public partial class UnSupplier : Unit
 	private int[] m_Sequence;
 	private int m_Index = -1;
 
-	private TlOutput m_Out0;
+	private Tile m_Out0;
 
 	public void Setup(WorldPanel world, Vector2I gloc, int workRate, Direction dir, IEnumerable<int> seq)
 	{

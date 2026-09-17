@@ -4,6 +4,6 @@
     <DisplayName>FullQualifiedName</DisplayName>
     <CaptureStdOut>true</CaptureStdOut>
     <!-- <CompileProcessTimeout>30000</CompileProcessTimeout> -->
-    <!-- <GodotConnectTimeout>20000</GodotConnectTimeout> -->
+    <GodotConnectTimeout>30000</GodotConnectTimeout>
   </GdUnit4>
 </RunSettings>

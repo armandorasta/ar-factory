@@ -79,7 +79,6 @@ public partial class WorldPanel : Panel
 	/// </summary>
 	public bool HasTile(Vector2I gloc) => IsWithin(gloc) && m_Tiles[GridToIndex(gloc)] != null;
 	public Tile GetTile(Vector2I gloc) => IsWithin(gloc) ? m_Tiles[GridToIndex(gloc)] : null;
-	public T GetTile<T>(Vector2I gloc) where T : Tile => (T)GetTile(gloc);
 
 	/// <summary>
 	/// Returns the whichever unit that <paramref name="gloc"/> lands on.
@@ -107,13 +106,13 @@ public partial class WorldPanel : Panel
 	/// </summary>
 	public Tile InstallTile(Tile tl, bool bOverride = false)
 	{
-		var gloc = tl.GetGridLoc();
-		Debug.Assert(IsWithin(gloc));
-		Debug.Assert(bOverride || !HasTile(gloc));
+		Debug.Assert(IsWithin(tl.GridLoc));
+		Debug.Assert(bOverride || !HasTile(tl.GridLoc));
 
-		RemoveTile(gloc, !bOverride);
-		m_Tiles[GridToIndex(gloc)] = tl;
-		tl.Connect(Tile.SignalName.NeedsRedraw, Callable.From(OnTile_NeedsRedraw));
+		RemoveTile(tl.GridLoc, !bOverride);
+		m_Tiles[GridToIndex(tl.GridLoc)] = tl;
+		// TODO: Replace this with something...
+		// tl.Connect(Tile.SignalName.NeedsRedraw, Callable.From(OnTile_NeedsRedraw));
 		return tl;
 	}
 
@@ -127,10 +126,7 @@ public partial class WorldPanel : Panel
 			return;
 		}
 		var i = GridToIndex(gloc);
-		if (m_Tiles[i] is TlHolder holder)
-		{
-			holder.DestroyItem(true);
-		}
+		m_Tiles[i].DestroyItem(true);
 		m_Tiles[i] = null;
 	}
 
@@ -149,7 +145,7 @@ public partial class WorldPanel : Panel
 			return GetTile(gFrom);
 		}
 		var myTile = ExtractTile(gFrom, bMaybeNull);
-		myTile.SetGridLocUnchecked(gTo);
+		myTile.SetGridLocUnsafe(gTo);
 		InstallTile(myTile, bOverride);
 		return myTile;
 	}
@@ -162,7 +158,8 @@ public partial class WorldPanel : Panel
 		var i = GridToIndex(gloc);
 		var myTile = m_Tiles[i];
 		m_Tiles[i] = null;
-		myTile.Disconnect(Tile.SignalName.NeedsRedraw, Callable.From(OnTile_NeedsRedraw));
+		// TODO: replace this.
+		// myTile.Disconnect(Tile.SignalName.NeedsRedraw, Callable.From(OnTile_NeedsRedraw));
 		return myTile;
 	}
 
@@ -183,13 +180,13 @@ public partial class WorldPanel : Panel
 		
 		if (tl1 != null)
 		{
-			tl1.SetGridLocUnchecked(gloc2);
+			tl1.SetGridLocUnsafe(gloc2);
 			InstallTile(tl1);
 		}
 		
 		if (tl2 != null)
 		{
-			tl2.SetGridLocUnchecked(gloc1);
+			tl2.SetGridLocUnsafe(gloc1);
 			InstallTile(tl2);
 		}
 	}
@@ -203,8 +200,8 @@ public partial class WorldPanel : Panel
 	/// </summary>
 	public Item SpawnItem(Vector2I gloc, int value)
 	{
-		Debug.AssertIs(GetTile(gloc), typeof(TlHolder));
-		var myTile = GetTile<TlHolder>(gloc);
+		Debug.AssertIs(GetTile(gloc), typeof(Tile));
+		var myTile = GetTile(gloc);
 		Debug.Assert(!myTile.IsReserved()); // Might have to change this to `HasItem`, but who knows.
 		
 		var newItem = ItemScene.Instantiate<Item>();
@@ -225,12 +222,10 @@ public partial class WorldPanel : Panel
 		Debug.Assert(IsWithin(gSrc));
 		Debug.Assert(IsWithin(gDest));
 		Debug.Assert(HasTile(gSrc));
-		Debug.AssertIs(GetTile(gSrc), typeof(TlHolder));
 		Debug.Assert(HasTile(gDest));
-		Debug.AssertIs(GetTile(gDest), typeof(TlHolder));
-		Debug.Assert(bMaybeNull || GetTile<TlHolder>(gSrc).HasItem());
-		Debug.Assert(bOverride || gSrc == gDest || !GetTile<TlHolder>(gDest).HasItem());
-		return SpawnItem(gDest, GetTile<TlHolder>(gSrc).GetItem().GetValue());
+		Debug.Assert(bMaybeNull || GetTile(gSrc).HasItem());
+		Debug.Assert(bOverride || gSrc == gDest || !GetTile(gDest).HasItem());
+		return SpawnItem(gDest, GetTile(gSrc).Item.Value);
 	}
 
 	/// <summary>
@@ -243,22 +238,20 @@ public partial class WorldPanel : Panel
 		Debug.Assert(IsWithin(gSrc));
 		Debug.Assert(IsWithin(gDest));
 		Debug.Assert(HasTile(gSrc));
-		Debug.AssertIs(GetTile(gSrc), typeof(TlHolder));
 		Debug.Assert(HasTile(gDest));
-		Debug.AssertIs(GetTile(gDest), typeof(TlHolder));
 
 		if (gSrc == gDest)
 		{
-			return GetTile<TlHolder>(gSrc).GetItem();
+			return GetTile(gSrc).Item;
 		}
 
-		var srcTile = GetTile<TlHolder>(gSrc);
-		var destTile = GetTile<TlHolder>(gDest);
+		var srcTile = GetTile(gSrc);
+		var destTile = GetTile(gDest);
 		Debug.Assert(bMaybeNull || srcTile.HasItem());
 		Debug.Assert(bOverride || gSrc == gDest || !destTile.HasItem());
 		destTile.SetItemUnchecked(srcTile.ExtractItem());
-		destTile.GetItem().SyncPosWithGrid(this);
-		return destTile.GetItem();
+		destTile.Item.SyncPosWithGrid(this);
+		return destTile.Item;
 	}
 
 
@@ -279,10 +272,7 @@ public partial class WorldPanel : Panel
 		Debug.AssertRefEq(lv.World, this);
 		foreach (var tl in m_Tiles)
 		{
-			if (tl is not null && tl is TlHolder holder)
-			{
-				holder.GetItem(true)?.ResetMovementFlag();
-			}
+			tl.GetItemMaybeNull()?.ResetMovementFlag();
 		}
 
 		// THIS LOOP HAS TO HAPPEN BEFORE PENDING NEW COMMANDS!
@@ -316,7 +306,7 @@ public partial class WorldPanel : Panel
 		
 		foreach (var tl in m_Tiles)
 		{
-			if (tl is TlHolder holder)
+			if (tl is Tile holder)
 			{
 				holder.DestroyItem(true);
 			}
@@ -332,7 +322,7 @@ public partial class WorldPanel : Panel
 	{
 		Reset();
 
-		// PlaceSomeUnits();
+		PlaceSomeUnits();
 	}
 
 	public override void _Draw()
@@ -365,31 +355,31 @@ public partial class WorldPanel : Panel
 	[System.Diagnostics.Conditional("DEBUG")]
 	private void PlaceSomeUnits()
 	{
-		PlaceInjector([
-			new CmdSpawn(new(2, 7), 1),
-			new CmdSlide(new(2, 7), Direction.West),
-			new CmdSpawn(new(2, 7), 2),
-			new CmdSpawn(new(2, 7), 3),
-		]);
-		PlaceSlider(new(1, 7), Direction.East);
-		PlaceSlider(new(2, 7), Direction.East);
-		PlaceSlider(new(3, 7), Direction.North);
-		// PlaceSlider(new(3, 6), Direction.East);
-		// PlaceUpdater(new(4, 6), Direction.East, 2, UpdateType.Double);
-		return;
-
-		// PlaceSupplier(new(0, 6), Direction.East, 1, [1, 2, 3, 4, 5, 6]);
+		// PlaceInjector([
+		// 	new CmdSpawn(new(2, 7), 1),
+		// 	new CmdSlide(new(2, 7), Direction.West),
+		// 	new CmdSpawn(new(2, 7), 2),
+		// 	new CmdSpawn(new(2, 7), 3),
+		// ]);
+		// PlaceSlider(new(1, 7), Direction.East);
 		// PlaceSlider(new(2, 7), Direction.East);
 		// PlaceSlider(new(3, 7), Direction.North);
 		// PlaceSlider(new(3, 6), Direction.East);
-		// PlaceUpdater(new(4, 6), Direction.East, 1, UpdateType.Double);
-		// PlaceSlider(new(5, 6), Direction.East);
-		// PlaceSlider(new(6, 6), Direction.South);
-		// PlaceSlider(new(6, 7), Direction.South);
-		// PlaceSlider(new(6, 8), Direction.West);
-		// PlaceUpdater(new(5, 8), Direction.West, 1, UpdateType.Double);
-		// PlaceSlider(new(4, 8), Direction.West);
-		// PlaceSlider(new(3, 8), Direction.North);
+		// PlaceUpdater(new(4, 6), Direction.East, 2, UpdateType.Double);
+		// return;
+
+		PlaceSupplier(new(0, 6), Direction.East, 1, [1, 2, 3, 4, 5, 6]);
+		PlaceSlider(new(2, 7), Direction.East);
+		PlaceSlider(new(3, 7), Direction.North);
+		PlaceSlider(new(3, 6), Direction.East);
+		PlaceUpdater(new(4, 6), Direction.East, 1, UpdateType.Double);
+		PlaceSlider(new(5, 6), Direction.East);
+		PlaceSlider(new(6, 6), Direction.South);
+		PlaceSlider(new(6, 7), Direction.South);
+		PlaceSlider(new(6, 8), Direction.West);
+		PlaceUpdater(new(5, 8), Direction.West, 1, UpdateType.Double);
+		PlaceSlider(new(4, 8), Direction.West);
+		PlaceSlider(new(3, 8), Direction.North);
 	}
 
 	public void PlaceInjector(IEnumerable<Command> cmdsToInject)
@@ -465,7 +455,7 @@ public partial class WorldPanel : Panel
 		
 		foreach (var tl in m_Tiles)
 		{
-			if (tl is TlHolder holder)
+			if (tl is Tile holder)
 			{
 				holder.DestroyItem(true);
 			}
@@ -494,9 +484,9 @@ public partial class WorldPanel : Panel
 	public void QueueBlockedSlideCmdByAnotherItem(CmdSlide cmd)
 	{
 		Debug.Assert(HasTile(cmd.GridFrom));
-		Debug.AssertIs(GetTile(cmd.GridFrom), typeof(TlHolder));
-		Debug.Assert(GetTile<TlHolder>(cmd.GridFrom).HasItem()); // Is there an actual item?
-		Debug.Assert(GetTile<TlHolder>(cmd.GetGridTo()).IsReserved()); // And is it blocked?
+		Debug.AssertIs(GetTile(cmd.GridFrom), typeof(Tile));
+		Debug.Assert(GetTile(cmd.GridFrom).HasItem()); // Is there an actual item?
+		Debug.Assert(GetTile(cmd.GetGridTo()).IsReserved()); // And is it blocked?
 		// For now dublication is not allowed, although logically it should be xd.
 		Debug.Assert(!m_BlockedSlideCmdsByItems.Contains(cmd));
 		

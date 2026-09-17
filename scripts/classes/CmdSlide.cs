@@ -7,9 +7,7 @@ namespace ArFactory;
 // is over.
 public partial class CmdSlide : Command
 {
-	public static CmdSlide FromTiles(TlHolder tlFrom, Direction dir) => new(tlFrom.GetGridLoc(), dir);
-	public static CmdSlide FromTiles(TlIO tlIO) => new(tlIO.GetGridLoc(), tlIO.GetOutputDir());
-	public static CmdSlide FromTiles(TlOutput tlIO) => new(tlIO.GetGridLoc(), tlIO.GetDir());
+	public static CmdSlide FromTiles(Tile tlFrom, Direction dir) => new(tlFrom.GridLoc, dir);
 
 	public Vector2I GridFrom { get; private set; }
 	public Direction Dir { get; private set; }
@@ -53,7 +51,7 @@ public partial class CmdSlide : Command
 		Debug.Assert(TrackedItem.IsAllowedToMove());
 
 		var gridTo = GetGridTo();
-		if (world.GetTile<TlHolder>(gridTo).IsReserved())
+		if (world.GetTile(gridTo).IsReserved())
 		{
 			return false;
 		}
@@ -75,7 +73,7 @@ public partial class CmdSlide : Command
 	private void HandleDefault(Level lv)
 	{
 		// Debug.Assert(TrackedItem == null);
-		Debug.AssertIs(lv.World.GetTile(GridFrom), typeof(TlHolder));
+		Debug.AssertIs(lv.World.GetTile(GridFrom), typeof(Tile));
 		
 		var gridTo = GetGridTo();
 		if (!lv.World.HasTile(gridTo))
@@ -84,17 +82,17 @@ public partial class CmdSlide : Command
 			return; // Forever and ever...
 		}
 
-		var srcTile = lv.World.GetTile<TlHolder>(GridFrom);
-		if (!srcTile.HasItem() || srcTile.GetItem().IsMidAnimation())
+		var srcTile = lv.World.GetTile(GridFrom);
+		if (!srcTile.HasItem() || srcTile.Item.IsMidAnimation())
 		{
 			PauseThisTick();
 			return;
 		}
 
-		TrackedItem = srcTile.GetItem();
+		TrackedItem = srcTile.Item;
 
-		var destTile = lv.World.GetTile<TlHolder>(gridTo);
-		if (!destTile.CanItemEnterInDir(srcTile.GetItem(), Dir))
+		var destTile = lv.World.GetTile(gridTo);
+		if (!destTile.CanItemEnterInDir(Dir))
 		{
 			PauseThisTick();
 			return; // Forever and ever probably...

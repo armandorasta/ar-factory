@@ -43,7 +43,8 @@ public partial class UnUpdater : Unit
 
 	protected override void BuildTiles()
 	{
-		AddIO(Vector2I.Zero, Direction.East, Direction.West);
+		AddInput(Vector2I.Zero, Direction.West);
+		AddOutput(Vector2I.Zero, Direction.East);
 	}
 
 	public override void PendNewCommands()
@@ -58,9 +59,9 @@ public partial class UnUpdater : Unit
 			return;
 		}
 
-		var tl = GetTile<TlIO>(Vector2I.Zero);
+		var tl = GetTile<Tile>(Vector2I.Zero);
 		PendCmd(CmdUpdate.FromTiles(tl, (val) => Apply(m_UpType, val)));
-		PendCmd(CmdSlide.FromTiles(tl));
+		PendCmd(CmdSlide.FromTiles(tl, Dir));
 	}
 
 	public override string ToString()

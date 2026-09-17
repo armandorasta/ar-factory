@@ -3,7 +3,7 @@ using System;
 using System.IO;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using GdUnit4;
+using System.Collections.Generic;
 
 namespace ArFactory;
 
@@ -35,9 +35,9 @@ internal static class Debug
 	/// equality operator. Use <seealso cref="AssertRefEq"/> for reference comparison.
 	/// </summary>
 	[StackTraceHidden] [DebuggerStepThrough]
-	public static void AssertEq<T>(IEquatable<T> testValue, IEquatable<T> target, string? msg = null)
+	public static void AssertEq<T>(T testValue, T target, string? msg = null)
 	{
-		HandleImpl(testValue == target,
+		HandleImpl(EqualityComparer<T>.Default.Equals(testValue, target),
 			$"AssertEq: expected '{target}' but got '{testValue}'.", 
 			msg);
 	}
@@ -63,8 +63,7 @@ internal static class Debug
 	/// </summary>
 	[StackTraceHidden] 
 	[DebuggerStepThrough] 
-	[DoesNotReturn] 
-	[ThrowsException(typeof(NotImplementedException))]
+	[DoesNotReturn]
 	public static void AssertUnreachable()
 	{
 		PrintStackTrace();

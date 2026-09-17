@@ -14,6 +14,11 @@ public class CommandTests
 	private Level m_Level;
 	private WorldPanel m_World;
 
+	public static void FailingTest(Level lv)
+	{
+		Asserts.AssertEq(5, 6);
+	}
+
 	[TestCase]
 	public void TestSomething()
 	{
@@ -55,17 +60,17 @@ public class CommandTests
 	[TestCase]
 	public async Task TestCmdSpawn()
 	{
-		m_World.InstallTile(new TlBlackhole(Vector2I.Zero));
+		m_World.InstallTile(new Tile(Vector2I.Zero));
 		m_World.PlaceInjector([new CmdSpawn(Vector2I.Zero, 5)]);
 		
 		m_Level.StartSimulation();
 		{
 			await m_Level.WaitForTicks(1);
 			
-			var tl = m_World.GetTile<TlBlackhole>(Vector2I.Zero);
+			var tl = m_World.GetTile(Vector2I.Zero);
 			AssertThat(tl.HasItem()).IsTrue();
 
-			var it = tl.GetItem();
+			var it = tl.Item;
 			AssertThat(it.GetValue()).Equals(5);
 			AssertThat(it.IsAllowedToMove()).IsTrue();
 			AssertThat(it.IsMidAnimation()).IsFalse();	
@@ -76,17 +81,17 @@ public class CommandTests
 	[TestCase]
 	public async Task TestCmdSlide()
 	{
-		m_World.InstallTile(new TlBlackhole(new(0, 0)));
-		m_World.InstallTile(new TlBlackhole(new(1, 0)));
+		m_World.InstallTile(new Tile(new(0, 0)));
+		m_World.InstallTile(new Tile(new(1, 0)));
 		
-		m_World.InstallTile(new TlBlackhole(new(2, 0)));
-		m_World.InstallTile(new TlBlackhole(new(2, 1)));
+		m_World.InstallTile(new Tile(new(2, 0)));
+		m_World.InstallTile(new Tile(new(2, 1)));
 		
-		// m_World.InstallTile(new TlBlackhole(new(3, 0)));
-		// m_World.InstallTile(new TlBlackhole(new(3, 1)));
+		// m_World.InstallTile(new Tile(new(3, 0)));
+		// m_World.InstallTile(new Tile(new(3, 1)));
 		
-		// m_World.InstallTile(new TlBlackhole(new(4, 0)));
-		// m_World.InstallTile(new TlBlackhole(new(5, 0)));
+		// m_World.InstallTile(new Tile(new(4, 0)));
+		// m_World.InstallTile(new Tile(new(5, 0)));
 		
 		m_World.PlaceInjector([
 			new CmdSpawn(new(0, 0), 1),
@@ -102,29 +107,29 @@ public class CommandTests
 		m_Level.StartSimulation(true);
 		{
 			await m_Level.WaitForTicks(1);
-			AssertThat(m_World.GetTile<TlBlackhole>(new(0, 0)).HasItem()).IsFalse();
-			AssertThat(m_World.GetTile<TlBlackhole>(new(1, 0)).HasItem()).IsTrue();
-			AssertThat(m_World.GetTile<TlBlackhole>(new(2, 0)).HasItem()).IsFalse();
-			AssertThat(m_World.GetTile<TlBlackhole>(new(2, 1)).HasItem()).IsTrue();
-			var it1 = m_World.GetTile<TlBlackhole>(new(1, 0)).GetItem();
+			AssertThat(m_World.GetTile(new(0, 0)).HasItem()).IsFalse();
+			AssertThat(m_World.GetTile(new(1, 0)).HasItem()).IsTrue();
+			AssertThat(m_World.GetTile(new(2, 0)).HasItem()).IsFalse();
+			AssertThat(m_World.GetTile(new(2, 1)).HasItem()).IsTrue();
+			var it1 = m_World.GetTile(new(1, 0)).Item;
 			AssertThat(it1.GetValue()).IsEqual(1);
 			AssertThat(it1.IsAllowedToMove()).IsFalse();
 			AssertThat(it1.IsMidAnimation()).IsTrue();
-			var it2 = m_World.GetTile<TlBlackhole>(new(2, 1)).GetItem();
+			var it2 = m_World.GetTile(new(2, 1)).Item;
 			AssertThat(it2.GetValue()).IsEqual(2);
 			AssertThat(it2.IsAllowedToMove()).IsFalse();
 			AssertThat(it2.IsMidAnimation()).IsTrue();
 
 			await m_Level.WaitForTicks(1);
-			AssertThat(m_World.GetTile<TlBlackhole>(new(0, 0)).HasItem()).IsFalse();
-			AssertThat(m_World.GetTile<TlBlackhole>(new(1, 0)).HasItem()).IsTrue();
-			AssertThat(m_World.GetTile<TlBlackhole>(new(2, 0)).HasItem()).IsFalse();
-			AssertThat(m_World.GetTile<TlBlackhole>(new(2, 1)).HasItem()).IsTrue();
-			it1 = m_World.GetTile<TlBlackhole>(new(1, 0)).GetItem();
+			AssertThat(m_World.GetTile(new(0, 0)).HasItem()).IsFalse();
+			AssertThat(m_World.GetTile(new(1, 0)).HasItem()).IsTrue();
+			AssertThat(m_World.GetTile(new(2, 0)).HasItem()).IsFalse();
+			AssertThat(m_World.GetTile(new(2, 1)).HasItem()).IsTrue();
+			it1 = m_World.GetTile(new(1, 0)).Item;
 			AssertThat(it1.GetValue()).IsEqual(1);
 			AssertThat(it1.IsAllowedToMove()).IsTrue();
 			AssertThat(it1.IsMidAnimation()).IsFalse();
-			it2 = m_World.GetTile<TlBlackhole>(new(2, 1)).GetItem();
+			it2 = m_World.GetTile(new(2, 1)).Item;
 			AssertThat(it2.GetValue()).IsEqual(2);
 			AssertThat(it2.IsAllowedToMove()).IsTrue();
 			AssertThat(it2.IsMidAnimation()).IsFalse();

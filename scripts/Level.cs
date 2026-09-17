@@ -69,6 +69,8 @@ public partial class Level : Node2D
 		SpeedSlider.Value = GetTickRate();
 
 		AddTools();
+
+		Tests.TestHandler.RunTests(this);
 	}
 
 	public override void _EnterTree()
@@ -187,6 +189,7 @@ public partial class Level : Node2D
 
 	
 	#endregion .Signal Handlers
+
 
 	private void SyncButtStates()
 	{

@@ -20,15 +20,19 @@ public abstract partial class Unit : Node2D
 
 
 	// Public Interface
+	public Vector2I GridLoc => m_GridLoc;
+	public Direction Dir => m_Dir;
+	public Vector2I Dims => m_Dims;
+	public int Rate => m_Rate;
 	public WorldPanel World { get; private set; }
-	public Vector2I GridLoc { get; private set; }
-	public int Rate { get; private set; }
-	public Vector2I Dims { get; private set; }
-	public Direction Dir { get; private set; } = Direction.East;
 
 
 	// Privates
 	private TickType m_TickType;
+	private Vector2I m_GridLoc;
+	private Direction m_Dir = Direction.East;
+	private Vector2I m_Dims;
+	public int m_Rate;
 
 	// Keeps track of `Rate` every tick.
 	private int m_Count = 0;
@@ -36,9 +40,9 @@ public abstract partial class Unit : Node2D
 	//  Commands that need to finish for the unit to keep operating again
 	private List<Command> m_PendingCmds = [];
 
-	// These are checked by the `ON_DEMAND` units
+	// These are checked by the on-demand units
 	// TODO: Add a way to add blocks to this list explicitly.
-	private List<TlHolder> m_HoldingTiles = [];
+	private List<Tile> m_TickTiles = [];
 
 	
 	public static bool CanFitIn(WorldPanel world, Vector2I gloc, Vector2I dims)
@@ -77,12 +81,14 @@ public abstract partial class Unit : Node2D
 	{
 		Debug.Assert(Unit.CanFitIn(world, gloc, dims));
 		Debug.Assert(CanFaceDir(dir));
+		Debug.Assert(workRate > 0);
+		Debug.Assert(Enum.IsDefined(tickType));
 
-		World = world;
-		Rate = workRate;
-		GridLoc = gloc;
-		Dims = dims;
-		m_TickType = tickType;
+		this.World = world;
+		this.m_Rate = workRate;
+		this.m_GridLoc = gloc;
+		this.m_Dims = dims;
+		this.m_TickType = tickType;
 
 		Position = world.GridToPos(gloc);
 
@@ -96,7 +102,7 @@ public abstract partial class Unit : Node2D
 			for (var x = 0; x < dims.X; ++x)
 			{
 				var myLoc = gloc + new Vector2I(x, y);
-				world.InstallTile(new TlSolid(myLoc));
+				world.InstallTile(Tile.CreateSolid(myLoc));
 			}
 		}
 
@@ -108,7 +114,7 @@ public abstract partial class Unit : Node2D
 	{
 		World = world;
 		m_TickType = TickType.Steady;
-		Position = world.GridToPos(Dims);
+		Position = world.GridToPos(m_Dims);
 	}
 
 	#region Abstract Interface
@@ -137,9 +143,9 @@ public abstract partial class Unit : Node2D
 		var bui = new StringBuilder("Unit[");
 		bui.Append(string.Join(", ", [
 			GridLoc, 
-			$"{Dims.X}x{Dims.Y}",
-			Dir,
-			$"{Rate}t/s",
+			$"{m_Dims.X}x{m_Dims.Y}",
+			m_Dir,
+			$"{m_Rate}t/s",
 		]));
 		return bui.Append(']').ToString();
 	}
@@ -147,27 +153,27 @@ public abstract partial class Unit : Node2D
 	/// <summary>
 	/// Returns enclosing Rect2I in grid-space.
 	/// </summary>
-	public Rect2I GetRect2I() => new(GridLoc, Dims);
+	public Rect2I GetRect2I() => new(m_GridLoc, m_Dims);
 	
 	/// <summary>
 	/// Returns enclosing Rect2 in world-space.
 	/// </summary>
 	public Rect2 GetRect2() 
-		=> new(World.CellWidth * (Vector2)GridLoc, World.CellWidth * (Vector2)Dims);
+		=> new(World.CellWidth * (Vector2)m_GridLoc, World.CellWidth * (Vector2)m_Dims);
 	
 	/// <summary>
 	/// Checks if <paramref name="gloc"/> is within the world in grid-space.
 	/// </summary>
 	public bool IsWithin(Vector2I gloc) => GetRect2I().HasPoint(gloc);
-	public Tile GetTile(Vector2I gloc) => World.GetTile(GridLoc + gloc);
+	public Tile GetTile(Vector2I gloc) => World.GetTile(m_GridLoc + gloc);
 	public T GetTile<T>(Vector2I gloc) where T : Tile => (T)GetTile(gloc);
 
 	/// <summary>
-	/// Returns true if the machine is expected to operate during this tick, <see cref="Rate"/> 
+	/// Returns true if the machine is expected to operate during this tick, <see cref="m_Rate"/> 
 	/// determines how 
-	/// often this function returns true, ex. when <see cref="Rate"/> is 1, it returns true every single tick.
+	/// often this function returns true, ex. when <see cref="m_Rate"/> is 1, it returns true every single tick.
 	/// </summary>
-	public bool IsWorkTick() => m_Count > 0 && m_Count % Rate == 0;
+	public bool IsWorkTick() => m_Count > 0 && m_Count % m_Rate == 0;
 
 	/// <summary>
 	/// Returns true if the command queue still has commands to be executed. You usually pend all the 
@@ -202,17 +208,17 @@ public abstract partial class Unit : Node2D
 	/// </summary>
 	public bool HasSpaceForRotate90()
 	{
-		if (Dims.X == Dims.Y)
+		if (m_Dims.X == m_Dims.Y)
 		{
 			return true;
 		}
 
-		Vector2I vec = Dims.X > Dims.Y ? new(0, Dims.Y) :  new(Dims.X, 0);
-		for (; vec.Y < Dims.X; ++vec.Y)
+		Vector2I vec = m_Dims.X > m_Dims.Y ? new(0, m_Dims.Y) :  new(m_Dims.X, 0);
+		for (; vec.Y < m_Dims.X; ++vec.Y)
 		{
-			for (; vec.X < Dims.Y; ++vec.X)
+			for (; vec.X < m_Dims.Y; ++vec.X)
 			{
-				if (World.HasTile(GridLoc + vec))
+				if (World.HasTile(m_GridLoc + vec))
 				{
 					return false;
 				}
@@ -231,17 +237,17 @@ public abstract partial class Unit : Node2D
 	public void SetDir(Direction newDir)
 	{
 		Debug.Assert(Enum.IsDefined(newDir));
-		if (newDir == Dir)
+		if (newDir == m_Dir)
 		{
 			return;
 		}
-		else if (newDir == Dir.Invert())
+		else if (newDir == m_Dir.Invert())
 		{
 			// Checking the inverse direction first is crucial because most units can only face east
 			// or west!
 			Rotate180();
 		}
-		else if (newDir == Dir.Rotate90())
+		else if (newDir == m_Dir.Rotate90())
 		{
 			Rotate90();
 		}
@@ -253,28 +259,28 @@ public abstract partial class Unit : Node2D
 
 	public void Rotate180()
 	{
-		Debug.Assert(CanFaceDir(Dir.Invert()));
+		Debug.Assert(CanFaceDir(m_Dir.Invert()));
 
-		if (Dims == Vector2I.One)
+		if (m_Dims == Vector2I.One)
 		{
 			GetTile(Vector2I.Zero).Rotate180();
-			Dir = Dir.Invert();
+			m_Dir = m_Dir.Invert();
 			return;
 		}
 
 		// (new.x, new.y) = (max_x - old.x, max_y - old.y)
-		var maxGLoc = Dims - Vector2I.One;
-		for (var y = 0; y < Dims.Y / 2; ++y) // Only go up to the center.
+		var maxGLoc = m_Dims - Vector2I.One;
+		for (var y = 0; y < m_Dims.Y / 2; ++y) // Only go up to the center.
 		{
-			for (var x = 0; x < Dims.X; ++x)
+			for (var x = 0; x < m_Dims.X; ++x)
 			{
 				var vec = new Vector2I(x, y);
 				GetTile(vec).Rotate180();
 				GetTile(maxGLoc - vec).Rotate180();
-				World.SwapTiles(GridLoc + vec, GridLoc + (maxGLoc - vec));
+				World.SwapTiles(m_GridLoc + vec, m_GridLoc + (maxGLoc - vec));
 			}
 		}
-		Dir = Dir.Invert();
+		m_Dir = m_Dir.Invert();
 	}
 
 	/// <summary>
@@ -283,41 +289,41 @@ public abstract partial class Unit : Node2D
 	/// </summary>
 	public void Rotate90()
 	{
-		Debug.Assert(CanFaceDir(Dir.Rotate90()));
+		Debug.Assert(CanFaceDir(m_Dir.Rotate90()));
 		Debug.Assert(HasSpaceForRotate90());
 
-		if (Dims == Vector2I.One)
+		if (m_Dims == Vector2I.One)
 		{
 			GetTile(Vector2I.Zero).Rotate90();
-			Dir = Dir.Rotate90();
+			m_Dir = m_Dir.Rotate90();
 			return;
 		}
 
 
 		// Collect all the tiles and remove them from the world.
-		var floatyTiles = new Tile[Dims.X * Dims.Y];
-		for (var y = 0; y < Dims.Y; ++y)
+		var floatyTiles = new Tile[m_Dims.X * m_Dims.Y];
+		for (var y = 0; y < m_Dims.Y; ++y)
 		{
-			for (var x = 0; x < Dims.X; ++x)
+			for (var x = 0; x < m_Dims.X; ++x)
 			{
-				floatyTiles[y * Dims.X + x] = World.ExtractTile(GridLoc + new Vector2I(x, y));
+				floatyTiles[y * m_Dims.X + x] = World.ExtractTile(m_GridLoc + new Vector2I(x, y));
 			}
 		}
 
 		// (new.x, new.y) = (max_y - old.y, old.x)
-		var maxY = Dims.Y - 1;
+		var maxY = m_Dims.Y - 1;
 		for (var i = 0; i < floatyTiles.Length; ++i)
 		{
 			var tl = floatyTiles[i];
 			tl.Rotate90();
-			var x = i % Dims.X;
-			var y = i / Dims.X;
-			tl.SetGridLocUnchecked(GridLoc + new Vector2I(maxY - y, x));
+			var x = i % m_Dims.X;
+			var y = i / m_Dims.X;
+			tl.SetGridLocUnsafe(m_GridLoc + new Vector2I(maxY - y, x));
 			World.InstallTile(tl);
 		}
 
-		Dims = new(Dims.Y, Dims.X);
-		Dir = Dir.Rotate90();
+		m_Dims = new(m_Dims.Y, m_Dims.X);
+		m_Dir = m_Dir.Rotate90();
 	}
 
 	/// <summary>
@@ -326,11 +332,11 @@ public abstract partial class Unit : Node2D
 	/// </summary>
 	public void Rotate270()
 	{
-		if (Dims == Vector2I.One)
+		if (m_Dims == Vector2I.One)
 		{
-			Debug.Assert(CanFaceDir(Dir.Rotate270()));
+			Debug.Assert(CanFaceDir(m_Dir.Rotate270()));
 			GetTile(Vector2I.Zero).Rotate270();
-			Dir = Dir.Rotate270();
+			m_Dir = m_Dir.Rotate270();
 			return;
 		}
 
@@ -346,113 +352,52 @@ public abstract partial class Unit : Node2D
 	/// Returns the adjusted tile. 
 	/// Input tiles let items slide in from a specified direction.
 	/// </summary>
-	public TlInput AddInput(Vector2I gloc, Direction dir)
+	/// <param name="bKeepTrack">
+	/// All tiles kept track of must be filled before the tick counter starts counting for on-demand 
+	/// units.
+	/// </param>
+	public Tile AddInput(Vector2I gloc, Direction dir, bool bKeepTrack = false)
 	{
-		Debug.Assert(IsWithin(GridLoc + gloc));
-		Debug.AssertIs(GetTile(gloc), typeof(TlSolid));
+		Debug.Assert(IsWithin(m_GridLoc + gloc));
+		Debug.Assert(GetTile(gloc).IsSolid(dir));
 		Debug.Assert(dir != Direction.East);
 
 		// Must be facing out of the unit.
-		Debug.Assert(!IsWithin(GridLoc + gloc + dir.ToGrid()));
+		Debug.Assert(!IsWithin(m_GridLoc + gloc + dir.ToGrid()));
 
-		var newTile = new TlInput(GridLoc + gloc, dir);
-		World.InstallTile(newTile, true);
-		m_HoldingTiles.Add(newTile);
-		return newTile;
+		Tile tl = World.GetTile(m_GridLoc + gloc);
+		tl.AddInput(dir, true);
+		if (bKeepTrack)
+		{
+			m_TickTiles.Add(tl);
+		}
+		return tl;
 	}
 
 	/// <summary>
 	/// Returns the adjusted tile. 
 	/// Output tiles are meant to generate tiles and slide them out in a specified direction.
 	/// </summary>
-	public TlOutput AddOutput(Vector2I gloc, Direction dir)
+	/// <param name="bKeepTrack">
+	/// All tiles kept track of must be filled before the tick counter starts counting for on-demand 
+	/// units.
+	/// </param>
+	public Tile AddOutput(Vector2I gloc, Direction dir, bool bKeepTrack = false)
 	{
-		Debug.Assert(IsWithin(GridLoc + gloc));
-		Debug.AssertIs(GetTile(gloc), typeof(TlSolid));
+		Debug.Assert(IsWithin(m_GridLoc + gloc));
+		Debug.Assert(GetTile(gloc).IsSolid(dir));
 		Debug.Assert(dir != Direction.West);
 
 		// Must be facing out of the unit.
-		Debug.Assert(!IsWithin(GridLoc + gloc + dir.ToGrid()));
+		Debug.Assert(!IsWithin(m_GridLoc + gloc + dir.ToGrid()));
 
-		var newTile = new TlOutput(GridLoc + gloc, dir);
-		World.InstallTile(newTile, true);
-		m_HoldingTiles.Add(newTile);
-		return newTile;
-	}
-
-	/// <summary>
-	/// Returns the adjusted tile. 
-	/// IO tiles are an input tile and output tile combined in one, they let items slide in in one 
-	/// direction, and are meant to let them slide out in another, the 2 directions may not coincide.
-	/// </summary>
-	public TlIO AddIO(Vector2I gloc, Direction outDir, Direction inDir)
-	{
-		Debug.Assert(IsWithin(GridLoc + gloc));
-		Debug.AssertIs(GetTile(gloc), typeof(TlSolid));
-		Debug.Assert(outDir != inDir);
-		Debug.Assert(outDir != Direction.West);
-		Debug.Assert(inDir != Direction.East);
-
-		// Both input and output must be facing out of the unit.
-		Debug.Assert(!IsWithin(GridLoc + gloc + inDir.ToGrid()));
-		Debug.Assert(!IsWithin(GridLoc + gloc + outDir.ToGrid()));
-
-		var newTile = new TlIO(GridLoc + gloc, outDir, inDir);
-		World.InstallTile(newTile, true);
-		m_HoldingTiles.Add(newTile);
-		return newTile;
-	}
-
-	/// <summary>
-	/// Returns the adjusted tile. 
-	/// Output tiles are meant to generate tiles and slide them out in a specified direction.
-	/// Sliders are not considered in tick counting for on-demand units.
-	/// </summary>
-	public TlSlider AddSlider(Vector2I gloc, Direction dir)
-	{
-		Debug.Assert(IsWithin(GridLoc + gloc));
-		Debug.AssertIs(GetTile(gloc), typeof(TlSolid));
-
-		// Must be facing out of the unit.
-		Debug.Assert(!IsWithin(GridLoc + gloc + dir.ToGrid()));
-
-		// For now sliders can be placed anywhere, and can face any direction.
-		// TODO: Assert that the slider's output and one input are connected.
-		// I will need tests for that of course...
-
-		var newTile = new TlSlider(GridLoc + gloc, dir);
-		World.InstallTile(newTile, true);
-		
-		// Sliders are not considered in tick counting for on-demand units.
-		// m_HoldingTiles.Add(newTile);
-		
-		return newTile;
-	}
-
-	/// <summary>
-	/// Returns the adjusted tile. 
-	/// Blackhole tiles allow in items from all directions.
-	/// Blackholes are not considered in tick counting for on-demand units.
-	/// </summary>
-	public TlBlackhole AddBlackhole(Vector2I gloc)
-	{
-		Debug.Assert(IsWithin(GridLoc + gloc));
-		Debug.AssertIs(GetTile(gloc), typeof(TlSolid));
-
-		// At least one direction must be facing out.
-		Debug.Assert(
-			!IsWithin(GridLoc + gloc + Direction.North.ToGrid()) ||
-			!IsWithin(GridLoc + gloc + Direction.East.ToGrid())  ||
-			!IsWithin(GridLoc + gloc + Direction.South.ToGrid()) ||
-			!IsWithin(GridLoc + gloc + Direction.West.ToGrid())   );
-
-		var newTile = new TlBlackhole(GridLoc + gloc);
-		World.InstallTile(newTile, true);
-		
-		// Blackholes are not considered in tick counting for on-demand units.
-		// m_HoldingTiles.Add(newTile);
-		
-		return newTile;
+		Tile tl = World.GetTile(m_GridLoc + gloc);
+		tl.AddOutput(dir, true);
+		if (bKeepTrack)
+		{
+			m_TickTiles.Add(tl);
+		}
+		return tl;
 	}
 
 
@@ -471,7 +416,7 @@ public abstract partial class Unit : Node2D
 				break;
 			
 			case TickType.OnDemand:
-				if (m_HoldingTiles.All((tl) => tl.HasItem()))
+				if (m_TickTiles.All((tl) => tl.HasItem()))
 				{
 					m_Count += 1;
 				}
