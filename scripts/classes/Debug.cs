@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using GdUnit4;
 
 namespace ArFactory;
 
@@ -18,20 +19,33 @@ internal static class Debug
 		HandleImpl(cond, $"Assertion Failed!", msg);
 	}
 
+	/// <summary>
+	/// Asserts: <paramref name="subject"/> is an instance of <paramref name="expectedType"/>.
+	/// </summary>
 	[StackTraceHidden] [DebuggerStepThrough]
-	public static void AssertIs(object lhs, Type type, string? msg = null)
+	public static void AssertIs(object subject, Type expectedType, string? msg = null)
 	{
-		var lhsTypeName = lhs.GetType().ToString();
-		var targetTypeName = type.ToString();
-		HandleImpl(lhsTypeName == targetTypeName, 
-			$"AssertIs: expected '{lhsTypeName}' but got '{targetTypeName}'.", 
+		HandleImpl(expectedType.IsInstanceOfType(subject), 
+			$"AssertIs: expected '{subject.GetType()}' but got '{expectedType}'.", 
 			msg);
 	}
 
+	/// <summary>
+	/// Asserts the <paramref name="testValue"/> is equal to <paramref name="target"/> using the
+	/// equality operator. Use <seealso cref="AssertRefEq"/> for reference comparison.
+	/// </summary>
 	[StackTraceHidden] [DebuggerStepThrough]
 	public static void AssertEq<T>(IEquatable<T> testValue, IEquatable<T> target, string? msg = null)
 	{
 		HandleImpl(testValue == target,
+			$"AssertEq: expected '{target}' but got '{testValue}'.", 
+			msg);
+	}
+
+	[StackTraceHidden] [DebuggerStepThrough]
+	public static void AssertRefEq<T>(T testValue, T target, string? msg = null)
+	{
+		HandleImpl(object.ReferenceEquals(testValue, target),
 			$"AssertEq: expected '{target}' but got '{testValue}'.", 
 			msg);
 	}
@@ -44,15 +58,23 @@ internal static class Debug
 			msg);
 	}
 
-	[StackTraceHidden] [DebuggerStepThrough] [DoesNotReturn]
+	/// <summary>
+	/// Used in branches meant to be impossible.
+	/// </summary>
+	[StackTraceHidden] 
+	[DebuggerStepThrough] 
+	[DoesNotReturn] 
+	[ThrowsException(typeof(NotImplementedException))]
 	public static void AssertUnreachable()
 	{
 		PrintStackTrace();
 		throw new NotImplementedException("AssertUnreachable: Code shouldn't be able to reach here!");
 	}
 
-	[StackTraceHidden] [DebuggerHidden]
-	private static void HandleImpl(bool bMustBe, string specialMsg, string? userMsg)
+
+	[StackTraceHidden] 
+	[DebuggerHidden]
+	private static void HandleImpl([DoesNotReturnIf(false)] bool bMustBe, string specialMsg, string? userMsg)
 	{
 #if DEBUG
 		if (bMustBe)
@@ -77,7 +99,7 @@ internal static class Debug
 	private static void PrintStackTrace(int nSkippedFrames = 1, bool includeGodotShit = false)
 	{
 		GD.PrintErr("Stack:");
-		var trace = new System.Diagnostics.StackTrace(nSkippedFrames, fNeedFileInfo: true);
+		var trace = new StackTrace(nSkippedFrames, fNeedFileInfo: true);
 		for (var i = 0; i < trace.FrameCount; ++i)
 		{
 			var frame = trace.GetFrame(i)!;
@@ -93,13 +115,13 @@ internal static class Debug
 				break;
 			}
 
-			var className = Path.GetFileNameWithoutExtension(frame.GetFileName());
+			var clazz = Path.GetFileNameWithoutExtension(frame.GetFileName());
 			var file = frame.GetFileName();
 			var meth = frame.GetMethod();
 			var line = frame.GetFileLineNumber();
 			var col = frame.GetFileColumnNumber();
 
-			GD.PrintErr($"[{i + 1}] ({className}) {meth} ({file}:{line}:{col})");
+			GD.PrintErr($"[{i + 1}] (class {clazz}) {meth} ({file}:{line}:{col})");
 		}
 	}
 }

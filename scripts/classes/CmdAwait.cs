@@ -3,18 +3,20 @@ using System;
 
 namespace ArFactory;
 
-// Waits for an item to arrive at a specific tile, makes sure if it's sliding in that the animation
-// is over.
+/// <summary>
+/// Waits for an item to arrive at a specific tile, makes sure if it's sliding into the target tile
+/// that the animation is over.
+/// </summary>
 public partial class CmdAwait(Vector2I gloc) : Command(1)
 {
-	public static CmdAwait FromTiles(TlHolder tl) => new(tl.GetGridLoc());
-
 	public Vector2I GridLoc = gloc;
+	
+	public static CmdAwait FromTiles(TlHolder tl) => new(tl.GetGridLoc());
 
 	public override void OnTick(Level lv)
 	{
-		Debug.Assert(lv.World.GetTile(GridLoc) is TlHolder);
-		var targetTile = lv.World.GetTile(GridLoc) as TlHolder;
+		Debug.AssertIs(lv.World.GetTile(GridLoc), typeof(TlHolder));
+		var targetTile = lv.World.GetTile<TlHolder>(GridLoc);
 		if (!targetTile.HasItem() || targetTile.GetItem().IsMidAnimation())
 		{
 			PauseThisTick();

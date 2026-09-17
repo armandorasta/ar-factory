@@ -10,8 +10,8 @@ public partial class CmdKill(Vector2I gloc) : Command(0)
 
 	public override void OnTick(Level lv)
 	{
-		Debug.Assert(lv.World.GetTile(GridLoc) is TlHolder);
-		var targetTile = lv.World.GetTile(GridLoc) as TlHolder;
+		Debug.AssertIs(lv.World.GetTile(GridLoc), typeof(TlHolder));
+		var targetTile = lv.World.GetTile<TlHolder>(GridLoc);
 		if (!targetTile.HasItem() || targetTile.GetItem().IsMidAnimation())
 		{
 			PauseThisTick();

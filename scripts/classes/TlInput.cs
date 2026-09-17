@@ -1,3 +1,4 @@
+using System.Text;
 using Godot;
 
 namespace ArFactory;
@@ -13,5 +14,8 @@ public partial class TlInput(Vector2I gloc, Direction dir) : TlHolder(gloc)
 	public override Color TypeToCol() => Colors.IndianRed;
 	public override Direction GetDir() => m_Dir;
 	public override void SetDir(Direction newDir) => m_Dir = newDir;
+
+	public override string ToString()
+		=> $"InputTile[on {m_GridLoc} -> {m_Dir}{GetItemToString()}]";
 }
 

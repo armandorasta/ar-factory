@@ -13,6 +13,36 @@ border_width_bottom = 1
 border_color = Color(0.8813782, 1, 0.6106771, 1)
 border_blend = true
 
+[sub_resource type="InputEventKey" id="InputEventKey_w8frs"]
+device = -1
+keycode = 4194336
+
+[sub_resource type="Shortcut" id="Shortcut_h4qsp"]
+events = [SubResource("InputEventKey_w8frs")]
+
+[sub_resource type="InputEventKey" id="InputEventKey_mx8sn"]
+device = -1
+shift_pressed = true
+keycode = 4194336
+
+[sub_resource type="InputEventKey" id="InputEventKey_2r41h"]
+device = -1
+keycode = 4194337
+
+[sub_resource type="InputEventKey" id="InputEventKey_klq6b"]
+device = -1
+keycode = 4194305
+
+[sub_resource type="Shortcut" id="Shortcut_xqrfn"]
+events = [SubResource("InputEventKey_mx8sn"), SubResource("InputEventKey_2r41h"), SubResource("InputEventKey_klq6b")]
+
+[sub_resource type="InputEventKey" id="InputEventKey_ppgk2"]
+device = -1
+keycode = 4194341
+
+[sub_resource type="Shortcut" id="Shortcut_u716c"]
+events = [SubResource("InputEventKey_ppgk2")]
+
 [node name="Level" type="Node2D" unique_id=1731236255]
 script = ExtResource("1_mx8sn")
 
@@ -125,14 +155,17 @@ alignment = 1
 [node name="PlayButt" type="Button" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox" unique_id=1254505]
 custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
+shortcut = SubResource("Shortcut_h4qsp")
 text = "PLAY"
 
 [node name="PauseButt" type="Button" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox" unique_id=1866396312]
 custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
+shortcut = SubResource("Shortcut_xqrfn")
 text = "PAUSE"
 
 [node name="DebugButt" type="Button" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox" unique_id=1629186902]
 custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
+shortcut = SubResource("Shortcut_u716c")
 text = "DEBUG"

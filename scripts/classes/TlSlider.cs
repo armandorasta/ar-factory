@@ -2,6 +2,7 @@ using Godot;
 
 namespace ArFactory;
 
+// TODO: Rename this to TlMerger
 public partial class TlSlider(Vector2I gloc, Direction dir) : TlHolder(gloc)
 {
 	private Direction m_Dir = dir;
@@ -12,4 +13,7 @@ public partial class TlSlider(Vector2I gloc, Direction dir) : TlHolder(gloc)
 	public override Color TypeToCol() => Colors.LightPink;
 	public override Direction GetDir() => m_Dir;
 	public override void SetDir(Direction newDir) => m_Dir = newDir;
+
+	public override string ToString()
+		=> $"SliderTile[on {m_GridLoc} -> {m_Dir}{GetItemToString()}]";
 }

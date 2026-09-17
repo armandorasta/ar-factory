@@ -1,0 +1,9 @@
+<RunSettings>
+  <GdUnit4>
+    <Parameters>--verbose --headless</Parameters>
+    <DisplayName>FullQualifiedName</DisplayName>
+    <CaptureStdOut>true</CaptureStdOut>
+    <!-- <CompileProcessTimeout>30000</CompileProcessTimeout> -->
+    <!-- <GodotConnectTimeout>20000</GodotConnectTimeout> -->
+  </GdUnit4>
+</RunSettings>

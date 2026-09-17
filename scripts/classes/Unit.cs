@@ -349,7 +349,7 @@ public abstract partial class Unit : Node2D
 	public TlInput AddInput(Vector2I gloc, Direction dir)
 	{
 		Debug.Assert(IsWithin(GridLoc + gloc));
-		Debug.Assert(GetTile(gloc) is TlSolid);
+		Debug.AssertIs(GetTile(gloc), typeof(TlSolid));
 		Debug.Assert(dir != Direction.East);
 
 		// Must be facing out of the unit.
@@ -368,7 +368,7 @@ public abstract partial class Unit : Node2D
 	public TlOutput AddOutput(Vector2I gloc, Direction dir)
 	{
 		Debug.Assert(IsWithin(GridLoc + gloc));
-		Debug.Assert(GetTile(gloc) is TlSolid);
+		Debug.AssertIs(GetTile(gloc), typeof(TlSolid));
 		Debug.Assert(dir != Direction.West);
 
 		// Must be facing out of the unit.
@@ -388,7 +388,7 @@ public abstract partial class Unit : Node2D
 	public TlIO AddIO(Vector2I gloc, Direction outDir, Direction inDir)
 	{
 		Debug.Assert(IsWithin(GridLoc + gloc));
-		Debug.Assert(GetTile(gloc) is TlSolid);
+		Debug.AssertIs(GetTile(gloc), typeof(TlSolid));
 		Debug.Assert(outDir != inDir);
 		Debug.Assert(outDir != Direction.West);
 		Debug.Assert(inDir != Direction.East);
@@ -411,7 +411,7 @@ public abstract partial class Unit : Node2D
 	public TlSlider AddSlider(Vector2I gloc, Direction dir)
 	{
 		Debug.Assert(IsWithin(GridLoc + gloc));
-		Debug.Assert(GetTile(gloc) is TlSolid);
+		Debug.AssertIs(GetTile(gloc), typeof(TlSolid));
 
 		// Must be facing out of the unit.
 		Debug.Assert(!IsWithin(GridLoc + gloc + dir.ToGrid()));
@@ -437,7 +437,7 @@ public abstract partial class Unit : Node2D
 	public TlBlackhole AddBlackhole(Vector2I gloc)
 	{
 		Debug.Assert(IsWithin(GridLoc + gloc));
-		Debug.Assert(GetTile(gloc) is TlSolid);
+		Debug.AssertIs(GetTile(gloc), typeof(TlSolid));
 
 		// At least one direction must be facing out.
 		Debug.Assert(
@@ -462,7 +462,7 @@ public abstract partial class Unit : Node2D
 	/// <summary>
 	/// This HAS to be called before <see cref="PendNewCommands"/>.
 	/// </summary>
-	public void PreProcessTick()
+	public void PreprocessTick()
 	{
 		switch (m_TickType)
 		{
@@ -492,7 +492,7 @@ public abstract partial class Unit : Node2D
 	/// </summary>
 	public void DoPerFrame(double dt, Level lv)
 	{
-		Debug.Assert(lv.World == this.World);
+		Debug.AssertRefEq(lv.World, this.World);
 		foreach (var cmd in m_PendingCmds)
 		{
 			cmd.DoPerFrame(dt, lv);
@@ -504,8 +504,8 @@ public abstract partial class Unit : Node2D
 	/// </summary>
 	public void HandleCmdTick(Level lv)
 	{
-		Debug.Assert(lv.World == this.World);
-		if (m_PendingCmds.Count == 0)
+        Debug.AssertRefEq(lv.World, this.World);
+        if (m_PendingCmds.Count == 0)
 		{
 			return;
 		}
@@ -516,14 +516,16 @@ public abstract partial class Unit : Node2D
 		{
 			currCmd.OnTick(lv);
 		}
+
+		// TODO: Fix this nonsense! I really don't like this zero tick command business, so solve
+		// it a different way ffs!
+		// Filtering below has to happen before counting ticks, otherwise things go wack.
+		m_PendingCmds = m_PendingCmds.FindAll((c) => !c.IsDone());
 		
-		// Count then check for finished commands, that's how the IsDone function is setup.
 		foreach (var cmd in m_PendingCmds)
 		{
 			cmd.CountThisTick();
 		}
-		
-		m_PendingCmds = m_PendingCmds.FindAll((c) => !c.IsDone());
 
 		if (m_PendingCmds.Count == 0)
 		{

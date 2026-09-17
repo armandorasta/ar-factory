@@ -1,3 +1,4 @@
+using System.Text;
 using Godot;
 
 namespace ArFactory;
@@ -39,4 +40,7 @@ public partial class TlIO(Vector2I gloc, Direction outDir, Direction inDir) : Tl
 		m_InputDir = newDir;
 		EmitSignal(SignalName.NeedsRedraw);
 	}
+
+	public override string ToString()
+		=> $"IOTile[on {m_GridLoc}, o:{m_OutputDir}, i:{m_InputDir}{GetItemToString()}]";
 }

@@ -48,11 +48,12 @@ public partial class CmdSlide : Command
 	/// </summary>
 	public bool TryMovingByOverlap(WorldPanel world)
 	{
-		Debug.Assert(m_StateFunc == HandleDestTile);
-		Debug.Assert(TrackedItem != null && TrackedItem.IsAllowedToMove());
+		Debug.Assert(m_StateFunc == HandleDefault);
+		Debug.AssertNotNull(TrackedItem);
+		Debug.Assert(TrackedItem.IsAllowedToMove());
 
 		var gridTo = GetGridTo();
-		if (world.GetTile(gridTo).IsReserved())
+		if (world.GetTile<TlHolder>(gridTo).IsReserved())
 		{
 			return false;
 		}
@@ -73,46 +74,38 @@ public partial class CmdSlide : Command
 
 	private void HandleDefault(Level lv)
 	{
-		Debug.Assert(TrackedItem == null);
-		Debug.Assert(lv.World.GetTile(GridFrom) is TlHolder);
-		var srcTile = lv.World.GetTile(GridFrom) as TlHolder;
-		if (!srcTile.HasItem() || !srcTile.GetItem().IsAllowedToMove())
+		// Debug.Assert(TrackedItem == null);
+		Debug.AssertIs(lv.World.GetTile(GridFrom), typeof(TlHolder));
+		
+		var gridTo = GetGridTo();
+		if (!lv.World.HasTile(gridTo))
+		{
+			PauseThisTick();
+			return; // Forever and ever...
+		}
+
+		var srcTile = lv.World.GetTile<TlHolder>(GridFrom);
+		if (!srcTile.HasItem() || srcTile.GetItem().IsMidAnimation())
 		{
 			PauseThisTick();
 			return;
 		}
 
 		TrackedItem = srcTile.GetItem();
-		m_StateFunc = HandleDestTile;
-		m_StateFunc.Invoke(lv);
-	}
 
-	private void HandleDestTile(Level lv)
-	{
-		var gridTo = GetGridTo();
-		if (!lv.World.HasTile(gridTo))
-		{
-			PauseThisTick(); // Items are not allowed to be scattered in the wild
-			return; // Forever and ever...
-		}
-
-		var srcTile = lv.World.GetTile(GridFrom) as TlHolder;
-		var destTile = lv.World.GetTile(gridTo) as TlHolder;
+		var destTile = lv.World.GetTile<TlHolder>(gridTo);
 		if (!destTile.CanItemEnterInDir(srcTile.GetItem(), Dir))
 		{
 			PauseThisTick();
-			return;
+			return; // Forever and ever probably...
 		}
 
 		if (destTile.IsReserved())
 		{
-			lv.World.BlockedSlideCmds.Add(this);
+			lv.World.QueueBlockedSlideCmdByAnotherItem(this);
 			PauseThisTick();
 			return;
 		}
-
-		// Item must not have been stolen somehow!
-		Debug.Assert(srcTile.HasItem() && srcTile.GetItem() == TrackedItem);
 		
 		// Can't use WorldPanel.TeleportItem because it will set the position to the destination 
 		// immediately.

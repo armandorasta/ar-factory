@@ -37,10 +37,11 @@ enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg", "res://addons/gut/p
 
 [gdunit4]
 
-settings/test/test_discovery=true
 ui/inspector/tree_view_mode=1
-ui/inspector/tree_sort_mode=1
 ui/toolbar/run_overall=true
+settings/common/update_notification_enabled=false
+settings/test/test_timeout_seconds=10
+settings/test/test_suite_naming_convention=2
 
 [input]
 

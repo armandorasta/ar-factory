@@ -14,7 +14,7 @@ public partial class CmdTeleport(Vector2I gfrom, Vector2I gto) : Command(0)
 	{
 		Debug.Assert(lv.World.GetTile(SrcGridLoc) is TlHolder);
 		Debug.Assert(lv.World.GetTile(DestGridLoc) is TlHolder);
-		var srcTile = lv.World.GetTile(SrcGridLoc) as TlHolder;
+		var srcTile = lv.World.GetTile<TlHolder>(SrcGridLoc);
 		if (!srcTile.HasItem() || srcTile.GetItem().IsMidAnimation())
 		{
 			PauseThisTick();

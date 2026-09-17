@@ -33,16 +33,17 @@ public partial class CmdCombine : Command
 
 	public override void OnTick(Level lv)
 	{
-		Debug.Assert(lv.World.GetTile(DestGridLoc) is TlHolder);
+		Debug.AssertIs(lv.World.GetTile(DestGridLoc), typeof(TlHolder));
 		Debug.Assert(SrcGridLocs.All((l) => lv.World.GetTile(l) is TlHolder));
-		var destTile = lv.World.GetTile(DestGridLoc) as TlHolder;
+		
+		var destTile = lv.World.GetTile<TlHolder>(DestGridLoc);
 		if (destTile.IsReserved())
 		{
 			PauseThisTick();
 			return;
 		}
 
-		if (SrcGridLocs.Any((l) => !lv.World.GetTile(l).HasItem()))
+		if (SrcGridLocs.Any((l) => !lv.World.GetTile<TlHolder>(l).HasItem()))
 		{
 			PauseThisTick();
 			return;
@@ -50,12 +51,12 @@ public partial class CmdCombine : Command
 
 		// This asserts that await was called before this command.
 		// TODO: Add sub-commands and remove the needs for the below assert.
-		Debug.Assert(SrcGridLocs.All((l) => !lv.World.GetTile(l).GetItem().IsMidAnimation()));
+		Debug.Assert(SrcGridLocs.All((l) => !lv.World.GetTile<TlHolder>(l).GetItem().IsMidAnimation()));
 
-		var values = SrcGridLocs.Select((l) => lv.World.GetTile(l).GetItem().GetValue());
+		var values = SrcGridLocs.Select((l) => lv.World.GetTile<TlHolder>(l).GetItem().GetValue());
 		foreach (var sgloc in SrcGridLocs)
 		{
-			(lv.World.GetTile(sgloc) as TlHolder).DestroyItem();
+			lv.World.GetTile<TlHolder>(sgloc).DestroyItem();
 		}
 		lv.World.SpawnItem(DestGridLoc, CombFunc.Invoke(values));
 	}

@@ -13,8 +13,8 @@ public partial class CmdUpdate(Vector2I gloc, Func<int, int> upFunc) : Command(0
 
 	public override void OnTick(Level lv)
 	{
-		Debug.Assert(lv.World.GetTile(GridLoc) is TlHolder);
-		var targetTile = lv.World.GetTile(GridLoc) as TlHolder;
+		Debug.AssertIs(lv.World.GetTile(GridLoc), typeof(TlHolder));
+		var targetTile = lv.World.GetTile<TlHolder>(GridLoc);
 		if (!targetTile.HasItem() || targetTile.GetItem().IsMidAnimation())
 		{
 			PauseThisTick();

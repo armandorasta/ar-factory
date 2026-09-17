@@ -2,14 +2,18 @@ using Godot;
 
 namespace ArFactory;
 
-public abstract partial class Tile(Vector2I gloc) : RefCounted
+public abstract partial class Tile(Vector2I gloc) : Godot.RefCounted
 {
-	const Direction DefaultDir = Direction.East;
+	// Constants
+	public const Direction DefaultDir = Direction.East;
 
+
+	// Signals
 	[Signal] 
 	public delegate void NeedsRedrawEventHandler();
 
 	
+	// Privates and protecteds
 	protected Vector2I m_GridLoc = gloc;
 
 	/// <summary>
@@ -33,18 +37,17 @@ public abstract partial class Tile(Vector2I gloc) : RefCounted
 	/// This is a shorthand for <c>tile is TlHolder holder &amp;&amp; holder.IsReserved()</c><br/>
 	/// This always returns true for tiles that are not <see cref="TlHolder"/> by default.
 	/// </summary>
-	public virtual bool IsReserved() => true;
+	// public virtual bool IsReserved() => true;
 
 	/// <summary>
 	/// Items are not allowed to slide into reserved tiles. <br/>
 	/// This does nothing for tiles that are not <see cref="TlHolder"/> by default.
 	/// </summary>
-	public virtual void SetReserved(bool toWhat) {}
+	// public virtual void SetReserved(bool toWhat) {}
 
 	/// <summary>
 	/// For <see cref="TlIO"/> this is an alias for <see cref="TlIO.GetOutputDir"/>.
 	/// </summary>
-	/// <returns></returns>
 	public virtual Direction GetDir() => DefaultDir;
 	
 	/// <summary>
@@ -72,12 +75,12 @@ public abstract partial class Tile(Vector2I gloc) : RefCounted
 	/// <summary>
 	/// Shorthand for: <c>tile is CS.TlHolder holder &amp;&amp; holder.HasItem()</c>
 	/// </summary>
-	public virtual bool HasItem() => false;
+	// public virtual bool HasItem() => false;
 
 	/// <summary>
 	/// Always returns null for tiles that are not <see cref="TlHolder"/>.
 	/// </summary>
-	public virtual Item GetItem(bool bMaybeNull = false) => null;
+	// public virtual Item GetItem(bool bMaybeNull = false) => null;
 
 	// No SetItem of course, adding that would have caused so many disasters, god damn...
 

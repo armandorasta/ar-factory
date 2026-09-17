@@ -53,7 +53,7 @@ public partial class CmdCondSlide : Command
 		Debug.Assert(lv.World.GetTile(FalseGridLoc) is TlHolder);
 		Debug.Assert(m_SlideCmd == null);
 
-		var srcTile = lv.World.GetTile(SrcGridLoc) as TlHolder;
+		var srcTile = lv.World.GetTile<TlHolder>(SrcGridLoc);
 		if (!srcTile.HasItem() || srcTile.GetItem().IsMidAnimation())
 		{
 			PauseThisTick();

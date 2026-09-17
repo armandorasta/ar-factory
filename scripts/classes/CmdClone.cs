@@ -34,7 +34,7 @@ public partial class CmdClone : Command
 			return;
 		}
 
-		if (DestGridLocs.Any((l) => lv.World.GetTile(l).IsReserved()))
+		if (DestGridLocs.Any((l) => lv.World.GetTile<TlHolder>(l).IsReserved()))
 		{
 			PauseThisTick();
 			return;			

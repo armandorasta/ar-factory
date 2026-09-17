@@ -1,0 +1,16 @@
+{
+  "profiles": {
+    "arFactory (C#)": {
+      "commandName": "Project",
+      "commandLineArgs": "-e --path \"E:\\c++ related\\godot\\projects\\ar-factory\"",
+      "workingDirectory": "$(ProjectDir)",
+      "nativeDebugging": true
+    },
+    "Profile 1": {
+      "commandName": "Executable",
+      "executablePath": "E:\\c++ related\\godot\\engine\\Godot_v4.7.2-stable_mono_win64\\Godot_v4.7.2-stable_mono_win64.exe",
+      "commandLineArgs": "--path \"$(ProjectDir)",
+      "workingDirectory": "$(ProjectDir)"
+    }
+  }
+}

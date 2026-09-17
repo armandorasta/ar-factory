@@ -8,4 +8,7 @@ public partial class TlBlackhole(Vector2I gloc) : TlHolder(gloc)
 	public override bool HasInputInDir(Direction dir) => true;
 	public override bool HasOutputInDir(Direction dir) => false;
 	public override Color TypeToCol() => Colors.Brown;
+
+	public override string ToString()
+		=> Utilz.ReplaceBaseNameInToString(base.ToString(), "BlackholeTile");
 }

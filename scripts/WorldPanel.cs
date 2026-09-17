@@ -25,13 +25,12 @@ public partial class WorldPanel : Panel
 	// Public interface
 	public readonly Vector2I Dims = new(15, 10);
 	public readonly float CellWidth = 100.0f;
-	// TODO: Make this private!
-	public List<CmdSlide> BlockedSlideCmds = [];
 
 
 	// Privates
 	private List<Unit> m_Units = [];
 	private List<Tile> m_Tiles = [];
+	private List<CmdSlide> m_BlockedSlideCmdsByItems = [];
 
 
 	#region .Essential Functions
@@ -80,6 +79,7 @@ public partial class WorldPanel : Panel
 	/// </summary>
 	public bool HasTile(Vector2I gloc) => IsWithin(gloc) && m_Tiles[GridToIndex(gloc)] != null;
 	public Tile GetTile(Vector2I gloc) => IsWithin(gloc) ? m_Tiles[GridToIndex(gloc)] : null;
+	public T GetTile<T>(Vector2I gloc) where T : Tile => (T)GetTile(gloc);
 
 	/// <summary>
 	/// Returns the whichever unit that <paramref name="gloc"/> lands on.
@@ -93,15 +93,18 @@ public partial class WorldPanel : Panel
 				return u;
 			}
 		}
+
 		return null;
 	}
 
 
 	#region .Tile Methods
 
-	// Adds the passed tile to the world, the tile has to be within boundaries!
-	// `bOverride` can be used to override an existing tile in the same location, the old tile will be
-	// sent to oblivion and not returned.
+	/// <summary>
+	/// Adds the passed tile to the world, the tile has to be within boundaries!
+	/// <paramref name="bOverride"/> can be used to override an existing tile in the same location, 
+	/// the old tile will be sent to oblivion and not returned.
+	/// </summary>
 	public Tile InstallTile(Tile tl, bool bOverride = false)
 	{
 		var gloc = tl.GetGridLoc();
@@ -200,8 +203,8 @@ public partial class WorldPanel : Panel
 	/// </summary>
 	public Item SpawnItem(Vector2I gloc, int value)
 	{
-		Debug.Assert(GetTile(gloc) is TlHolder);
-		var myTile = GetTile(gloc) as TlHolder;
+		Debug.AssertIs(GetTile(gloc), typeof(TlHolder));
+		var myTile = GetTile<TlHolder>(gloc);
 		Debug.Assert(!myTile.IsReserved()); // Might have to change this to `HasItem`, but who knows.
 		
 		var newItem = ItemScene.Instantiate<Item>();
@@ -221,11 +224,13 @@ public partial class WorldPanel : Panel
 	{
 		Debug.Assert(IsWithin(gSrc));
 		Debug.Assert(IsWithin(gDest));
-		Debug.Assert(HasTile(gSrc) && GetTile(gSrc) is TlHolder);
-		Debug.Assert(HasTile(gDest)   && GetTile(gDest)   is TlHolder);
-		Debug.Assert(bMaybeNull || (GetTile(gSrc) as TlHolder).HasItem());
-		Debug.Assert(bOverride || gSrc == gDest || !(GetTile(gDest) as TlHolder).HasItem());
-		return SpawnItem(gDest, GetTile(gSrc).GetItem(false).GetValue());
+		Debug.Assert(HasTile(gSrc));
+		Debug.AssertIs(GetTile(gSrc), typeof(TlHolder));
+		Debug.Assert(HasTile(gDest));
+		Debug.AssertIs(GetTile(gDest), typeof(TlHolder));
+		Debug.Assert(bMaybeNull || GetTile<TlHolder>(gSrc).HasItem());
+		Debug.Assert(bOverride || gSrc == gDest || !GetTile<TlHolder>(gDest).HasItem());
+		return SpawnItem(gDest, GetTile<TlHolder>(gSrc).GetItem().GetValue());
 	}
 
 	/// <summary>
@@ -237,15 +242,18 @@ public partial class WorldPanel : Panel
 	{
 		Debug.Assert(IsWithin(gSrc));
 		Debug.Assert(IsWithin(gDest));
-		Debug.Assert(GetTile(gSrc) is TlHolder);
-		Debug.Assert(GetTile(gDest) is TlHolder);
+		Debug.Assert(HasTile(gSrc));
+		Debug.AssertIs(GetTile(gSrc), typeof(TlHolder));
+		Debug.Assert(HasTile(gDest));
+		Debug.AssertIs(GetTile(gDest), typeof(TlHolder));
+
 		if (gSrc == gDest)
 		{
-			return GetTile(gSrc).GetItem();
+			return GetTile<TlHolder>(gSrc).GetItem();
 		}
 
-		var srcTile = GetTile(gSrc) as TlHolder;
-		var destTile = GetTile(gDest) as TlHolder;
+		var srcTile = GetTile<TlHolder>(gSrc);
+		var destTile = GetTile<TlHolder>(gDest);
 		Debug.Assert(bMaybeNull || srcTile.HasItem());
 		Debug.Assert(bOverride || gSrc == gDest || !destTile.HasItem());
 		destTile.SetItemUnchecked(srcTile.ExtractItem());
@@ -268,16 +276,19 @@ public partial class WorldPanel : Panel
 
 	public void OnTick(Level lv)
 	{
-		Debug.Assert(lv.World == this);
+		Debug.AssertRefEq(lv.World, this);
 		foreach (var tl in m_Tiles)
 		{
-			tl?.GetItem(true)?.ResetMovementFlag();
+			if (tl is not null && tl is TlHolder holder)
+			{
+				holder.GetItem(true)?.ResetMovementFlag();
+			}
 		}
 
 		// THIS LOOP HAS TO HAPPEN BEFORE PENDING NEW COMMANDS!
 		foreach (var u in m_Units)
 		{
-			u.PreProcessTick();
+			u.PreprocessTick();
 		}
 
 		// This must happen before HandleCmdTick, otherwise the first tick will handle nothing.
@@ -296,7 +307,7 @@ public partial class WorldPanel : Panel
 		HandleSlideCmdOverlapping();
 	}
 
-	public void CleanUp()
+	public void CleanUpAfterSim()
 	{
 		foreach (var u in m_Units)
 		{
@@ -311,7 +322,7 @@ public partial class WorldPanel : Panel
 			}
 		}
 
-		BlockedSlideCmds.Clear();
+		m_BlockedSlideCmdsByItems.Clear();
 	}
 
 	#endregion
@@ -319,13 +330,9 @@ public partial class WorldPanel : Panel
 
 	public override void _Ready()
 	{
-		Size = CellWidth * (Vector2)Dims;
-		for (var i = 0; i < Dims.X * Dims.Y; ++i)
-		{
-			m_Tiles.Add(null);
-		}
+		Reset();
 
-		PlaceSomeUnits();
+		// PlaceSomeUnits();
 	}
 
 	public override void _Draw()
@@ -358,30 +365,31 @@ public partial class WorldPanel : Panel
 	[System.Diagnostics.Conditional("DEBUG")]
 	private void PlaceSomeUnits()
 	{
-		// PlaceInjector([
-		// 	new CmdSpawn(new(2, 7), 1),
-		// 	new CmdSpawn(new(2, 7), 2),
-		// 	new CmdSpawn(new(2, 7), 3),
-		// 	new CmdSpawn(new(2, 7), 3),
-		// ]);
+		PlaceInjector([
+			new CmdSpawn(new(2, 7), 1),
+			new CmdSlide(new(2, 7), Direction.West),
+			new CmdSpawn(new(2, 7), 2),
+			new CmdSpawn(new(2, 7), 3),
+		]);
+		PlaceSlider(new(1, 7), Direction.East);
+		PlaceSlider(new(2, 7), Direction.East);
+		PlaceSlider(new(3, 7), Direction.North);
+		// PlaceSlider(new(3, 6), Direction.East);
+		// PlaceUpdater(new(4, 6), Direction.East, 2, UpdateType.Double);
+		return;
+
+		// PlaceSupplier(new(0, 6), Direction.East, 1, [1, 2, 3, 4, 5, 6]);
 		// PlaceSlider(new(2, 7), Direction.East);
 		// PlaceSlider(new(3, 7), Direction.North);
 		// PlaceSlider(new(3, 6), Direction.East);
-		// PlaceUpdater(new(4, 6), Direction.East, 2, UpdateType.Double);
-		// return;
-
-		PlaceSupplier(new(0, 6), Direction.East, 1, [1, 2, 3, 4, 5, 6]);
-		PlaceSlider(new(2, 7), Direction.East);
-		PlaceSlider(new(3, 7), Direction.North);
-		PlaceSlider(new(3, 6), Direction.East);
-		PlaceUpdater(new(4, 6), Direction.East, 1, UpdateType.Double);
-		PlaceSlider(new(5, 6), Direction.East);
-		PlaceSlider(new(6, 6), Direction.South);
-		PlaceSlider(new(6, 7), Direction.South);
-		PlaceSlider(new(6, 8), Direction.West);
-		PlaceUpdater(new(5, 8), Direction.West, 1, UpdateType.Double);
-		PlaceSlider(new(4, 8), Direction.West);
-		PlaceSlider(new(3, 8), Direction.North);
+		// PlaceUpdater(new(4, 6), Direction.East, 1, UpdateType.Double);
+		// PlaceSlider(new(5, 6), Direction.East);
+		// PlaceSlider(new(6, 6), Direction.South);
+		// PlaceSlider(new(6, 7), Direction.South);
+		// PlaceSlider(new(6, 8), Direction.West);
+		// PlaceUpdater(new(5, 8), Direction.West, 1, UpdateType.Double);
+		// PlaceSlider(new(4, 8), Direction.West);
+		// PlaceSlider(new(3, 8), Direction.North);
 	}
 
 	public void PlaceInjector(IEnumerable<Command> cmdsToInject)
@@ -451,6 +459,50 @@ public partial class WorldPanel : Panel
 	#endregion // Placement Functions
 	#region .Other Methods
 
+	public void Reset()
+	{
+		Size = CellWidth * (Vector2)Dims;
+		
+		foreach (var tl in m_Tiles)
+		{
+			if (tl is TlHolder holder)
+			{
+				holder.DestroyItem(true);
+			}
+		}
+		m_Tiles.Clear();
+		for (var i = 0; i < Dims.X * Dims.Y; ++i)
+		{
+			m_Tiles.Add(null);
+		}
+
+		foreach (var u in m_Units)
+		{
+			u.QueueFree();
+			RemoveChild(u);
+		}
+		m_Units.Clear();
+		
+		m_BlockedSlideCmdsByItems.Clear();
+	}
+
+
+	/// <summary>
+	/// Adds a slide command blocked by another item in the way only, all other types crash the
+	/// program.
+	/// </summary>
+	public void QueueBlockedSlideCmdByAnotherItem(CmdSlide cmd)
+	{
+		Debug.Assert(HasTile(cmd.GridFrom));
+		Debug.AssertIs(GetTile(cmd.GridFrom), typeof(TlHolder));
+		Debug.Assert(GetTile<TlHolder>(cmd.GridFrom).HasItem()); // Is there an actual item?
+		Debug.Assert(GetTile<TlHolder>(cmd.GetGridTo()).IsReserved()); // And is it blocked?
+		// For now dublication is not allowed, although logically it should be xd.
+		Debug.Assert(!m_BlockedSlideCmdsByItems.Contains(cmd));
+		
+		m_BlockedSlideCmdsByItems.Add(cmd);
+	}
+
 	/// <summary>
 	/// Called after handling all ticks of pending commands
 	/// </summary>
@@ -461,9 +513,9 @@ public partial class WorldPanel : Panel
 		while (1 + 1 == 2)
 		{
 			var dirtyIndex = -1;
-			for (var i = 0; i < BlockedSlideCmds.Count; ++i)
+			for (var i = 0; i < m_BlockedSlideCmdsByItems.Count; ++i)
 			{
-				if (BlockedSlideCmds[i].TryMovingByOverlap(this))
+				if (m_BlockedSlideCmdsByItems[i].TryMovingByOverlap(this))
 				{
 					dirtyIndex = i;
 					break;
@@ -475,9 +527,9 @@ public partial class WorldPanel : Panel
 			}
 
 			// Something moved? can only move once per tick so bye-bye.
-			BlockedSlideCmds.RemoveAt(dirtyIndex);
+			m_BlockedSlideCmdsByItems.RemoveAt(dirtyIndex);
 		}
-		BlockedSlideCmds.Clear();
+		m_BlockedSlideCmdsByItems.Clear();
 	}
 
 	/// <summary>

@@ -11,8 +11,8 @@ public partial class CmdDemand(Vector2I gloc, int reqVal) : Command(1)
 
 	public override void OnTick(Level lv)
 	{
-		Debug.Assert(lv.World.GetTile(GridLoc) is TlHolder);
-		var targetTile = lv.World.GetTile(GridLoc) as TlHolder;
+		Debug.AssertIs(lv.World.GetTile(GridLoc), typeof(TlHolder));
+		var targetTile = lv.World.GetTile<TlHolder>(GridLoc);
 		if (!targetTile.HasItem() || targetTile.GetItem().IsMidAnimation())
 		{
 			PauseThisTick();

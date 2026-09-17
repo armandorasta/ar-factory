@@ -9,10 +9,10 @@ public abstract partial class TlHolder(Vector2I gloc) : Tile(gloc)
 	private Item m_Item;
 	private bool m_bReserved = false;
 
-	public override bool IsReserved() => m_bReserved;
-	public override void SetReserved(bool toWhat) => m_bReserved = toWhat;
-	public override bool HasItem() => m_Item != null;
-	public override Item GetItem(bool bMaybeNull = false)
+	public bool IsReserved() => m_bReserved;
+	public void SetReserved(bool toWhat) => m_bReserved = toWhat;
+	public bool HasItem() => m_Item != null;
+	public Item GetItem(bool bMaybeNull = false)
 	{
 		Debug.Assert(bMaybeNull || HasItem());
 		return m_Item;
@@ -59,12 +59,8 @@ public abstract partial class TlHolder(Vector2I gloc) : Tile(gloc)
 		return myItem;
 	}
 
-	public override string ToString()
-	{
-		var bui = new StringBuilder("TlHolder[");
-		bui.Append(m_GridLoc);
-		if (m_Item is not null) bui.Append($", item({m_Item.GetValue()})");
-		return bui.Append(']').ToString();
-	}
+	public override string ToString() => $"HolderTile[on {m_GridLoc}{GetItemToString()}]";
+	protected string GetItemToString()
+		=> m_Item is null ? "" : $" with item({m_Item.GetValue()})";
 }
 

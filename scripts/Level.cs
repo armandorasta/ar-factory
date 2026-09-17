@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using System.Threading.Tasks;
 
 namespace ArFactory;
 
@@ -7,6 +8,15 @@ public partial class Level : Node2D
 {
 	enum PlayMode { Off, Play, Debug }
 
+	/// <summary>
+	/// Emitted after a tick is fully processed. <paramref name="tickCount"/> is the number of ticks
+	/// processed up until now.
+	/// </summary>
+	[Signal]
+	public delegate void TickProcessedEventHandler(int tickCount);
+
+
+	// Nodes
 	public Camera2D Cam;
 	public WorldPanel World;
 	public Button PlayButt;
@@ -18,12 +28,17 @@ public partial class Level : Node2D
 	public HSlider SpeedSlider;
 	public Label TickSpeedLabel;
 
+
+	// Publics
 	public float DefaultTickMillis = 300.0f;
 
+
+	// Privates
 	private PlayMode m_CurrPlayMode = PlayMode.Off;
 	private Timer m_TickTimer = new();
 	private int m_TickCount = 0; // Number of ticks since the start.
 	private float m_TickMillis;
+
 
 	public override void _Ready()
 	{
@@ -82,13 +97,63 @@ public partial class Level : Node2D
 	public void ResetTickRate() { m_TickMillis = DefaultTickMillis; }
 	public void SetTickRate(float ratePerSec) { m_TickMillis = 1000.0f / ratePerSec; }
 
+	public bool IsSimRunning() => m_CurrPlayMode != PlayMode.Off;
+	public bool IsDebugging() => m_CurrPlayMode == PlayMode.Debug;
+
 
 	private void OnTick()
 	{
 		World.OnTick(this);
 		TicksLabel.Text = $"ticks: {m_TickCount}";
 		m_TickCount += 1;
+		EmitSignal(SignalName.TickProcessed, m_TickCount);
 	}
+
+	public void StartSimulation(bool bWasteFirstTick = false)
+	{
+		Debug.Assert(m_CurrPlayMode != PlayMode.Play);
+		m_CurrPlayMode = PlayMode.Play;
+		SyncButtStates();
+		OnSimulationStart();
+
+		m_TickTimer.Paused = false;
+
+		if (bWasteFirstTick)
+		{
+			m_TickTimer.Start(m_TickMillis * 0.001f);
+		}
+		else
+		{
+			OnTickTimer_TimeOut();
+		}
+	}
+
+	public void EndSimulation()
+	{
+		Debug.Assert(m_CurrPlayMode != PlayMode.Off);
+		m_CurrPlayMode = PlayMode.Off;
+		SyncButtStates();
+
+		// This makes it possible to call this function multiple times
+		if (m_TickCount > 0)
+		{
+			OnSimulationEnd();
+		}
+	}
+
+	/// <summary>
+	/// Waits a certain number of ticks, and returns after processing the last tick.
+	/// </summary>
+	public async Task WaitForTicks(int tickCount)
+	{
+		for (var i = 0; i < tickCount; ++i)
+		{
+			await ToSignal(this, SignalName.TickProcessed);
+		}
+	}
+
+
+	#region .Signal Handlers
 
 	private void OnTickTimer_TimeOut()
 	{
@@ -99,21 +164,12 @@ public partial class Level : Node2D
 
 	private void OnPlayButt_Pressed()
 	{
-		Debug.Assert(m_CurrPlayMode != PlayMode.Play);
-		m_CurrPlayMode = PlayMode.Play;
-		SyncButtStates();
-		OnSimulationStart();
-
-		m_TickTimer.Paused = false;
-		OnTickTimer_TimeOut();
+		StartSimulation();
 	}
-	
+
 	private void OnPauseButt_Pressed()
 	{
-		Debug.Assert(m_CurrPlayMode != PlayMode.Off);
-		m_CurrPlayMode = PlayMode.Off;
-		SyncButtStates();
-		OnSimulationEnd();
+		EndSimulation();
 	}
 
 	private void OnDebugButt_Pressed()
@@ -121,13 +177,16 @@ public partial class Level : Node2D
 		m_CurrPlayMode = PlayMode.Debug;
 		SyncButtStates();
 		GD.Print("Debug thick meaty butt");
-	}	
+	}
 
 	private void OnSpeedSlider_ValueChanged(double newVal)
 	{
 		SetTickRate((float)newVal);
 		TickSpeedLabel.Text = $"{GetTickRate()} tick/s";
 	}
+
+	
+	#endregion .Signal Handlers
 
 	private void SyncButtStates()
 	{
@@ -141,7 +200,7 @@ public partial class Level : Node2D
 			break;
 		
 		case PlayMode.Play:
-			PlayButt.Disabled = false;
+			PlayButt.Disabled = true;
 			PauseButt.Disabled = false;
 			DebugButt.Disabled = false;
 			PlayHBox.Show();
@@ -149,7 +208,7 @@ public partial class Level : Node2D
 			break;
 		
 		case PlayMode.Debug:
-			PlayButt.Disabled = true;
+			PlayButt.Disabled = false;
 			PauseButt.Disabled = false;
 			DebugButt.Disabled = false;
 			PlayHBox.Show();
@@ -164,7 +223,7 @@ public partial class Level : Node2D
 
 	private void OnSimulationEnd()
 	{
-		World.CleanUp();
+		World.CleanUpAfterSim();
 		m_TickTimer.Paused = true;
 		m_TickCount = 0;
 	}
