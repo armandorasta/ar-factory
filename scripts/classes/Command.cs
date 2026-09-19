@@ -3,14 +3,20 @@ using System;
 
 namespace ArFactory;
 
-public abstract partial class Command(int tickCount) : RefCounted
+public abstract partial class Command : RefCounted
 {
 	// Number of _Ticks it takes to finish.
-	private int m_Ticks = tickCount;
+	private int m_Ticks;
 
 	/// Keeps track of _Ticks passed for this command.
 	/// Not that simple though, because sometimes the command has to wait for something and freezes.
 	private int m_Count = 0;
+
+	public Command(int tickCount)
+	{
+		Debug.Assert(tickCount >= 0);
+		m_Ticks = tickCount;
+	}
 
 	public abstract void OnTick(Level lv);
 	
@@ -24,10 +30,15 @@ public abstract partial class Command(int tickCount) : RefCounted
 	/// commands will take 2 ticks; one will block the other on the first tick.
 	public int GetTickCount() => m_Ticks;
 
-
+	/// <summary>
+	/// Count then check.
+	/// </summary>
 	public void CountThisTick() => m_Count += 1;
 	public void PauseThisTick() => m_Count -= 1;
-	public bool IsDone() => m_Count >= m_Ticks;
+	/// <summary>
+	/// Count then check.
+	/// </summary>
+	public bool IsDone() => m_Count > m_Ticks;
 
 	public override string ToString() => $"Cmd[{m_Count}/{m_Ticks}]";
 }

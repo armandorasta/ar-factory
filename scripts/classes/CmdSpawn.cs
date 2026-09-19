@@ -11,9 +11,7 @@ public partial class CmdSpawn(Vector2I gloc, int val) : Command(0)
 
 	public override void OnTick(Level lv)
 	{
-		Debug.AssertIs(lv.World.GetTile(GridLoc), typeof(Tile));
-		var targetTile = lv.World.GetTile(GridLoc);
-		if (targetTile.IsReserved())
+		if (lv.World.GetTile(GridLoc).IsReserved())
 		{
 			PauseThisTick();
 			return;

@@ -92,7 +92,7 @@ public partial class CmdSlide : Command
 		TrackedItem = srcTile.Item;
 
 		var destTile = lv.World.GetTile(gridTo);
-		if (!destTile.CanItemEnterInDir(Dir))
+		if (!destTile.CanItemEnter(Dir))
 		{
 			PauseThisTick();
 			return; // Forever and ever probably...
@@ -107,7 +107,8 @@ public partial class CmdSlide : Command
 		
 		// Can't use WorldPanel.TeleportItem because it will set the position to the destination 
 		// immediately.
-		destTile.SetItemUnchecked(srcTile.ExtractItem());
+		lv.World.TeleportItem(srcTile.GridLoc, destTile.GridLoc);
+		TrackedItem.Position = lv.World.GridToPos(srcTile.GridLoc);
 		TrackedItem.DisallowMovementThisTick();
 		TrackedItem.SetMidAnimationFlag(true);
 		m_StateFunc = HandleAfterAnimation;

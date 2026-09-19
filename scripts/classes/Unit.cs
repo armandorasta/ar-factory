@@ -47,7 +47,7 @@ public abstract partial class Unit : Node2D
 	
 	public static bool CanFitIn(WorldPanel world, Vector2I gloc, Vector2I dims)
 	{
-		if (!world.GetRectGrid().Encloses(new Rect2I(gloc, dims)))
+		if (!world.GetGridRect().Encloses(new Rect2I(gloc, dims)))
 		{
 			return false;
 		}
@@ -102,7 +102,7 @@ public abstract partial class Unit : Node2D
 			for (var x = 0; x < dims.X; ++x)
 			{
 				var myLoc = gloc + new Vector2I(x, y);
-				world.InstallTile(Tile.CreateSolid(myLoc));
+				world.InstallTile(Tile.CreateSolid(Vector2I.Zero), myLoc);
 			}
 		}
 
@@ -318,8 +318,7 @@ public abstract partial class Unit : Node2D
 			tl.Rotate90();
 			var x = i % m_Dims.X;
 			var y = i / m_Dims.X;
-			tl.SetGridLocUnsafe(m_GridLoc + new Vector2I(maxY - y, x));
-			World.InstallTile(tl);
+			World.InstallTile(tl, m_GridLoc + new Vector2I(maxY - y, x));
 		}
 
 		m_Dims = new(m_Dims.Y, m_Dims.X);
@@ -366,7 +365,7 @@ public abstract partial class Unit : Node2D
 		Debug.Assert(!IsWithin(m_GridLoc + gloc + dir.ToGrid()));
 
 		Tile tl = World.GetTile(m_GridLoc + gloc);
-		tl.AddInput(dir, true);
+		tl.MakeOutput(dir, true);
 		if (bKeepTrack)
 		{
 			m_TickTiles.Add(tl);
@@ -392,7 +391,7 @@ public abstract partial class Unit : Node2D
 		Debug.Assert(!IsWithin(m_GridLoc + gloc + dir.ToGrid()));
 
 		Tile tl = World.GetTile(m_GridLoc + gloc);
-		tl.AddOutput(dir, true);
+		tl.MakeInput(dir, true);
 		if (bKeepTrack)
 		{
 			m_TickTiles.Add(tl);
@@ -457,19 +456,56 @@ public abstract partial class Unit : Node2D
 
 		// We have to execute all of them, because so of them are executed in different tiles in
 		// parallel. We will move the resposbility of them not clashing to the commands themselves.
-		foreach (var currCmd in m_PendingCmds)
-		{
-			currCmd.OnTick(lv);
-		}
 
 		// TODO: Fix this nonsense! I really don't like this zero tick command business, so solve
 		// it a different way ffs!
-		// Filtering below has to happen before counting ticks, otherwise things go wack.
-		m_PendingCmds = m_PendingCmds.FindAll((c) => !c.IsDone());
-		
-		foreach (var cmd in m_PendingCmds)
+
+
+		// When a sleep is in the front, it will act as a checkpoint. It must finish before any
+		// commands after do anything.
+		if (m_PendingCmds[0] is CmdSleep)
 		{
-			cmd.CountThisTick();
+			m_PendingCmds[0].CountThisTick();
+			if (m_PendingCmds[0].IsDone())
+			{
+				m_PendingCmds.RemoveAt(0);
+			}
+		}
+		else
+		{
+			// When a sleep is not at the front, finish all the commands before it, then the above 
+			// applies.
+			var executedCmdCount = m_PendingCmds.Count;
+			for (var i = 0; i < m_PendingCmds.Count; ++i)
+			{
+				var cmd = m_PendingCmds[i];
+				if (cmd is CmdSleep)
+				{
+					executedCmdCount = i;
+					break;
+				}
+				cmd.OnTick(lv);
+			}
+
+			var passingCmds = new List<Command>();
+			for (var i = 0; i < executedCmdCount; ++i)
+			{
+				var cmd = m_PendingCmds[i];
+				cmd.CountThisTick();
+				if (!cmd.IsDone())
+				{
+					passingCmds.Add(cmd);
+				}
+			}
+
+			for (var i = executedCmdCount; i < m_PendingCmds.Count; ++i)
+			{
+				// Sleep in the way, no counting nor OnTick.
+				passingCmds.Add(m_PendingCmds[i]);
+			}
+
+			m_PendingCmds.Clear();
+			m_PendingCmds = passingCmds;
 		}
 
 		if (m_PendingCmds.Count == 0)

@@ -1,139 +1,181 @@
 using Godot;
-using System;
-using GdUnit4;
 using System.Threading.Tasks;
 
 namespace ArFactory.Tests;
-using static Assertions;
+using static Asserts;
 
-[TestSuite]
-[RequireGodotRuntime]
-public class CommandTests
+public static class CommandTests
 {
-	private ISceneRunner m_Runner;
-	private Level m_Level;
-	private WorldPanel m_World;
+	public static float s_TickRate = 50.0f;
 
-	public static void FailingTest(Level lv)
+	public static async Task TestWaitForTicks(Level lv)
 	{
-		Asserts.AssertEq(5, 6);
-	}
-
-	[TestCase]
-	public void TestSomething()
-	{
-		var some = new int[5];
-		AssertThat(some).HasSize(5);
-	}
-
-	[Before]
-	public void Before()
-	{
-		m_Runner = ISceneRunner.Load("res://scenes/level.tscn");
-		m_Level = (Level)m_Runner.Scene();
-		m_World = m_Level.World;
-	}
-
-	[BeforeTest]
-	public void BeforeTest()
-	{
-		Debug.Assert(!m_Level.IsSimRunning());
-		m_World.Reset();
-		// m_Level.SetTickRate(50);
-		m_Runner.MaximizeView();
-	}
-
-	[TestCase]
-	public async Task TestWaitForTicks()
-	{
-		m_Runner.MaximizeView();
-		m_Level.StartSimulation();
+		lv.SetTickRate(s_TickRate);
+		lv.StartSimulation();
 		{
-			await m_Level.WaitForTicks(5);
-			AssertThat(m_Level.GetTicksSinceStart()).Equals(5);
-			await m_Level.WaitForTicks(5);
-			AssertThat(m_Level.GetTicksSinceStart()).Equals(10);
+			await lv.WaitForTicks(5);
+			AssertEq(lv.GetTicksSinceStart(), 6); // First one executes instantly, that's why.
+			await lv.WaitForTicks(5);
+			AssertEq(lv.GetTicksSinceStart(), 11);
 		}
-		m_Level.EndSimulation();
+		lv.EndSimulation();
 	}
 
-	[TestCase]
-	public async Task TestCmdSpawn()
+	public static async Task TestCmdSpawn(Level lv)
 	{
-		m_World.InstallTile(new Tile(Vector2I.Zero));
-		m_World.PlaceInjector([new CmdSpawn(Vector2I.Zero, 5)]);
+		var world = lv.World;
+		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		world.PlaceInjector([
+			new CmdSleep(1),
+			new CmdSpawn(Vector2I.Zero, 5),
+		]);
 		
-		m_Level.StartSimulation();
+		lv.SetTickRate(s_TickRate);
+		lv.StartSimulation();
 		{
-			await m_Level.WaitForTicks(1);
+			AssertFalse(tl.HasItem());
 			
-			var tl = m_World.GetTile(Vector2I.Zero);
-			AssertThat(tl.HasItem()).IsTrue();
+			await lv.WaitForTicks(1); // Spawns!
+			AssertTrue(tl.HasItem());
 
 			var it = tl.Item;
-			AssertThat(it.GetValue()).Equals(5);
-			AssertThat(it.IsAllowedToMove()).IsTrue();
-			AssertThat(it.IsMidAnimation()).IsFalse();	
+			AssertEq(it.GetValue(), 5);
+			AssertTrue(it.IsAllowedToMove());
+			AssertFalse(it.IsMidAnimation());
 		}
-		m_Level.EndSimulation();
+		lv.EndSimulation();
 	}
 
-	[TestCase]
-	public async Task TestCmdSlide()
+	public static async Task TestCmdSleep(Level lv)
 	{
-		m_World.InstallTile(new Tile(new(0, 0)));
-		m_World.InstallTile(new Tile(new(1, 0)));
+		// Behaviour:
+		// When it's not the first current pending command, execute all commands before it only,
+		// then start counting ticks for the sleep, and only when it dies do the other commands see
+		// the light.
+
+		var world = lv.World;
+		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		var inj = world.PlaceInjector([
+			new CmdSleep(3),
+			new CmdSpawn(Vector2I.Zero, 3),
+			new CmdSleep(1),
+			new CmdKill(Vector2I.Zero),
+		]);
+
+		lv.StartSimulation();
+		{
+			// First cycle executes instantly, so we start waiting from the second and up.
+
+			await lv.WaitForTicks(1);
+			AssertEq(lv.GetTicksSinceStart(), 2);
+			AssertFalse(tl.HasItem());
+			
+			await lv.WaitForTicks(1);
+			AssertEq(lv.GetTicksSinceStart(), 3);
+			AssertFalse(tl.HasItem());			
+			// And now sleep is done.
+
+			await lv.WaitForTicks(1);
+			AssertEq(lv.GetTicksSinceStart(), 4);
+			AssertTrue(tl.HasItem());
+
+			await lv.WaitForTicks(1);
+			AssertEq(lv.GetTicksSinceStart(), 5);
+			AssertTrue(tl.HasItem());
+			// The second sleep should be done.
+
+			await lv.WaitForTicks(1);
+			AssertEq(lv.GetTicksSinceStart(), 6);
+			AssertFalse(tl.HasItem()); // Item should be dead now
+			AssertFalse(inj.HasPendingCmds());
+		}
+		lv.EndSimulation();
+	}
+
+	public static async Task TestCmdSlide(Level lv)
+	{
+		var world = lv.World;
+		world.InstallEmptyTile(new(0, 0));
+		world.InstallEmptyTile(new(1, 0));
 		
-		m_World.InstallTile(new Tile(new(2, 0)));
-		m_World.InstallTile(new Tile(new(2, 1)));
+		world.InstallEmptyTile(new(2, 0));
+		world.InstallEmptyTile(new(2, 1));
 		
-		// m_World.InstallTile(new Tile(new(3, 0)));
-		// m_World.InstallTile(new Tile(new(3, 1)));
+		world.InstallEmptyTile(new(3, 0));
+		world.InstallEmptyTile(new(3, 1));
 		
-		// m_World.InstallTile(new Tile(new(4, 0)));
-		// m_World.InstallTile(new Tile(new(5, 0)));
+		world.InstallEmptyTile(new(4, 0));
+		world.InstallEmptyTile(new(5, 0));
 		
-		m_World.PlaceInjector([
+		var injy = world.PlaceInjector([
+			new CmdSleep(1),
 			new CmdSpawn(new(0, 0), 1),
 			new CmdSlide(new(0, 0), Direction.East),
 			new CmdSpawn(new(2, 0), 2),
 			new CmdSlide(new(2, 0), Direction.South),
-			// new CmdSpawn(new(3, 1), 3),
-			// new CmdSlide(new(3, 1), Direction.North),
-			// new CmdSpawn(new(5, 0), 4),
-			// new CmdSlide(new(5, 0), Direction.West),
+			new CmdSpawn(new(3, 1), 3),
+			new CmdSlide(new(3, 1), Direction.North),
+			new CmdSpawn(new(5, 0), 4),
+			new CmdSlide(new(5, 0), Direction.West),
 		]);
 
-		m_Level.StartSimulation(true);
+		lv.SetTickRate(s_TickRate);
+		lv.StartSimulation();
 		{
-			await m_Level.WaitForTicks(1);
-			AssertThat(m_World.GetTile(new(0, 0)).HasItem()).IsFalse();
-			AssertThat(m_World.GetTile(new(1, 0)).HasItem()).IsTrue();
-			AssertThat(m_World.GetTile(new(2, 0)).HasItem()).IsFalse();
-			AssertThat(m_World.GetTile(new(2, 1)).HasItem()).IsTrue();
-			var it1 = m_World.GetTile(new(1, 0)).Item;
-			AssertThat(it1.GetValue()).IsEqual(1);
-			AssertThat(it1.IsAllowedToMove()).IsFalse();
-			AssertThat(it1.IsMidAnimation()).IsTrue();
-			var it2 = m_World.GetTile(new(2, 1)).Item;
-			AssertThat(it2.GetValue()).IsEqual(2);
-			AssertThat(it2.IsAllowedToMove()).IsFalse();
-			AssertThat(it2.IsMidAnimation()).IsTrue();
+			await lv.WaitForTicks(1);
+			AssertTrue(injy.HasPendingCmds());
+			AssertFalse(world.GetTile(new(0, 0)).HasItem());
+			AssertTrue(world.GetTile(new(1, 0)).HasItem());
+			AssertFalse(world.GetTile(new(2, 0)).HasItem());
+			AssertTrue(world.GetTile(new(2, 1)).HasItem());
 
-			await m_Level.WaitForTicks(1);
-			AssertThat(m_World.GetTile(new(0, 0)).HasItem()).IsFalse();
-			AssertThat(m_World.GetTile(new(1, 0)).HasItem()).IsTrue();
-			AssertThat(m_World.GetTile(new(2, 0)).HasItem()).IsFalse();
-			AssertThat(m_World.GetTile(new(2, 1)).HasItem()).IsTrue();
-			it1 = m_World.GetTile(new(1, 0)).Item;
-			AssertThat(it1.GetValue()).IsEqual(1);
-			AssertThat(it1.IsAllowedToMove()).IsTrue();
-			AssertThat(it1.IsMidAnimation()).IsFalse();
-			it2 = m_World.GetTile(new(2, 1)).Item;
-			AssertThat(it2.GetValue()).IsEqual(2);
-			AssertThat(it2.IsAllowedToMove()).IsTrue();
-			AssertThat(it2.IsMidAnimation()).IsFalse();
+			var itEast = world.GetTile(new(1, 0)).Item;
+			AssertEq(itEast.GetValue(), 1);
+			AssertFalse(itEast.IsAllowedToMove());
+			AssertTrue(itEast.IsMidAnimation());
+
+			var itSouth = world.GetTile(new(2, 1)).Item;
+			AssertEq(itSouth.GetValue(), 2);
+			AssertFalse(itSouth.IsAllowedToMove());
+			AssertTrue(itSouth.IsMidAnimation());
+
+			var itNorth = world.GetTile(new(3, 0)).Item;
+			AssertEq(itNorth.GetValue(), 3);
+			AssertFalse(itNorth.IsAllowedToMove());
+			AssertTrue(itNorth.IsMidAnimation());
+
+			var itWest = world.GetTile(new(4, 0)).Item;
+			AssertEq(itWest.GetValue(), 4);
+			AssertFalse(itWest.IsAllowedToMove());
+			AssertTrue(itWest.IsMidAnimation());
+
+			await lv.WaitForTicks(1);
+			AssertFalse(injy.HasPendingCmds());
+			AssertFalse(world.GetTile(new(0, 0)).HasItem());
+			AssertTrue(world.GetTile(new(1, 0)).HasItem());
+			AssertFalse(world.GetTile(new(2, 0)).HasItem());
+			AssertTrue(world.GetTile(new(2, 1)).HasItem());
+
+			itEast = world.GetTile(new(1, 0)).Item;
+			AssertEq(itEast.GetValue(), 1);
+			AssertTrue(itEast.IsAllowedToMove());
+			AssertFalse(itEast.IsMidAnimation());
+
+			itSouth = world.GetTile(new(2, 1)).Item;
+			AssertEq(itSouth.GetValue(), 2);
+			AssertTrue(itSouth.IsAllowedToMove());
+			AssertFalse(itSouth.IsMidAnimation());
+			
+			itNorth = world.GetTile(new(3, 0)).Item;
+			AssertEq(itNorth.GetValue(), 3);
+			AssertTrue(itNorth.IsAllowedToMove());
+			AssertFalse(itNorth.IsMidAnimation());
+			
+			itWest = world.GetTile(new(4, 0)).Item;
+			AssertEq(itWest.GetValue(), 4);
+			AssertTrue(itWest.IsAllowedToMove());
+			AssertFalse(itWest.IsMidAnimation());
 		}
-		m_Level.EndSimulation();
+		lv.EndSimulation();
 	}
 }

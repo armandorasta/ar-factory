@@ -2,6 +2,6 @@ using System;
 
 namespace ArFactory.Tests;
 
-public class AssertFailedException(string msg) : Exception(msg)
+public class TestAssertFailedException(string msg) : Exception(msg)
 {
 }

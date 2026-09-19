@@ -12,8 +12,15 @@ namespace ArFactory;
 internal static class Debug
 {
 	public static SceneTree? TreePtr;
+	
+	private static bool s_bEnabled = true;
 
-	[StackTraceHidden] [DebuggerStepThrough]
+
+	public static void DisableAsserts() { s_bEnabled = false; }
+	public static void EnableAsserts()  { s_bEnabled = true;  }
+
+
+	[StackTraceHidden] [DebuggerStepThrough] [Conditional("DEBUG")]
 	public static void Assert([DoesNotReturnIf(false)] bool cond, string? msg = null)
 	{
 		HandleImpl(cond, $"Assertion Failed!", msg);
@@ -22,7 +29,7 @@ internal static class Debug
 	/// <summary>
 	/// Asserts: <paramref name="subject"/> is an instance of <paramref name="expectedType"/>.
 	/// </summary>
-	[StackTraceHidden] [DebuggerStepThrough]
+	[StackTraceHidden] [DebuggerStepThrough] [Conditional("DEBUG")]
 	public static void AssertIs(object subject, Type expectedType, string? msg = null)
 	{
 		HandleImpl(expectedType.IsInstanceOfType(subject), 
@@ -34,7 +41,7 @@ internal static class Debug
 	/// Asserts the <paramref name="testValue"/> is equal to <paramref name="target"/> using the
 	/// equality operator. Use <seealso cref="AssertRefEq"/> for reference comparison.
 	/// </summary>
-	[StackTraceHidden] [DebuggerStepThrough]
+	[StackTraceHidden] [DebuggerStepThrough] [Conditional("DEBUG")]
 	public static void AssertEq<T>(T testValue, T target, string? msg = null)
 	{
 		HandleImpl(EqualityComparer<T>.Default.Equals(testValue, target),
@@ -42,7 +49,7 @@ internal static class Debug
 			msg);
 	}
 
-	[StackTraceHidden] [DebuggerStepThrough]
+	[StackTraceHidden] [DebuggerStepThrough] [Conditional("DEBUG")]
 	public static void AssertRefEq<T>(T testValue, T target, string? msg = null)
 	{
 		HandleImpl(object.ReferenceEquals(testValue, target),
@@ -50,7 +57,7 @@ internal static class Debug
 			msg);
 	}
 
-	[StackTraceHidden] [DebuggerStepThrough]
+	[StackTraceHidden] [DebuggerStepThrough] [Conditional("DEBUG")]
 	public static void AssertNotNull(object testValue, string? msg = null)
 	{
 		HandleImpl(testValue is not null, 
@@ -71,11 +78,14 @@ internal static class Debug
 	}
 
 
-	[StackTraceHidden] 
-	[DebuggerHidden]
+	[StackTraceHidden] [DebuggerHidden] [Conditional("DEBUG")]
 	private static void HandleImpl([DoesNotReturnIf(false)] bool bMustBe, string specialMsg, string? userMsg)
 	{
-#if DEBUG
+		if (!s_bEnabled)
+		{
+			return;
+		}
+
 		if (bMustBe)
 		{
 			return;
@@ -90,7 +100,6 @@ internal static class Debug
 		PrintStackTrace(3);
 		// GD.PushError($"Assertion Failed! {msg}");
 		TreePtr?.Quit();
-#endif
 	}
 
 	[StackTraceHidden]

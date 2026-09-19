@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace ArFactory;
 
@@ -23,11 +24,13 @@ public partial class WorldPanel : Panel
 
 
 	// Public interface
-	public readonly Vector2I Dims = new(15, 10);
+	public Vector2I Dims => m_Dims;
 	public readonly float CellWidth = 100.0f;
+	public Tile this[int x, int y] => GetTile(new(x, y));
 
 
 	// Privates
+	private Vector2I m_Dims = Vector2I.One;
 	private List<Unit> m_Units = [];
 	private List<Tile> m_Tiles = [];
 	private List<CmdSlide> m_BlockedSlideCmdsByItems = [];
@@ -38,17 +41,17 @@ public partial class WorldPanel : Panel
 	/// <summary>
 	/// Checks if <paramref name="gloc"/> is within the world in grid-space.
 	/// </summary>
-	public bool IsWithin(Vector2I gloc) => GetRectGrid().HasPoint(gloc);
+	public bool IsWithin(Vector2I gloc) => GetGridRect().HasPoint(gloc);
 
 	/// <summary>
 	/// Returns enclosing Rect2I in grid-space.
 	/// </summary>
-	public Rect2I GetRectGrid() => new(Vector2I.Zero, Dims);
+	public Rect2I GetGridRect() => new(Vector2I.Zero, m_Dims);
 
 	/// <summary>
 	/// Returns enclosing Rect2 in world-space.
 	/// </summary>
-	public Rect2 GetRect2() => new(Vector2I.Zero, CellWidth * (Vector2)Dims);
+	public Rect2 GetWorldRect() => new(Vector2I.Zero, CellWidth * (Vector2)m_Dims);
 	
 	/// <summary>
 	/// Converts from grid-space to world-space. 
@@ -66,13 +69,13 @@ public partial class WorldPanel : Panel
 	/// Converts a vector in grid-space to an index into an array.
 	/// This function does not bounds checking whatsoever.
 	/// </summary>
-	public int GridToIndex(Vector2I gloc) => gloc.Y * Dims.X + gloc.X;
+	public int GridToIndex(Vector2I gloc) => gloc.Y * m_Dims.X + gloc.X;
 
 	/// <summary>
 	/// Converts an index to a vector in grid-space.
 	/// This function does not bounds checking whatsoever.
 	/// </summary>
-	public Vector2I IndexToGrid(int index) => new(index % Dims.X, index / Dims.X);
+	public Vector2I IndexToGrid(int index) => new(index % m_Dims.X, index / m_Dims.X);
 
 	/// <summary>
 	/// Same as <seealso cref="IsWithin"/>, but also checks if a tile is allocated in that spot.
@@ -100,40 +103,58 @@ public partial class WorldPanel : Panel
 	#region .Tile Methods
 
 	/// <summary>
-	/// Adds the passed tile to the world, the tile has to be within boundaries!
-	/// <paramref name="bOverride"/> can be used to override an existing tile in the same location, 
-	/// the old tile will be sent to oblivion and not returned.
+	/// Same as <c>InstallTile(new Tile(Vector2I.Zero), gloc, bOverride)</c>
 	/// </summary>
-	public Tile InstallTile(Tile tl, bool bOverride = false)
+	/// <returns>The installed tile, or null when it fails</returns>
+	public Tile InstallEmptyTile(Vector2I gloc, bool bOverride = false)
 	{
-		Debug.Assert(IsWithin(tl.GridLoc));
-		Debug.Assert(bOverride || !HasTile(tl.GridLoc));
+		return InstallTile(new Tile(Vector2I.Zero), gloc, bOverride);
+	}
 
-		RemoveTile(tl.GridLoc, !bOverride);
-		m_Tiles[GridToIndex(tl.GridLoc)] = tl;
-		// TODO: Replace this with something...
-		// tl.Connect(Tile.SignalName.NeedsRedraw, Callable.From(OnTile_NeedsRedraw));
+	/// <summary>
+	/// Adds the passed tile to the world, the location of the tile is not consider and is overriden
+	/// by <paramref name="gloc"/>.
+	/// </summary>
+	/// <param name="bOverride">Only matters in debug mode</param>
+	/// <returns>The installed tile, or null when it fails</returns>
+	public Tile InstallTile(Tile tl, Vector2I gloc, bool bOverride = false)
+	{
+		Debug.AssertNotNull(tl);
+		Debug.Assert(IsWithin(gloc));
+		Debug.Assert(bOverride || !HasTile(gloc));
+		if (tl is not null)
+		{
+			DeleteTile(gloc, true);
+			m_Tiles[GridToIndex(gloc)] = tl;
+			tl.SetGridLocUnsafe(gloc);
+			// TODO: Replace this with something...
+			// tl.Connect(Tile.SignalName.NeedsRedraw, Callable.From(OnTile_NeedsRedraw));
+		}
 		return tl;
 	}
 
-	// Removes the tile from the world, destroys items within it, and sends it into oblivion.
-	public void RemoveTile(Vector2I gloc, bool bMaybeNull = false)
+	/// <summary>
+	/// Removes the tile from the world, destroys items within it, and sends it into oblivion.
+	/// </summary>
+	/// <param name="bMaybeNull">Only matters in debug mode</param>
+	public void DeleteTile(Vector2I gloc, bool bMaybeNull = false)
 	{
 		Debug.Assert(IsWithin(gloc));
 		Debug.Assert(bMaybeNull || HasTile(gloc));
-		if (!HasTile(gloc))
-		{
-			return;
-		}
 		var i = GridToIndex(gloc);
-		m_Tiles[i].DestroyItem(true);
+		m_Tiles[i]?.DestroyItem(true);
 		m_Tiles[i] = null;
 	}
 
-	// Returns the moved tile.
-	// Moves the tile from one location to another, along with the items it contains.
-	// Does nothing when `gFrom` and 'gTo' are the same.
-	// Same as `ExtractTile` followed by `InstallTile`.
+	/// <summary>
+	/// Returns the moved tile, or null when it fails for some reason.
+	/// Moves the tile from one location to another, along with the items it contains.
+	/// Does nothing when <paramref name="gFrom"/> and <paramref name="gTo"/> are the same or when
+	/// the moved tile does not exist.
+	/// Same as <see cref="ExtractTile"/> followed by <see cref="InstallTile"/>.
+	/// </summary>
+	/// <param name="bMaybeNull">Only matters in debug mode</param>
+	/// <param name="bOverride">Only matters in debug mode</param>
 	public Tile MoveTile(Vector2I gFrom, Vector2I gTo, bool bMaybeNull = false, bool bOverride = false)
 	{
 		Debug.Assert(IsWithin(gFrom));
@@ -144,13 +165,18 @@ public partial class WorldPanel : Panel
 		{
 			return GetTile(gFrom);
 		}
-		var myTile = ExtractTile(gFrom, bMaybeNull);
-		myTile.SetGridLocUnsafe(gTo);
-		InstallTile(myTile, bOverride);
+		var myTile = ExtractTile(gFrom, true);
+		if (myTile is not null)
+		{
+			InstallTile(myTile, gTo, true);
+		}
 		return myTile;
 	}
 
-	// Removes the tile from the world, and returns it.
+	/// <summary>
+	/// Removes the tile from the world, and returns it.
+	/// </summary>
+	/// <param name="bMaybeNull">Only matters in debug mode</param>
 	public Tile ExtractTile(Vector2I gloc, bool bMaybeNull = false)
 	{
 		Debug.Assert(IsWithin(gloc));
@@ -163,7 +189,12 @@ public partial class WorldPanel : Panel
 		return myTile;
 	}
 
-	// Swaps two tiles, or does nothing when `gloc1` and `gloc2` are the same.
+	/// <summary>
+	/// Swaps two tiles, or does nothing when <paramref name="gloc1"/> and <paramref name="gloc2"/> 
+	/// are the same. This function acts like <see cref="MoveTile"/> when one of the tiles does
+	/// not exist
+	/// </summary>
+	/// <param name="bMaybeNull">Only matters in debug mode</param>
 	public void SwapTiles(Vector2I gloc1, Vector2I gloc2, bool bMaybeNull = false)
 	{
 		Debug.Assert(IsWithin(gloc1));
@@ -180,14 +211,12 @@ public partial class WorldPanel : Panel
 		
 		if (tl1 != null)
 		{
-			tl1.SetGridLocUnsafe(gloc2);
-			InstallTile(tl1);
+			InstallTile(tl1, gloc2);
 		}
 		
 		if (tl2 != null)
 		{
-			tl2.SetGridLocUnsafe(gloc1);
-			InstallTile(tl2);
+			InstallTile(tl2, gloc1);
 		}
 	}
 
@@ -196,28 +225,104 @@ public partial class WorldPanel : Panel
 	#region .Item Methods
 
 	/// <summary>
-	/// Returns the item just added.
+	/// Returns the item just added or null when spawn fails. Null returns are considered errors
+	/// in debug and crash the program.
 	/// </summary>
 	public Item SpawnItem(Vector2I gloc, int value)
 	{
-		Debug.AssertIs(GetTile(gloc), typeof(Tile));
-		var myTile = GetTile(gloc);
-		Debug.Assert(!myTile.IsReserved()); // Might have to change this to `HasItem`, but who knows.
-		
+		Debug.AssertNotNull(GetTile(gloc));
+		Debug.Assert(!GetTile(gloc).IsReserved());
+		var tl = GetTile(gloc);
+		if (tl is null || tl.IsReserved())
+		{
+			return null;
+		}
+
 		var newItem = ItemScene.Instantiate<Item>();
 		AddChild(newItem);
 		newItem.Setup(this, gloc, value);
 		
-		myTile.SetItemUnchecked(newItem);
+		tl.SetItemUnsafe(newItem);
 		return newItem;
 	}
 
 	/// <summary>
-	/// Returns the clone, not the original.
-	/// Clones the item into another tile, or does nothing if <paramref name="gSrc"/> and <paramref name="gDest"/> 
-	/// are the same.
+	/// Returns the passed item itself or null when it fails. Null returns are considered errors
+	/// in debug and crash the program.
+	/// This very same passed item is gauranteed to be installed, no new items are made.
 	/// </summary>
+	public Item InstallItem(Item it)
+	{
+		Debug.Assert(it.GetParent() is null); // No associated world.
+		// TODO: When you add the reference to the parent tile, add an assert here for that.
+		Debug.AssertNotNull(GetTile(it.GridLoc));
+		Debug.Assert(!GetTile(it.GridLoc).IsReserved());
+		
+		var tl = GetTile(it.GridLoc);
+		if (tl is null || tl.IsReserved())
+		{
+			return null;
+		}
+		
+		it.GetParent()?.RemoveChild(it);
+		tl.SetItemUnsafe(it); // Must be set before adding it to the tree.
+		it.SyncPosWithGrid(this);
+		AddChild(it);
+		return it;
+	}
+
+	/// <summary>
+	/// Returns the clone, not the original, or null if the item does not exits in the first place.
+	/// Clones the item into another tile, or does nothing if <paramref name="gSrc"/> and 
+	/// <paramref name="gDest"/> are the same, or when the item or its tile does not exist, or when
+	/// the destination tile does not exist.
+	/// </summary>
+	/// <param name="bMaybeNull">Only matters in debug mode</param>
+	/// <param name="bOverride">Only matters in debug mode</param>
 	public Item CloneItem(Vector2I gSrc, Vector2I gDest, bool bMaybeNull = false, bool bOverride = false)
+	{
+		Debug.Assert(IsWithin(gSrc));
+		Debug.Assert(HasTile(gSrc));
+		Debug.Assert(bMaybeNull || GetTile(gSrc).HasItem());
+		Debug.Assert(IsWithin(gDest));
+		Debug.Assert(HasTile(gDest));
+		Debug.Assert(bOverride || gSrc == gDest || !GetTile(gDest).HasItem());
+		
+		var srcTl = GetTile(gSrc);
+		var destTl = GetTile(gDest);
+		if (srcTl is null || !srcTl.HasItem() || destTl is null)
+		{
+			return null;
+		}
+		
+		destTl.DestroyItem(true);
+		return SpawnItem(gDest, srcTl.Item.Value);
+	}
+
+	/// <summary>
+	/// Returns the teleported item, not the original, or null if the item does not exits in the 
+	/// first place.
+	/// Teleports the item to another tile, or does nothing if <paramref name="gSrc"/> and 
+	/// <paramref name="gDest"/> are the same, or when the item or its tile does not exist, or when
+	/// the destination tile does not exist.
+	/// </summary>
+	/// <param name="bMaybeNull">Only matters in debug mode</param>
+	/// <param name="bOverride">Only matters in debug mode</param>
+	public Item TeleportItem(Vector2I gSrc, Vector2I gDest, bool bMaybeNull = false, bool bOverride = false)
+	{
+		var it = TeleportItemNoSync(gSrc, gDest, bMaybeNull, bOverride);
+		it?.SyncPosWithGrid(this);
+		return it;
+	}
+
+	/// <summary>
+	/// Same as <see cref="TeleportItem"/> but does not change the position of the item in the world.
+	/// Calling <see cref="Item.SyncPosWithGrid"/> right after this is equivalent to <see cref="TeleportItem"/>.
+	/// This function is much faster than <see cref="TeleportItem"/> because it does no marsheling.
+	/// </summary>
+	/// <param name="bMaybeNull">Only matters in debug mode</param>
+	/// <param name="bOverride">Only matters in debug mode</param>
+	public Item TeleportItemNoSync(Vector2I gSrc, Vector2I gDest, bool bMaybeNull = false, bool bOverride = false)
 	{
 		Debug.Assert(IsWithin(gSrc));
 		Debug.Assert(IsWithin(gDest));
@@ -225,39 +330,29 @@ public partial class WorldPanel : Panel
 		Debug.Assert(HasTile(gDest));
 		Debug.Assert(bMaybeNull || GetTile(gSrc).HasItem());
 		Debug.Assert(bOverride || gSrc == gDest || !GetTile(gDest).HasItem());
-		return SpawnItem(gDest, GetTile(gSrc).Item.Value);
-	}
-
-	/// <summary>
- 	/// Returns the teleported item.
-	/// Teleports the item to another tile, or does nothing if <paramref name="gSrc"/> and <paramref name="gDest"/> 
-	/// are the same.
-	/// </summary>
-	public Item TeleportItem(Vector2I gSrc, Vector2I gDest, bool bMaybeNull = false, bool bOverride = false)
-	{
-		Debug.Assert(IsWithin(gSrc));
-		Debug.Assert(IsWithin(gDest));
-		Debug.Assert(HasTile(gSrc));
-		Debug.Assert(HasTile(gDest));
-
+		
 		if (gSrc == gDest)
 		{
-			return GetTile(gSrc).Item;
+			return GetTile(gSrc)?.GetItemMaybeNull();
 		}
 
-		var srcTile = GetTile(gSrc);
-		var destTile = GetTile(gDest);
-		Debug.Assert(bMaybeNull || srcTile.HasItem());
-		Debug.Assert(bOverride || gSrc == gDest || !destTile.HasItem());
-		destTile.SetItemUnchecked(srcTile.ExtractItem());
-		destTile.Item.SyncPosWithGrid(this);
-		return destTile.Item;
+		var srcTl = GetTile(gSrc);
+		var destTl = GetTile(gDest);
+		if (srcTl is null || !srcTl.HasItem() || destTl is null)
+		{
+			return null;
+		}
+
+		var extractedTl = srcTl.ExtractItem();
+		destTl.SetItemUnsafe(extractedTl); // Must be before adding to tree.
+		AddChild(extractedTl);
+		return destTl.Item;
 	}
 
 
 	#endregion // Item Methods
 	#endregion // Essential Functions
-	#region .Simulation Related.
+	#region .Simulation Related
 
 	public void DoPerFrame(float dt, Level lv)
 	{
@@ -272,7 +367,7 @@ public partial class WorldPanel : Panel
 		Debug.AssertRefEq(lv.World, this);
 		foreach (var tl in m_Tiles)
 		{
-			tl.GetItemMaybeNull()?.ResetMovementFlag();
+			tl?.GetItemMaybeNull()?.ResetMovementFlag();
 		}
 
 		// THIS LOOP HAS TO HAPPEN BEFORE PENDING NEW COMMANDS!
@@ -292,8 +387,8 @@ public partial class WorldPanel : Panel
 			u.HandleCmdTick(lv);
 		}
 
-		// Must happen after HandleCmdTick, otherwise it will do nothing since BlockSlideCmds is
-		// populated by HandleCmdTick.
+		// Must happen after HandleCmdTick, otherwise it will do nothing since the queue is populated 
+		// by HandleCmdTick.
 		HandleSlideCmdOverlapping();
 	}
 
@@ -306,10 +401,7 @@ public partial class WorldPanel : Panel
 		
 		foreach (var tl in m_Tiles)
 		{
-			if (tl is Tile holder)
-			{
-				holder.DestroyItem(true);
-			}
+			tl?.DestroyItem(true);
 		}
 
 		m_BlockedSlideCmdsByItems.Clear();
@@ -322,17 +414,17 @@ public partial class WorldPanel : Panel
 	{
 		Reset();
 
-		PlaceSomeUnits();
+		// PlaceSomeUnits();
 	}
 
 	public override void _Draw()
 	{
 		DrawRect(new(Vector2.Zero, Size), new(0.0f, 0.1f, 0.0f));
-		for (var i = 1; i < Dims.X; ++i)
+		for (var i = 1; i < m_Dims.X; ++i)
 		{
 			DrawLine(new(i*CellWidth, 0.0f), new(i*CellWidth, Size.Y), new(0.0f, 0.18f, 0.0f));
 		}
-		for (var i = 1; i < Dims.Y; ++i)
+		for (var i = 1; i < m_Dims.Y; ++i)
 		{
 			DrawLine(new(0.0f, i*CellWidth), new(Size.X, i*CellWidth), new(0.0f, 0.18f, 0.0f));
 		}
@@ -345,7 +437,6 @@ public partial class WorldPanel : Panel
 			DrawRect(new(GridToPos(u.GridLoc), CellWidth*(Vector2)u.Dims), Colors.Black, false, -2.0f);
 			DrawString(DebugFont, u.Position + new Vector2(0.0f, 15.0f), u.GetType().Name,
 				HorizontalAlignment.Left, CellWidth, 16, Colors.Black);
-				// u.GetScript().As<CSharpScript>().GetGlobalName(),
 		}
 	}
 
@@ -382,32 +473,36 @@ public partial class WorldPanel : Panel
 		PlaceSlider(new(3, 8), Direction.North);
 	}
 
-	public void PlaceInjector(IEnumerable<Command> cmdsToInject)
+	public UnCmdInjector PlaceInjector(IEnumerable<Command> cmdsToInject)
 	{
-		var myUnit = new UnCmdInjector();
-		AddUnit(myUnit);
-		myUnit.Setup(this, cmdsToInject);
+		var u = new UnCmdInjector();
+		AddUnit(u);
+		u.Setup(this, cmdsToInject);
+		return u;
 	}
 
-	public void PlaceSupplier(Vector2I gloc, Direction dir, int rate, IEnumerable<int> seq)
+	public UnSupplier PlaceSupplier(Vector2I gloc, Direction dir, int rate, IEnumerable<int> seq)
 	{
-		var myUnit = UnSupplierScene.Instantiate() as UnSupplier;
-		AddUnit(myUnit);
-		myUnit.Setup(this, gloc, rate, dir, seq);
+		var u = UnSupplierScene.Instantiate() as UnSupplier;
+		AddUnit(u);
+		u.Setup(this, gloc, rate, dir, seq);
+		return u;
 	}
 
-	public void PlaceSlider(Vector2I gloc, Direction dir)
+	public UnSlider PlaceSlider(Vector2I gloc, Direction dir)
 	{
-		var myUnit = UnSliderScene.Instantiate() as UnSlider;
-		AddUnit(myUnit);
-		myUnit.Setup(this, gloc, 1, dir);
+		var u = UnSliderScene.Instantiate() as UnSlider;
+		AddUnit(u);
+		u.Setup(this, gloc, 1, dir);
+		return u;
 	}
 
-	public void PlaceUpdater(Vector2I gloc, Direction dir, int rate, UpdateType UpT)
+	public UnUpdater PlaceUpdater(Vector2I gloc, Direction dir, int rate, UpdateType UpT)
 	{
-		var doub = UnUpdaterScene.Instantiate<UnUpdater>();
-		AddUnit(doub);
-		doub.Setup(this, gloc, rate, dir, UpT);
+		var u = UnUpdaterScene.Instantiate<UnUpdater>();
+		AddUnit(u);
+		u.Setup(this, gloc, rate, dir, UpT);
+		return u;
 	}
 
 	// public void PlaceBin(Vector2I gloc)
@@ -449,19 +544,53 @@ public partial class WorldPanel : Panel
 	#endregion // Placement Functions
 	#region .Other Methods
 
-	public void Reset()
+	public void SetDims(Vector2I newDims)
 	{
-		Size = CellWidth * (Vector2)Dims;
-		
-		foreach (var tl in m_Tiles)
+		var oldDims = m_Dims;
+		m_Dims = newDims;
+		Size = CellWidth * (Vector2)newDims;
+
+
+		var oldTiles = m_Tiles;
+		m_Tiles = [];
+		for (var i = 0; i < m_Dims.X * m_Dims.Y; ++i)
 		{
-			if (tl is Tile holder)
+			m_Tiles.Add(null);
+		}
+
+		// Remove cut-off units
+		m_Units = [];
+		for (var i = m_Units.Count - 1; i >= 0;)
+		{
+			var u = m_Units[i];
+			if (!Unit.CanFitIn(this, u.GridLoc, u.Dims))
 			{
-				holder.DestroyItem(true);
+				RemoveUnit(u);
+			}
+			else
+			{
+				--i;
 			}
 		}
+
+		// Copy over the tiles.
+		for (var y = 0; y < int.Min(oldDims.Y, newDims.Y); ++y)
+		{
+			for (var x = 0; x < int.Min(oldDims.X, newDims.X); ++x)
+			{
+				m_Tiles[y * newDims.X + x] = oldTiles[y * oldDims.X + x];
+			}
+		}
+	}
+
+	public void Reset()
+	{
+		foreach (var tl in m_Tiles)
+		{
+			tl?.DestroyItem(true);
+		}
 		m_Tiles.Clear();
-		for (var i = 0; i < Dims.X * Dims.Y; ++i)
+		for (var i = 0; i < m_Dims.X * m_Dims.Y; ++i)
 		{
 			m_Tiles.Add(null);
 		}
@@ -484,7 +613,6 @@ public partial class WorldPanel : Panel
 	public void QueueBlockedSlideCmdByAnotherItem(CmdSlide cmd)
 	{
 		Debug.Assert(HasTile(cmd.GridFrom));
-		Debug.AssertIs(GetTile(cmd.GridFrom), typeof(Tile));
 		Debug.Assert(GetTile(cmd.GridFrom).HasItem()); // Is there an actual item?
 		Debug.Assert(GetTile(cmd.GetGridTo()).IsReserved()); // And is it blocked?
 		// For now dublication is not allowed, although logically it should be xd.
@@ -538,6 +666,13 @@ public partial class WorldPanel : Panel
 	{
 		m_Units.Add(newUnit);
 		AddChild(newUnit);
+	}
+
+	private void RemoveUnit(Unit u)
+	{
+		u.QueueFree();
+		RemoveChild(u);
+		m_Units.Remove(u);
 	}
 
 	#endregion

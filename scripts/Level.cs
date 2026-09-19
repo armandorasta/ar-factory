@@ -1,5 +1,7 @@
+using ArFactory.Tests;
 using Godot;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ArFactory;
@@ -19,14 +21,14 @@ public partial class Level : Node2D
 	// Nodes
 	public Camera2D Cam;
 	public WorldPanel World;
-	public Button PlayButt;
-	public Button PauseButt;
-	public Button DebugButt;
-	public HBoxContainer ToolsHBox;
-	public HBoxContainer PlayHBox;
-	public Label TicksLabel;
-	public HSlider SpeedSlider;
-	public Label TickSpeedLabel;
+	public Godot.Button PlayButt;
+	public Godot.Button PauseButt;
+	public Godot.Button DebugButt;
+	public Godot.HBoxContainer ToolsHBox;
+	public Godot.HBoxContainer PlayHBox;
+	public Godot.Label TicksLabel;
+	public Godot.HSlider SpeedSlider;
+	public Godot.Label TickSpeedLabel;
 
 
 	// Publics
@@ -35,9 +37,11 @@ public partial class Level : Node2D
 
 	// Privates
 	private PlayMode m_CurrPlayMode = PlayMode.Off;
-	private Timer m_TickTimer = new();
+	private Godot.Timer m_TickTimer = new();
 	private int m_TickCount = 0; // Number of ticks since the start.
 	private float m_TickMillis;
+
+	private TestHandler m_TestHandler;
 
 
 	public override void _Ready()
@@ -53,6 +57,7 @@ public partial class Level : Node2D
 		SpeedSlider = GetNode<HSlider>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/SpeedHSlider");
 		TickSpeedLabel = GetNode<Label>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TickSpeedLabel");
 
+		World.SetDims(new(5, 5));
 		Cam.Position = World.Size * 0.5f;
 		
 		m_TickTimer.OneShot = true;
@@ -70,7 +75,8 @@ public partial class Level : Node2D
 
 		AddTools();
 
-		Tests.TestHandler.RunTests(this);
+		m_TestHandler = new TestHandler(this, false);
+		m_TestHandler.RunTests();
 	}
 
 	public override void _EnterTree()
@@ -82,6 +88,7 @@ public partial class Level : Node2D
 	// Called every frame. 'delta' is the elapsed time since the previous frame.
 	public override void _Process(double dt)
 	{
+		m_TestHandler.OnProcess();
 		switch (m_CurrPlayMode) {
 		case PlayMode.Off: break;
 		case PlayMode.Debug: break;
@@ -133,14 +140,17 @@ public partial class Level : Node2D
 	public void EndSimulation()
 	{
 		Debug.Assert(m_CurrPlayMode != PlayMode.Off);
+		
+		// This makes it possible to call this function multiple times.
+		if (m_TickCount > 0)
+		{
+			// This has to be called before switching the PlayMode for fast tick rates.
+			OnSimulationEnd();
+		}		
+
 		m_CurrPlayMode = PlayMode.Off;
 		SyncButtStates();
 
-		// This makes it possible to call this function multiple times
-		if (m_TickCount > 0)
-		{
-			OnSimulationEnd();
-		}
 	}
 
 	/// <summary>
@@ -226,9 +236,9 @@ public partial class Level : Node2D
 
 	private void OnSimulationEnd()
 	{
-		World.CleanUpAfterSim();
 		m_TickTimer.Paused = true;
 		m_TickCount = 0;
+		World.CleanUpAfterSim();
 	}
 
 	private void AddTools()

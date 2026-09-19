@@ -31,10 +31,6 @@ window/vsync/vsync_mode=0
 
 project/assembly_name="arFactory (C#)"
 
-[editor_plugins]
-
-enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg", "res://addons/gut/plugin.cfg")
-
 [gdunit4]
 
 ui/inspector/tree_view_mode=1
