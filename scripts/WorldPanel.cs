@@ -30,7 +30,7 @@ public partial class WorldPanel : Panel
 
 
 	// Privates
-	private Vector2I m_Dims = Vector2I.One;
+	private Vector2I m_Dims = new(15, 10);
 	private List<Unit> m_Units = [];
 	private List<Tile> m_Tiles = [];
 	private List<CmdSlide> m_BlockedSlideCmdsByItems = [];
@@ -239,10 +239,9 @@ public partial class WorldPanel : Panel
 		}
 
 		var newItem = ItemScene.Instantiate<Item>();
+		tl.SetItemUnsafe(newItem);
 		AddChild(newItem);
 		newItem.Setup(this, gloc, value);
-		
-		tl.SetItemUnsafe(newItem);
 		return newItem;
 	}
 
@@ -370,16 +369,15 @@ public partial class WorldPanel : Panel
 			tl?.GetItemMaybeNull()?.ResetMovementFlag();
 		}
 
-		// THIS LOOP HAS TO HAPPEN BEFORE PENDING NEW COMMANDS!
-		foreach (var u in m_Units)
-		{
-			u.PreprocessTick();
-		}
-
 		// This must happen before HandleCmdTick, otherwise the first tick will handle nothing.
 		foreach (var u in m_Units)
 		{
 			u.PendNewCommands();
+		}
+
+		foreach (var u in m_Units)
+		{
+			u.PreprocessTick();
 		}
 
 		foreach (var u in m_Units)
@@ -413,8 +411,8 @@ public partial class WorldPanel : Panel
 	public override void _Ready()
 	{
 		Reset();
-
-		// PlaceSomeUnits();
+		SetDims(m_Dims);
+		PlaceSomeUnits();
 	}
 
 	public override void _Draw()
@@ -459,16 +457,16 @@ public partial class WorldPanel : Panel
 		// PlaceUpdater(new(4, 6), Direction.East, 2, UpdateType.Double);
 		// return;
 
-		PlaceSupplier(new(0, 6), Direction.East, 1, [1, 2, 3, 4, 5, 6]);
+		PlaceSupplier(new(0, 6), Direction.East, 3, [1, 2, 3, 4, 5, 6]);
 		PlaceSlider(new(2, 7), Direction.East);
 		PlaceSlider(new(3, 7), Direction.North);
 		PlaceSlider(new(3, 6), Direction.East);
-		PlaceUpdater(new(4, 6), Direction.East, 1, UpdateType.Double);
+		PlaceUpdater(new(4, 6), Direction.East, 3, UpdateType.Double);
 		PlaceSlider(new(5, 6), Direction.East);
 		PlaceSlider(new(6, 6), Direction.South);
 		PlaceSlider(new(6, 7), Direction.South);
 		PlaceSlider(new(6, 8), Direction.West);
-		PlaceUpdater(new(5, 8), Direction.West, 1, UpdateType.Double);
+		PlaceUpdater(new(5, 8), Direction.West, 3, UpdateType.Double);
 		PlaceSlider(new(4, 8), Direction.West);
 		PlaceSlider(new(3, 8), Direction.North);
 	}
@@ -549,7 +547,6 @@ public partial class WorldPanel : Panel
 		var oldDims = m_Dims;
 		m_Dims = newDims;
 		Size = CellWidth * (Vector2)newDims;
-
 
 		var oldTiles = m_Tiles;
 		m_Tiles = [];

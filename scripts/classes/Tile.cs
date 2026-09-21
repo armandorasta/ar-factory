@@ -29,7 +29,7 @@ public class Tile(Vector2I gloc)
 	{
 		get
 		{
-			Debug.Assert(m_Item != null);
+			Debug.AssertNotNull(m_Item);
 			return m_Item;
 		}	
 	}
@@ -174,7 +174,9 @@ public class Tile(Vector2I gloc)
 	private Tile SetWall(Direction dir, WallType wtype)
 	{
 		Debug.Assert(Enum.IsDefined(dir));
-		m_WallFlags |= (int)wtype << WallDirToShift(dir);
+		var dirShift = WallDirToShift(dir);
+		m_WallFlags &= ~(((1 << WallFieldWidth) - 1) << dirShift);
+		m_WallFlags |= (int)wtype << dirShift;
 		return this;
 	}
 
@@ -249,29 +251,23 @@ public class Tile(Vector2I gloc)
 		// feel like it.
 
 		// At least one input?
-		if (GetWall(Direction.North) == WallType.Input ||
-			GetWall(Direction.East)  == WallType.Input ||
-			GetWall(Direction.South) == WallType.Input ||
-			GetWall(Direction.West)  == WallType.Input)
+		if (IsInput(Direction.North) || IsInput(Direction.East)  || IsInput(Direction.South) ||
+			IsInput(Direction.West))
 		{
 			col = Colors.IndianRed;
 		}
 
 		// At least one output?
-		if (GetWall(Direction.North) == WallType.Output ||
-			GetWall(Direction.East)  == WallType.Output ||
-			GetWall(Direction.South) == WallType.Output ||
-			GetWall(Direction.West)  == WallType.Output)
+		if (IsOutput(Direction.North) || IsOutput(Direction.East)  || IsOutput(Direction.South) || 
+			IsOutput(Direction.West))
 		{
 			// Has input as well? yellow, otherwise green.
-			col = (col == Colors.IndianRed) ? Colors.LightYellow : Colors.LightGreen;
+			col = (col == Colors.IndianRed) ? Colors.Orange : Colors.LightGreen;
 		}
 
 		// Is completely solid?
-		if (GetWall(Direction.North) == WallType.Solid &&
-			GetWall(Direction.East)  == WallType.Solid &&
-			GetWall(Direction.South) == WallType.Solid &&
-			GetWall(Direction.West)  == WallType.Solid)
+		if (IsSolid(Direction.North) && IsSolid(Direction.East)  && IsSolid(Direction.South) &&
+			IsSolid(Direction.West))
 		{
 			col = Colors.DarkBlue;
 		}
@@ -287,11 +283,11 @@ public class Tile(Vector2I gloc)
 			}
 
 			var edgePos = myPos + world.CellWidth * (0.5f * Vector2.One + 0.4f * (Vector2)gdir);
-			var myCol = IsOutput(d) ? Colors.DarkRed : Colors.DarkGreen;
+			var myCol = IsInput(d) ? Colors.DarkRed : Colors.DarkGreen;
 
 			var myScale = 0.15f;
-			if (IsOutput(d) && 
-				!(world.HasTile(GridLoc + gdir) && world.GetTile(GridLoc + gdir).IsInput(d.Invert())))
+			if (IsInput(d) && 
+				!(world.HasTile(GridLoc + gdir) && world.GetTile(GridLoc + gdir).IsOutput(d.Invert())))
 			{
 				myScale *= 0.5f;
 				myCol.A = 0.3f;

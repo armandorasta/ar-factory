@@ -66,15 +66,13 @@ public partial class CmdSlide : Command
 
 	public override void OnTick(Level lv)
 	{
-		Debug.Assert(m_StateFunc != null);
+		Debug.AssertNotNull(m_StateFunc);
 		m_StateFunc.Invoke(lv);
 	}
 
 	private void HandleDefault(Level lv)
 	{
 		// Debug.Assert(TrackedItem == null);
-		Debug.AssertIs(lv.World.GetTile(GridFrom), typeof(Tile));
-		
 		var gridTo = GetGridTo();
 		if (!lv.World.HasTile(gridTo))
 		{
@@ -92,7 +90,7 @@ public partial class CmdSlide : Command
 		TrackedItem = srcTile.Item;
 
 		var destTile = lv.World.GetTile(gridTo);
-		if (!destTile.CanItemEnter(Dir))
+		if (!destTile.CanItemEnter(Dir.Invert()))
 		{
 			PauseThisTick();
 			return; // Forever and ever probably...
@@ -107,12 +105,11 @@ public partial class CmdSlide : Command
 		
 		// Can't use WorldPanel.TeleportItem because it will set the position to the destination 
 		// immediately.
-		lv.World.TeleportItem(srcTile.GridLoc, destTile.GridLoc);
-		TrackedItem.Position = lv.World.GridToPos(srcTile.GridLoc);
+		lv.World.TeleportItemNoSync(srcTile.GridLoc, destTile.GridLoc);
 		TrackedItem.DisallowMovementThisTick();
 		TrackedItem.SetMidAnimationFlag(true);
 		m_StateFunc = HandleAfterAnimation;
-		// `do_per_frame` animates until next tick.
+		// `DoPerFrame` animates until next tick.
 	}
 
 	private void HandleAfterAnimation(Level lv)

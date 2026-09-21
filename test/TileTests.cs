@@ -3,15 +3,23 @@ using Godot;
 namespace ArFactory.Tests;
 using static Asserts;
 
-public static class TileTests
+[TestSuite]
+public class TileTests
 {
-	public static void Test_SetWall_and_GetWall(Level lv)
+	[Test] public void Test_SetWall_and_GetWall(Level lv)
 	{
 		var tl = lv.World.InstallEmptyTile(Vector2I.Zero);
 		AssertTrue(tl.IsClear(Direction.North));
 		AssertTrue(tl.IsClear(Direction.East));
 		AssertTrue(tl.IsClear(Direction.South));
 		AssertTrue(tl.IsClear(Direction.West));
+
+		tl.MakeSolid(Direction.North);
+		AssertTrue(tl.IsSolid(Direction.North));
+		tl.MakeInput(Direction.North);
+		AssertTrue(tl.IsInput(Direction.North));
+		tl.MakeOutput(Direction.North);
+		AssertTrue(tl.IsOutput(Direction.North));
 
 		tl.MakeSolid(Direction.North);
 		AssertTrue(tl.IsSolid(Direction.North));
@@ -38,7 +46,7 @@ public static class TileTests
 		AssertTrue(tl.IsSolid(Direction.West));
 	}
 
-	public static void TestCanItemEnter(Level lv)
+	[Test] public void TestCanItemEnter(Level lv)
 	{
 		var tl = lv.World.InstallEmptyTile(Vector2I.Zero);
 		tl.MakeSolid(Direction.North);
@@ -59,7 +67,7 @@ public static class TileTests
 		AssertTrue(tl.CanItemEnter(Direction.West));
 	}
 
-	public static void TestCanItemExit(Level lv)
+	[Test] public void TestCanItemExit(Level lv)
 	{
 		var tl = lv.World.InstallEmptyTile(Vector2I.Zero);
 		tl.MakeSolid(Direction.North);
@@ -80,7 +88,7 @@ public static class TileTests
 		AssertTrue(tl.CanItemExit(Direction.West));
 	}
 
-	public static void Test_WorldPanel_InstallTile_and_DeleteTile(Level lv)
+	[Test] public void Test_WorldPanel_InstallTile_and_DeleteTile(Level lv)
 	{
 		var world = lv.World;
 		AssertFalse(world.HasTile(Vector2I.One));
@@ -96,7 +104,7 @@ public static class TileTests
 		AssertNull(world[1, 1]);
 	}
 
-	public static void Test_WorldPanel_SpawnItem_and_DestroyItem(Level lv)
+	[Test] public void Test_WorldPanel_SpawnItem_and_DestroyItem(Level lv)
 	{
 		var world = lv.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
@@ -119,7 +127,7 @@ public static class TileTests
 		AssertFalse(tl.HasItem());
 	}
 
-	public static void Test_WorldPanel_ExtractItem_and_InstallItem(Level lv)
+	[Test] public void Test_WorldPanel_ExtractItem_and_InstallItem(Level lv)
 	{
 		var world = lv.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
@@ -140,7 +148,7 @@ public static class TileTests
 		AssertEq(installedIt.Value, 7);
 	}
 
-	public static void Test_WorldPanel_ExtractTile(Level lv)
+	[Test] public void Test_WorldPanel_ExtractTile(Level lv)
 	{
 		var world = lv.World;
 		var installedTl = world.InstallEmptyTile(Vector2I.Zero);

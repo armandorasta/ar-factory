@@ -78,8 +78,7 @@ public partial class CmdCondSlide : Command
 	{
 		Debug.Assert(m_SlideCmd != null);
 		m_SlideCmd.OnTick(lv);
-		m_SlideCmd.CountThisTick();
-		if (!m_SlideCmd.IsDone())
+		if (!m_SlideCmd.CountAndCheckIfDone())
 		{
 			PauseThisTick();
 			return;

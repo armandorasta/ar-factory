@@ -57,7 +57,7 @@ public partial class Level : Node2D
 		SpeedSlider = GetNode<HSlider>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/SpeedHSlider");
 		TickSpeedLabel = GetNode<Label>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TickSpeedLabel");
 
-		World.SetDims(new(5, 5));
+		// World.SetDims(new(5, 5));
 		Cam.Position = World.Size * 0.5f;
 		
 		m_TickTimer.OneShot = true;
@@ -75,8 +75,8 @@ public partial class Level : Node2D
 
 		AddTools();
 
-		m_TestHandler = new TestHandler(this, false);
-		m_TestHandler.RunTests();
+		m_TestHandler = new TestHandler(this, true);
+		m_TestHandler?.RunTests();
 	}
 
 	public override void _EnterTree()
@@ -84,11 +84,10 @@ public partial class Level : Node2D
 		Debug.TreePtr = GetTree();
 	}
 
-
 	// Called every frame. 'delta' is the elapsed time since the previous frame.
 	public override void _Process(double dt)
 	{
-		m_TestHandler.OnProcess();
+		m_TestHandler?.OnProcess();
 		switch (m_CurrPlayMode) {
 		case PlayMode.Off: break;
 		case PlayMode.Debug: break;

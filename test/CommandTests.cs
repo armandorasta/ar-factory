@@ -4,13 +4,16 @@ using System.Threading.Tasks;
 namespace ArFactory.Tests;
 using static Asserts;
 
-public static class CommandTests
+[TestSuite]
+public class CommandTests
 {
-	public static float s_TickRate = 50.0f;
-
-	public static async Task TestWaitForTicks(Level lv)
+	[Test] public void BeforeAll(Level lv)
 	{
-		lv.SetTickRate(s_TickRate);
+		lv.SetTickRate(50.0f);
+	}
+
+	[Test] public async Task TestWaitForTicks(Level lv)
+	{
 		lv.StartSimulation();
 		{
 			await lv.WaitForTicks(5);
@@ -21,7 +24,7 @@ public static class CommandTests
 		lv.EndSimulation();
 	}
 
-	public static async Task TestCmdSpawn(Level lv)
+	[Test] public async Task TestCmdSpawn(Level lv)
 	{
 		var world = lv.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
@@ -30,7 +33,6 @@ public static class CommandTests
 			new CmdSpawn(Vector2I.Zero, 5),
 		]);
 		
-		lv.SetTickRate(s_TickRate);
 		lv.StartSimulation();
 		{
 			AssertFalse(tl.HasItem());
@@ -46,9 +48,9 @@ public static class CommandTests
 		lv.EndSimulation();
 	}
 
-	public static async Task TestCmdSleep(Level lv)
+	[Test] public async Task Test_CmdSleep_and_CmdSpawn_and_CmdKill(Level lv)
 	{
-		// Behaviour:
+		// Behaviour for clear:
 		// When it's not the first current pending command, execute all commands before it only,
 		// then start counting ticks for the sleep, and only when it dies do the other commands see
 		// the light.
@@ -58,7 +60,7 @@ public static class CommandTests
 		var inj = world.PlaceInjector([
 			new CmdSleep(3),
 			new CmdSpawn(Vector2I.Zero, 3),
-			new CmdSleep(1),
+			new CmdSleep(1), // Just pushes the kill below to the next tick.
 			new CmdKill(Vector2I.Zero),
 		]);
 
@@ -72,27 +74,23 @@ public static class CommandTests
 			
 			await lv.WaitForTicks(1);
 			AssertEq(lv.GetTicksSinceStart(), 3);
-			AssertFalse(tl.HasItem());			
+			AssertFalse(tl.HasItem());		
 			// And now sleep is done.
 
 			await lv.WaitForTicks(1);
 			AssertEq(lv.GetTicksSinceStart(), 4);
 			AssertTrue(tl.HasItem());
+			// The second sleep should be done immediately this tick as well.
 
 			await lv.WaitForTicks(1);
 			AssertEq(lv.GetTicksSinceStart(), 5);
-			AssertTrue(tl.HasItem());
-			// The second sleep should be done.
-
-			await lv.WaitForTicks(1);
-			AssertEq(lv.GetTicksSinceStart(), 6);
 			AssertFalse(tl.HasItem()); // Item should be dead now
 			AssertFalse(inj.HasPendingCmds());
 		}
 		lv.EndSimulation();
 	}
 
-	public static async Task TestCmdSlide(Level lv)
+	[Test] public async Task TestCmdSlide(Level lv)
 	{
 		var world = lv.World;
 		world.InstallEmptyTile(new(0, 0));
@@ -119,7 +117,6 @@ public static class CommandTests
 			new CmdSlide(new(5, 0), Direction.West),
 		]);
 
-		lv.SetTickRate(s_TickRate);
 		lv.StartSimulation();
 		{
 			await lv.WaitForTicks(1);
@@ -175,6 +172,68 @@ public static class CommandTests
 			AssertEq(itWest.GetValue(), 4);
 			AssertTrue(itWest.IsAllowedToMove());
 			AssertFalse(itWest.IsMidAnimation());
+		}
+		lv.EndSimulation();
+	}
+
+	[Test] public async Task TestInstantCmds(Level lv)
+	{
+		var world = lv.World;
+		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl1 = world.InstallEmptyTile(new(1, 0));
+		var injy = world.PlaceInjector([
+			new CmdSleep(1),
+			CmdSpawn.FromTiles(tl0, 1),
+			CmdSpawn.FromTiles(tl1, 1),
+			new CmdSleep(1), // Expected to stretch those instant commands to fill the tick.
+			CmdKill.FromTiles(tl0),
+			CmdKill.FromTiles(tl1),
+			new CmdSleep(1),
+			CmdSpawn.FromTiles(tl0, 1),
+			CmdSpawn.FromTiles(tl1, 1),
+			CmdKill.FromTiles(tl0),
+			CmdKill.FromTiles(tl1),
+		]);
+
+		lv.StartSimulation();
+		{
+			AssertFalse(tl0.HasItem());
+			AssertFalse(tl1.HasItem());
+
+			await lv.WaitForTicks(1);
+			AssertTrue(tl0.HasItem());
+			AssertTrue(tl1.HasItem());
+
+			await lv.WaitForTicks(1);
+			AssertFalse(tl0.HasItem());
+			AssertFalse(tl1.HasItem());
+			
+			await lv.WaitForTicks(1); // Should spawn and kill the items immediately
+			AssertFalse(tl0.HasItem());
+			AssertFalse(tl1.HasItem());
+
+			AssertFalse(injy.HasPendingCmds());
+		}
+		lv.EndSimulation();
+	}
+
+	[Ignore]
+	[Test] public async Task TestKillBeforeSlide(Level lv)
+	{
+		var world = lv.World;
+		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl1 = world.InstallEmptyTile(new(1, 0));
+		var injy = world.PlaceInjector([
+			new CmdSleep(1),
+			CmdKill.FromTiles(tl1),
+			CmdSlide.FromTiles(tl0, Direction.East),
+		]);
+
+		lv.StartSimulation();
+		{
+			await lv.WaitForTicks(1); // Kill should do its job here.
+			AssertFalse(tl0.HasItem());
+			AssertTrue(tl1.HasItem());
 		}
 		lv.EndSimulation();
 	}

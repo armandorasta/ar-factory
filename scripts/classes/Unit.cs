@@ -107,6 +107,8 @@ public abstract partial class Unit : Node2D
 		}
 
 		BuildTiles();
+		Debug.Assert(tickType != TickType.OnDemand || m_TickTiles.Count > 0);
+
 		SetDir(dir);
 	}
 
@@ -166,7 +168,6 @@ public abstract partial class Unit : Node2D
 	/// </summary>
 	public bool IsWithin(Vector2I gloc) => GetRect2I().HasPoint(gloc);
 	public Tile GetTile(Vector2I gloc) => World.GetTile(m_GridLoc + gloc);
-	public T GetTile<T>(Vector2I gloc) where T : Tile => (T)GetTile(gloc);
 
 	/// <summary>
 	/// Returns true if the machine is expected to operate during this tick, <see cref="m_Rate"/> 
@@ -365,9 +366,11 @@ public abstract partial class Unit : Node2D
 		Debug.Assert(!IsWithin(m_GridLoc + gloc + dir.ToGrid()));
 
 		Tile tl = World.GetTile(m_GridLoc + gloc);
-		tl.MakeOutput(dir, true);
+		tl.MakeInput(dir, true);
 		if (bKeepTrack)
 		{
+			// For now I dubs are not allowed.
+			Debug.Assert(!m_TickTiles.Contains(tl));
 			m_TickTiles.Add(tl);
 		}
 		return tl;
@@ -391,7 +394,7 @@ public abstract partial class Unit : Node2D
 		Debug.Assert(!IsWithin(m_GridLoc + gloc + dir.ToGrid()));
 
 		Tile tl = World.GetTile(m_GridLoc + gloc);
-		tl.MakeInput(dir, true);
+		tl.MakeOutput(dir, true);
 		if (bKeepTrack)
 		{
 			m_TickTiles.Add(tl);
@@ -444,7 +447,7 @@ public abstract partial class Unit : Node2D
 	}
 
 	/// <summary>
-	/// Calls <see cref="Command.OnTick"/> on all pending commands.
+	/// Handles <see cref="Command.OnTick"/> for pending commands.
 	/// </summary>
 	public void HandleCmdTick(Level lv)
 	{
@@ -460,21 +463,13 @@ public abstract partial class Unit : Node2D
 		// TODO: Fix this nonsense! I really don't like this zero tick command business, so solve
 		// it a different way ffs!
 
-
 		// When a sleep is in the front, it will act as a checkpoint. It must finish before any
 		// commands after do anything.
-		if (m_PendingCmds[0] is CmdSleep)
-		{
-			m_PendingCmds[0].CountThisTick();
-			if (m_PendingCmds[0].IsDone())
-			{
-				m_PendingCmds.RemoveAt(0);
-			}
-		}
-		else
+		if (m_PendingCmds[0] is not CmdSleep)
 		{
 			// When a sleep is not at the front, finish all the commands before it, then the above 
 			// applies.
+
 			var executedCmdCount = m_PendingCmds.Count;
 			for (var i = 0; i < m_PendingCmds.Count; ++i)
 			{
@@ -491,8 +486,7 @@ public abstract partial class Unit : Node2D
 			for (var i = 0; i < executedCmdCount; ++i)
 			{
 				var cmd = m_PendingCmds[i];
-				cmd.CountThisTick();
-				if (!cmd.IsDone())
+				if (!cmd.CountAndCheckIfDone())
 				{
 					passingCmds.Add(cmd);
 				}
@@ -501,11 +495,21 @@ public abstract partial class Unit : Node2D
 			for (var i = executedCmdCount; i < m_PendingCmds.Count; ++i)
 			{
 				// Sleep in the way, no counting nor OnTick.
+
 				passingCmds.Add(m_PendingCmds[i]);
 			}
 
 			m_PendingCmds.Clear();
 			m_PendingCmds = passingCmds;
+		}
+		
+		// This achieves the behaviour of stretching instant commands to take an entire tick
+		if (m_PendingCmds.Count > 0 && m_PendingCmds[0] is CmdSleep)
+		{
+			if (m_PendingCmds[0].CountAndCheckIfDone())
+			{
+				m_PendingCmds.RemoveAt(0);
+			}
 		}
 
 		if (m_PendingCmds.Count == 0)

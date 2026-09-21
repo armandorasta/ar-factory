@@ -3,9 +3,9 @@ using Godot;
 namespace ArFactory.Tests;
 using static Asserts;
 
-public static class WorldPanelTests
+[TestSuite] public class WorldPanelTests
 {
-	public static void TestSetDims(Level lv)
+	[Test] public void TestSetDims(Level lv)
 	{
 		var world = lv.World;
 		world.SetDims(new(10, 10));
@@ -18,7 +18,7 @@ public static class WorldPanelTests
 		// TODO: place some units and determine what happens to cut-off units.
 	}
 
-	public static void TestCloneItem(Level lv)
+	[Test] public void TestCloneItem(Level lv)
 	{
 		var world = lv.World;
 		var tl0 = world.InstallEmptyTile(new(1, 2));
@@ -67,7 +67,7 @@ public static class WorldPanelTests
 		AssertFalse(tl1.IsReserved());
 	}
 
-	public static void TestTeleportItem(Level lv)
+	[Test] public void TestTeleportItem(Level lv)
 	{
 		var world = lv.World;
 		var tl0 = world.InstallEmptyTile(new(1, 2));
