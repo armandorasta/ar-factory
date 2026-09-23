@@ -1,6 +1,6 @@
 using System;
 
-namespace ArFactory.Tests;
+namespace ArTest;
 
 public class TestAssertFailedException(string msg) : Exception(msg)
 {

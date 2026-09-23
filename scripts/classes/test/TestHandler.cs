@@ -1,15 +1,14 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Godot;
 
-namespace ArFactory.Tests;
+namespace ArTest;
 using static AnsiColors;
 
-public class TestHandler
+public partial class TestHandler : Godot.Node
 {
 	private struct TestClassResult
 	{
@@ -18,48 +17,63 @@ public class TestHandler
 		public int IgnoredTestCount;
 	}
 
+	private static TestHandler s_Instance;
 
-	private Level m_Level;
-	private bool m_bShowPassingTests;
+
+	public bool IsShowPassingTests 
+	{ 
+		get => m_bShowPassingTests;
+		set => m_bShowPassingTests = value; 
+	}
+
+	public bool IsPrintOrphanNodes
+	{ 
+		get => m_bPrintOrphanNodes;
+		set => m_bPrintOrphanNodes = value; 
+	}
+
+	private bool m_bShowPassingTests = false;
 	private Task m_WholeProgramTask;
+
+	private bool m_bPrintOrphanNodes = false;
+	private int m_OrphanCount = 0;
+
+
+	public static TestHandler GetInstance() => s_Instance;
+
 
 	/// <summary>
 	/// Must call <see cref="RunTests"/> on _Ready, and <see cref="OnProcess"/> in _Process!
 	/// </summary>
-	public TestHandler(Level lv, bool bShowPassingTests)
+	public TestHandler()
 	{
-		m_Level = lv;
-		m_bShowPassingTests = bShowPassingTests;
+		s_Instance = this;
 	}
-	/// <summary>
-	/// Must be called in _Ready.
-	/// </summary>
-	public void RunTests()
+
+	public override void _Ready()
 	{
 		m_WholeProgramTask = RunTestsImpl();
 	}
-	/// <summary>
-	/// Must be called in _Process.
-	/// </summary>
-	public void OnProcess()
+
+	public override void _Process(double dt)
 	{
 		if (m_WholeProgramTask is { IsCompleted: true })
 		{
-			m_Level.GetTree().Quit();
+			GetTree().Quit();
 		}
 	}
 
-
 	private async Task RunTestsImpl()
 	{
-		Asserts.TreePtr = m_Level.GetTree();
+		Asserts.TreePtr = GetTree();
 
 		var totalTestCount = 0;
 		var totalPassingTestCount = 0;
 		var totalIgnoredTests = 0;
 
-		var testClasses = Assembly.GetExecutingAssembly()
-			.GetTypes().Where((c) => c.GetCustomAttribute<TestSuiteAttribute>() != null).ToArray();
+		var testClasses = Assembly.GetExecutingAssembly().GetTypes()
+			.Where(c => c.IsSubclassOf(typeof(TestSuit)))
+			.ToArray();
 		
 		var runFirstMeths = testClasses
 			.SelectMany(c => c.GetMethods().Where(m => m.GetCustomAttribute<RunThisOnlyAttribute>() != null))
@@ -112,7 +126,7 @@ public class TestHandler
 		}
 		else if (totalPassingTestCount + totalIgnoredTests == totalTestCount)
 		{
-			GD.Print($"{Green}ALL TESTS PASS! 🥳{Reset}{ignoredMsg}.");
+			GD.Print($"{Green}ALL {totalTestCount} TESTS PASS! 🥳{Reset}{ignoredMsg}.");
 		}
 		else
 		{
@@ -130,10 +144,6 @@ public class TestHandler
 		var tMethods = (onlyRunThis != null) 
 			? [onlyRunThis] 
 			: allMethods.Where(m => m.GetCustomAttribute<TestAttribute>() != null);
-		var beforeAllMethod  = Array.Find(allMethods, m => m.Name == "BeforeAll");
-		var afterAllMethod   = Array.Find(allMethods, m => m.Name == "AfterAll");
-		var beforeEachMethod = Array.Find(allMethods, m => m.Name == "BeforeEach");
-		var afterEachMethod  = Array.Find(allMethods, m => m.Name == "AfterEach");
 
 		// Used to print the intro before the first failing test when passing tests are not shown.
 		// We don't wanna print intros for classes with no failing tests in that case.
@@ -146,7 +156,7 @@ public class TestHandler
 			bPrintClassIntro = false;
 		}
 
-		beforeAllMethod?.Invoke(instance, [m_Level]);
+		tclass.GetMethod("BeforeAll")?.Invoke(instance, []);
 		foreach (var tmeth in tMethods)
 		{
 			res.TestCount += 1;
@@ -157,27 +167,45 @@ public class TestHandler
 			}
 
 			Asserts.CurrTestMethod = tmeth.Name;
-			Debug.AssertEq(tmeth.GetParameters().Length, 1);
-			Debug.AssertEq(tmeth.GetParameters()[0].ParameterType, typeof(Level));
+			if (tmeth.GetParameters().Length > 0)
+			{
+				throw new InvalidProgramException($"Found a test ({Pink}{tmeth}{Reset}) that takes parameters, remove them.");
+			}
 
-			var isAsync = tmeth.GetCustomAttribute<AsyncStateMachineAttribute>() is not null;
-			Debug.Assert(isAsync && tmeth.ReturnType == typeof(Task) || tmeth.ReturnType == typeof(void));
+			var bAsync = tmeth.GetCustomAttribute<AsyncStateMachineAttribute>() is not null;
+			if (bAsync)
+			{
+				if (tmeth.ReturnType != typeof(Task))
+				{
+					throw new InvalidProgramException($"Async test {Pink}{tmeth}{Reset} must return Task");
+				}
+			}
+			else 
+			{
+				if (tmeth.ReturnType != typeof(void))
+				{
+					throw new InvalidProgramException($"Sync test {Pink}{tmeth}{Reset} must return void");
+				}
+			}
 			
-			DoBeforeEachTest();
 			try
 			{
-				Debug.DisableAsserts();
-				beforeEachMethod?.Invoke(instance, [m_Level]);
-				if (isAsync)
+				DoBeforeEachTest(tmeth);
+				tclass.GetMethod("BeforeEach")?.Invoke(instance, []);
+				if (bAsync)
 				{
-					await (Task)tmeth.Invoke(instance, [m_Level]);
+					await (Task)tmeth.Invoke(instance, []);
 				}
 				else
 				{
-					tmeth.Invoke(instance, [m_Level]);
+					tmeth.Invoke(instance, []);
 				}
-				afterEachMethod?.Invoke(instance, [m_Level]);
-				Debug.EnableAsserts();
+
+				// Wait for the frame to end first.
+				await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+				// Then call the after test stuff.
+				tclass.GetMethod("AfterEach")?.Invoke(instance, []);
+				DoAfterEachTest(tmeth);
 
 				res.PassingTestCount += 1;
 				if (m_bShowPassingTests)
@@ -185,7 +213,7 @@ public class TestHandler
 					GD.Print($"    {Cyan}{tmeth.Name} {Green}passes!{Reset}");
 				}
 			}
-			catch (TargetInvocationException ex)
+			catch (Exception ex)
 			{
 				if (bPrintClassIntro)
 				{
@@ -202,7 +230,7 @@ public class TestHandler
 				}
 			}
 		}
-		afterAllMethod?.Invoke(instance, [m_Level]);
+		tclass.GetMethod("AfterAll")?.Invoke(instance, []);
 
 		if (res.TestCount == 0 && res.IgnoredTestCount == 0)
 		{
@@ -231,10 +259,24 @@ public class TestHandler
 		return res;
 	}
 
-	private void DoBeforeEachTest()
+	private void DoBeforeEachTest(MethodInfo meth)
 	{
-		Debug.Assert(!m_Level.IsSimRunning());
-		m_Level.World.Reset();
-		m_Level.World.SetDims(new(15, 10));
+	}
+
+	private void DoAfterEachTest(MethodInfo meth)
+	{
+		var allOrphanBros = GetOrphanNodeIds();
+		var nCurrTestOrphan = allOrphanBros.Count - m_OrphanCount;
+		if (nCurrTestOrphan > 0)
+		{
+			GD.Print($"    {nCurrTestOrphan} {Red}orphan nodes detected{Reset}");
+		}
+
+		if (m_bPrintOrphanNodes)
+		{
+			PrintOrphanNodes();
+		}
+
+		m_OrphanCount = allOrphanBros.Count;
 	}
 }

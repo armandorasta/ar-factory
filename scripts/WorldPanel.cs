@@ -412,7 +412,7 @@ public partial class WorldPanel : Panel
 	{
 		Reset();
 		SetDims(m_Dims);
-		PlaceSomeUnits();
+		// PlaceSomeUnits();
 	}
 
 	public override void _Draw()
@@ -562,7 +562,7 @@ public partial class WorldPanel : Panel
 			var u = m_Units[i];
 			if (!Unit.CanFitIn(this, u.GridLoc, u.Dims))
 			{
-				RemoveUnit(u);
+				DeleteUnit(u);
 			}
 			else
 			{
@@ -582,6 +582,11 @@ public partial class WorldPanel : Panel
 
 	public void Reset()
 	{
+		for (var i = m_Units.Count - 1; i >= 0; --i)
+		{
+			DeleteUnit(m_Units[i]);
+		}
+		
 		foreach (var tl in m_Tiles)
 		{
 			tl?.DestroyItem(true);
@@ -592,13 +597,6 @@ public partial class WorldPanel : Panel
 			m_Tiles.Add(null);
 		}
 
-		foreach (var u in m_Units)
-		{
-			u.QueueFree();
-			RemoveChild(u);
-		}
-		m_Units.Clear();
-		
 		m_BlockedSlideCmdsByItems.Clear();
 	}
 
@@ -665,11 +663,19 @@ public partial class WorldPanel : Panel
 		AddChild(newUnit);
 	}
 
-	private void RemoveUnit(Unit u)
+	private void DeleteUnit(Unit u)
 	{
-		u.QueueFree();
+		u.Reset();
 		RemoveChild(u);
+		u.QueueFree();
 		m_Units.Remove(u);
+		for (var y = 0; y < u.Dims.Y; ++y)
+		{
+			for (var x = 0; x < u.Dims.X; ++x)
+			{
+				DeleteTile(u.GridLoc + new Vector2I(x, y));
+			}
+		}
 	}
 
 	#endregion

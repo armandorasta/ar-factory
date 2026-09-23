@@ -1,25 +1,53 @@
 using Godot;
 
 namespace ArFactory.Tests;
-using static Asserts;
+using static ArTest.Asserts;
 
-[TestSuite]
-public class TileTests
+public class TileTests : ArTest.TestSuit
 {
-	[Test] public void Test_SetWall_and_GetWall(Level lv)
+	private Level m_Lv;
+
+	public override void BeforeAll()
 	{
-		var tl = lv.World.InstallEmptyTile(Vector2I.Zero);
+		var levelScene = GD.Load<PackedScene>("res://scenes/level.tscn");
+		m_Lv = levelScene.Instantiate<Level>();
+		AddNode(m_Lv);
+		m_Lv.SetTickRate(50);
+	}
+
+	public override void BeforeEach()
+	{
+		m_Lv.World.Reset();
+		m_Lv.World.SetDims(new(15, 10));
+	}
+
+	public override void AfterEach()
+	{
+		AssertFalse(m_Lv.IsSimRunning());
+	}
+
+	public override void AfterAll()
+	{
+		m_Lv.QueueFree();
+		RemoveNode(m_Lv);
+	}
+
+	[ArTest.Test] public void Test_SetWall_and_GetWall()
+	{
+		var tl = m_Lv.World.InstallEmptyTile(Vector2I.Zero);
 		AssertTrue(tl.IsClear(Direction.North));
 		AssertTrue(tl.IsClear(Direction.East));
 		AssertTrue(tl.IsClear(Direction.South));
 		AssertTrue(tl.IsClear(Direction.West));
 
-		tl.MakeSolid(Direction.North);
-		AssertTrue(tl.IsSolid(Direction.North));
-		tl.MakeInput(Direction.North);
-		AssertTrue(tl.IsInput(Direction.North));
-		tl.MakeOutput(Direction.North);
-		AssertTrue(tl.IsOutput(Direction.North));
+		tl.MakeSolid(Direction.West);
+		AssertTrue(tl.IsSolid(Direction.West));
+		tl.MakeInput(Direction.West);
+		AssertTrue(tl.IsInput(Direction.West));
+		tl.MakeOutput(Direction.West);
+		AssertTrue(tl.IsOutput(Direction.West));
+		tl.ClearWall(Direction.West);
+		AssertTrue(tl.IsClear(Direction.West));
 
 		tl.MakeSolid(Direction.North);
 		AssertTrue(tl.IsSolid(Direction.North));
@@ -46,9 +74,9 @@ public class TileTests
 		AssertTrue(tl.IsSolid(Direction.West));
 	}
 
-	[Test] public void TestCanItemEnter(Level lv)
+	[ArTest.Test] public void TestCanItemEnter()
 	{
-		var tl = lv.World.InstallEmptyTile(Vector2I.Zero);
+		var tl = m_Lv.World.InstallEmptyTile(Vector2I.Zero);
 		tl.MakeSolid(Direction.North);
 		tl.MakeOutput(Direction.East);
 		tl.MakeInput(Direction.South);
@@ -60,16 +88,16 @@ public class TileTests
 		AssertTrue(tl.CanItemEnter(Direction.West));
 
 		// Function should not take held items into consideration.
-		lv.World.SpawnItem(Vector2I.Zero, 0);
+		m_Lv.World.SpawnItem(Vector2I.Zero, 0);
 		AssertFalse(tl.CanItemEnter(Direction.North));
 		AssertFalse(tl.CanItemEnter(Direction.East));
 		AssertTrue(tl.CanItemEnter(Direction.South));
 		AssertTrue(tl.CanItemEnter(Direction.West));
 	}
 
-	[Test] public void TestCanItemExit(Level lv)
+	[ArTest.Test] public void TestCanItemExit()
 	{
-		var tl = lv.World.InstallEmptyTile(Vector2I.Zero);
+		var tl = m_Lv.World.InstallEmptyTile(Vector2I.Zero);
 		tl.MakeSolid(Direction.North);
 		tl.MakeOutput(Direction.East);
 		tl.MakeInput(Direction.South);
@@ -81,16 +109,16 @@ public class TileTests
 		AssertTrue(tl.CanItemExit(Direction.West));
 
 		// Function should not take held items into consideration.
-		lv.World.SpawnItem(Vector2I.Zero, 0);
+		m_Lv.World.SpawnItem(Vector2I.Zero, 0);
 		AssertFalse(tl.CanItemExit(Direction.North));
 		AssertTrue(tl.CanItemExit(Direction.East));
 		AssertFalse(tl.CanItemExit(Direction.South));
 		AssertTrue(tl.CanItemExit(Direction.West));
 	}
 
-	[Test] public void Test_WorldPanel_InstallTile_and_DeleteTile(Level lv)
+	[ArTest.Test] public void Test_WorldPanel_InstallTile_and_DeleteTile()
 	{
-		var world = lv.World;
+		var world = m_Lv.World;
 		AssertFalse(world.HasTile(Vector2I.One));
 		AssertNull(world[1, 1]);
 
@@ -104,9 +132,9 @@ public class TileTests
 		AssertNull(world[1, 1]);
 	}
 
-	[Test] public void Test_WorldPanel_SpawnItem_and_DestroyItem(Level lv)
+	[ArTest.Test] public void Test_WorldPanel_SpawnItem_and_DestroyItem()
 	{
-		var world = lv.World;
+		var world = m_Lv.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
 		AssertFalse(world[0, 0].HasItem());
 		AssertNotNull(world.SpawnItem(tl.GridLoc, 7));
@@ -127,9 +155,9 @@ public class TileTests
 		AssertFalse(tl.HasItem());
 	}
 
-	[Test] public void Test_WorldPanel_ExtractItem_and_InstallItem(Level lv)
+	[ArTest.Test] public void Test_WorldPanel_ExtractItem_and_InstallItem()
 	{
-		var world = lv.World;
+		var world = m_Lv.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
 		var spawnedIt = world.SpawnItem(tl.GridLoc, 7);
 		AssertRefEq(spawnedIt.GetParent(), world);
@@ -148,18 +176,21 @@ public class TileTests
 		AssertEq(installedIt.Value, 7);
 	}
 
-	[Test] public void Test_WorldPanel_ExtractTile(Level lv)
+	[ArTest.Test] public void Test_WorldPanel_ExtractTile()
 	{
-		var world = lv.World;
-		var installedTl = world.InstallEmptyTile(Vector2I.Zero);
-		var extractedTl = world.ExtractTile(Vector2I.Zero);
+		var world = m_Lv.World;
+		var installedTl = world.InstallEmptyTile(new(3, 4));
+		var extractedTl = world.ExtractTile(installedTl.GridLoc);
 		AssertRefEq(installedTl, extractedTl);
-		AssertFalse(world.HasTile(Vector2I.Zero));
+		AssertFalse(world.HasTile(installedTl.GridLoc));
 
-		var anotherTl = world.InstallTile(extractedTl, extractedTl.GridLoc);
+		extractedTl.SetGridLocUnsafe(Vector2I.Zero); // Should be ignored and overriden.
+		var anotherTl = world.InstallTile(extractedTl, new(1, 2));
+		AssertTrue(world.HasTile(new(1, 2)));
+		AssertFalse(world.HasTile(new(3, 4))); // Ignore the tile's grid-loc
 		AssertRefEq(anotherTl, extractedTl);
 
-		world.DeleteTile(Vector2I.Zero);
+		world.DeleteTile(anotherTl.GridLoc);
 
 		// Must pass bMaybeNull in debug.
 		AssertNull(world.ExtractTile(Vector2I.Zero));

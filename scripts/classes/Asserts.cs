@@ -6,7 +6,7 @@ using System.IO;
 using System.Text;
 using Godot;
 
-namespace ArFactory.Tests;
+namespace ArTest;
 using static AnsiColors;
 
 public static class Asserts

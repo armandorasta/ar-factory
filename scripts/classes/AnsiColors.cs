@@ -1,7 +1,4 @@
-using Godot;
-using System;
-
-namespace ArFactory;
+namespace ArTest;
 
 public static class AnsiColors
 {

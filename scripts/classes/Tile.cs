@@ -218,8 +218,8 @@ public class Tile(Vector2I gloc)
 		Debug.Assert(bMaybeNull || m_bReserved);
 		if (m_Item is not null)
 		{
-			m_Item.GetParent().RemoveChild(m_Item);
 			m_Item.QueueFree();
+			m_Item.GetParent().RemoveChild(m_Item);
 			m_Item = null;
 		}
 	}

@@ -1,8 +1,8 @@
-using Godot;
+// using Godot;
 
-namespace ArFactory.Tests;
-using static Asserts;
+// namespace ArFactory.Tests;
+// using static Asserts;
 
-public static class UnitTests
-{
-}
+// public static class UnitTests
+// {
+// }

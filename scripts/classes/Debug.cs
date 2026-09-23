@@ -7,6 +7,14 @@ using System.Collections.Generic;
 
 namespace ArFactory;
 
+// When Assertions are enabled, the debugger will allow you to step over them.
+// When disabled, the debugger will completely ignore them as it should.
+#if ASSERTIONS
+using DebugAssertionDebuggerVisibiltyAttribute = DebuggerStepThroughAttribute;
+#else
+using DebugAssertionDebuggerVisibiltyAttribute = DebuggerHiddenAttribute;
+#endif
+
 #nullable enable
 
 internal static class Debug
@@ -20,7 +28,9 @@ internal static class Debug
 	public static void EnableAsserts()  { s_bEnabled = true;  }
 
 
-	[StackTraceHidden] [DebuggerStepThrough] [Conditional("DEBUG")]
+	[Conditional("ASSERTIONS")]
+	[DebugAssertionDebuggerVisibilty]
+	[StackTraceHidden] 
 	public static void Assert([DoesNotReturnIf(false)] bool cond, string? msg = null)
 	{
 		HandleImpl(cond, $"Assertion Failed!", msg);
@@ -29,7 +39,9 @@ internal static class Debug
 	/// <summary>
 	/// Asserts: <paramref name="subject"/> is an instance of <paramref name="expectedType"/>.
 	/// </summary>
-	[StackTraceHidden] [DebuggerStepThrough] [Conditional("DEBUG")]
+	[Conditional("ASSERTIONS")]
+	[DebugAssertionDebuggerVisibilty] 
+	[StackTraceHidden] 
 	public static void AssertIs(object subject, Type expectedType, string? msg = null)
 	{
 		HandleImpl(expectedType.IsInstanceOfType(subject), 
@@ -41,7 +53,9 @@ internal static class Debug
 	/// Asserts the <paramref name="testValue"/> is equal to <paramref name="target"/> using the
 	/// equality operator. Use <seealso cref="AssertRefEq"/> for reference comparison.
 	/// </summary>
-	[StackTraceHidden] [DebuggerStepThrough] [Conditional("DEBUG")]
+	[Conditional("ASSERTIONS")]
+	[DebugAssertionDebuggerVisibilty] 
+	[StackTraceHidden] 
 	public static void AssertEq<T>(T testValue, T target, string? msg = null)
 	{
 		HandleImpl(EqualityComparer<T>.Default.Equals(testValue, target),
@@ -49,7 +63,9 @@ internal static class Debug
 			msg);
 	}
 
-	[StackTraceHidden] [DebuggerStepThrough] [Conditional("DEBUG")]
+	[Conditional("ASSERTIONS")]
+	[DebugAssertionDebuggerVisibilty] 
+	[StackTraceHidden] 
 	public static void AssertRefEq<T>(T testValue, T target, string? msg = null)
 	{
 		HandleImpl(object.ReferenceEquals(testValue, target),
@@ -57,7 +73,9 @@ internal static class Debug
 			msg);
 	}
 
-	[StackTraceHidden] [DebuggerStepThrough] [Conditional("DEBUG")]
+	[Conditional("ASSERTIONS")]
+	[DebugAssertionDebuggerVisibilty] 
+	[StackTraceHidden] 
 	public static void AssertNotNull(object testValue, string? msg = null)
 	{
 		HandleImpl(testValue is not null, 
@@ -69,7 +87,7 @@ internal static class Debug
 	/// Used in branches meant to be impossible.
 	/// </summary>
 	[StackTraceHidden] 
-	[DebuggerStepThrough] 
+	[DebugAssertionDebuggerVisibilty] 
 	[DoesNotReturn]
 	public static void AssertUnreachable()
 	{
@@ -78,7 +96,9 @@ internal static class Debug
 	}
 
 
-	[StackTraceHidden] [DebuggerHidden] [Conditional("DEBUG")]
+	[Conditional("ASSERTIONS")]
+	[DebuggerHidden] 
+	[StackTraceHidden] 
 	private static void HandleImpl([DoesNotReturnIf(false)] bool bMustBe, string specialMsg, string? userMsg)
 	{
 		if (!s_bEnabled)
@@ -103,7 +123,7 @@ internal static class Debug
 	}
 
 	[StackTraceHidden]
-	[Conditional("DEBUG")]
+	[Conditional("ASSERTIONS")]
 	private static void PrintStackTrace(int nSkippedFrames = 1, bool includeGodotShit = false)
 	{
 		GD.PrintErr("Stack:");

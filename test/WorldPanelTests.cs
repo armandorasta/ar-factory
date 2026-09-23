@@ -1,13 +1,41 @@
 using Godot;
 
 namespace ArFactory.Tests;
-using static Asserts;
+using static ArTest.Asserts;
 
-[TestSuite] public class WorldPanelTests
+public class WorldPanelTests : ArTest.TestSuit
 {
-	[Test] public void TestSetDims(Level lv)
+	private Level m_Lv;
+
+	public override void BeforeAll()
 	{
-		var world = lv.World;
+		var levelScene = GD.Load<PackedScene>("res://scenes/level.tscn");
+		m_Lv = levelScene.Instantiate<Level>();
+		AddNode(m_Lv);
+	}
+
+	public override void BeforeEach()
+	{
+		m_Lv.World.Reset();
+		m_Lv.World.SetDims(new(15, 10));
+	}
+
+	public override void AfterEach()
+	{
+		AssertFalse(m_Lv.IsSimRunning());
+	}
+
+	public override void AfterAll()
+	{
+		m_Lv.QueueFree();
+		RemoveNode(m_Lv);
+	}
+
+
+	// [ArTest.RunThisOnly]
+	[ArTest.Test] public void TestSetDims()
+	{
+		var world = m_Lv.World;
 		world.SetDims(new(10, 10));
 		AssertEq(world.Dims, new(10, 10));
 		AssertTrue(world.IsWithin(new(5, 2)));
@@ -18,9 +46,9 @@ using static Asserts;
 		// TODO: place some units and determine what happens to cut-off units.
 	}
 
-	[Test] public void TestCloneItem(Level lv)
+	[ArTest.Test] public void TestCloneItem()
 	{
-		var world = lv.World;
+		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(new(1, 2));
 		var tl1 = world.InstallEmptyTile(new(3, 4));
 		var it0 = world.SpawnItem(tl0.GridLoc, 5);
@@ -67,9 +95,9 @@ using static Asserts;
 		AssertFalse(tl1.IsReserved());
 	}
 
-	[Test] public void TestTeleportItem(Level lv)
+	[ArTest.Test] public void TestTeleportItem()
 	{
-		var world = lv.World;
+		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(new(1, 2));
 		var tl1 = world.InstallEmptyTile(new(3, 4));
 		var it0 = world.SpawnItem(tl0.GridLoc, 50);

@@ -458,10 +458,7 @@ public abstract partial class Unit : Node2D
 		}
 
 		// We have to execute all of them, because so of them are executed in different tiles in
-		// parallel. We will move the resposbility of them not clashing to the commands themselves.
-
-		// TODO: Fix this nonsense! I really don't like this zero tick command business, so solve
-		// it a different way ffs!
+		// parallel. We will move the responsbility of them not clashing to the commands themselves.
 
 		// When a sleep is in the front, it will act as a checkpoint. It must finish before any
 		// commands after do anything.

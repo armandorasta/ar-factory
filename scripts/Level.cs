@@ -8,6 +8,18 @@ namespace ArFactory;
 
 public partial class Level : Node2D
 {
+	public class SimulationAutoEnder(Level lv) : IDisposable
+	{
+		private readonly Level m_Level = lv;
+
+		void IDisposable.Dispose()
+		{
+			Debug.Assert(m_Level.IsSimRunning());
+			m_Level.EndSimulation();
+		}
+	}
+
+
 	enum PlayMode { Off, Play, Debug }
 
 	/// <summary>
@@ -19,7 +31,7 @@ public partial class Level : Node2D
 
 
 	// Nodes
-	public Camera2D Cam;
+	public Godot.Camera2D Cam;
 	public WorldPanel World;
 	public Godot.Button PlayButt;
 	public Godot.Button PauseButt;
@@ -41,21 +53,19 @@ public partial class Level : Node2D
 	private int m_TickCount = 0; // Number of ticks since the start.
 	private float m_TickMillis;
 
-	private TestHandler m_TestHandler;
-
 
 	public override void _Ready()
 	{
-		Cam = GetNode<Camera2D>("WorldPanel/Cam");
+		Cam = GetNode<Godot.Camera2D>("WorldPanel/Cam");
 		World = GetNode<WorldPanel>("WorldPanel");
-		PlayButt = GetNode<Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PlayButt");
-		PauseButt = GetNode<Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PauseButt");
-		DebugButt = GetNode<Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/DebugButt");
-		ToolsHBox = GetNode<HBoxContainer>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/ToolsHBox");
-		PlayHBox = GetNode<HBoxContainer>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox");
-		TicksLabel = GetNode<Label>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TicksLabel");
-		SpeedSlider = GetNode<HSlider>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/SpeedHSlider");
-		TickSpeedLabel = GetNode<Label>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TickSpeedLabel");
+		PlayButt = GetNode<Godot.Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PlayButt");
+		PauseButt = GetNode<Godot.Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PauseButt");
+		DebugButt = GetNode<Godot.Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/DebugButt");
+		ToolsHBox = GetNode<Godot.HBoxContainer>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/ToolsHBox");
+		PlayHBox = GetNode<Godot.HBoxContainer>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox");
+		TicksLabel = GetNode<Godot.Label>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TicksLabel");
+		SpeedSlider = GetNode<Godot.HSlider>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/SpeedHSlider");
+		TickSpeedLabel = GetNode<Godot.Label>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TickSpeedLabel");
 
 		// World.SetDims(new(5, 5));
 		Cam.Position = World.Size * 0.5f;
@@ -74,9 +84,6 @@ public partial class Level : Node2D
 		SpeedSlider.Value = GetTickRate();
 
 		AddTools();
-
-		m_TestHandler = new TestHandler(this, true);
-		m_TestHandler?.RunTests();
 	}
 
 	public override void _EnterTree()
@@ -87,7 +94,6 @@ public partial class Level : Node2D
 	// Called every frame. 'delta' is the elapsed time since the previous frame.
 	public override void _Process(double dt)
 	{
-		m_TestHandler?.OnProcess();
 		switch (m_CurrPlayMode) {
 		case PlayMode.Off: break;
 		case PlayMode.Debug: break;
@@ -117,7 +123,10 @@ public partial class Level : Node2D
 		EmitSignal(SignalName.TickProcessed, m_TickCount);
 	}
 
-	public void StartSimulation(bool bWasteFirstTick = false)
+	/// <summary>
+	/// Returns a proxy that can be used in a using statement which will automatically end the simulation.
+	/// </summary>
+	public SimulationAutoEnder StartSimulation(bool bWasteFirstTick = false)
 	{
 		Debug.Assert(m_CurrPlayMode != PlayMode.Play);
 		m_CurrPlayMode = PlayMode.Play;
@@ -134,6 +143,8 @@ public partial class Level : Node2D
 		{
 			OnTickTimer_TimeOut();
 		}
+
+		return new(this);
 	}
 
 	public void EndSimulation()
