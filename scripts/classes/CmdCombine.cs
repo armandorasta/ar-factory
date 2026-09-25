@@ -5,60 +5,64 @@ using System.Linq;
 
 namespace ArFactory;
 
-public partial class CmdCombine : Command
+/// <summary>
+/// Combines items in multiple locations into one.
+/// </summary>
+public class CmdCombine : Command
 {
-	public Vector2I[] SrcGridLocs;
-	public Vector2I DestGridLoc;
-	public Func<IEnumerable<int>, int> CombFunc;
-
-	public static CmdCombine FromTiles(Tile[] srcTls, Tile destTl, 
-		Func<IEnumerable<int>, int> combFunc) 
-		=> new(srcTls.Select((tl) => tl.GridLoc), destTl.GridLoc, combFunc);
-
+	public Vector2I[] SrcGridLocs { get; private set; }
+	public Vector2I DestGridLoc { get; private set; }
+	public Func<IEnumerable<int>, int> CombFunc { get; private set; }
 
 	/// <summary>
-	/// `combFunc` will take values of items in specified locations is the same order of the locations, 
-	/// and returns the value will be assigned to the generated item.
-	/// `destGLoc` can overlap with `srcGLocs`; the old items will be destroyed before the new item is
-	/// spawned.
+	/// <paramref name="combFunc"/> will take values of items in specified locations is the same 
+	/// order of the locations, and returns the value will be assigned to the generated item.
+	/// <paramref name="destGLoc"/> can overlap with <paramref name="srcGLocs"/>; the old items will 
+	/// be destroyed before the new item is spawned.
 	/// </summary>
-	public CmdCombine(IEnumerable<Vector2I> srcGLocs, Vector2I destGLoc, 
-		Func<IEnumerable<int>, int> combFunc) : base(0)
+	public CmdCombine(
+		IEnumerable<Vector2I> srcGLocs, Vector2I destGLoc, Func<IEnumerable<int>, int> combFunc) 
+		: base(0)
 	{
-		SrcGridLocs = srcGLocs.ToArray();
+		SrcGridLocs = [.. srcGLocs];
 		Debug.Assert(!SrcGridLocs.IsEmpty());
 		DestGridLoc = destGLoc;
 		CombFunc = combFunc;
+
+		if (srcGLocs.Contains(destGLoc))
+		{
+			// If the destination overlaps with sources, we don't need to wait for the destination 
+			// to be empty as that's literally impossible
+			AddSubParallelCmds([ new CmdAwait(srcGLocs) ]);
+		}
+		else
+		{
+			AddSubParallelCmds([ new CmdAwaitVacate(srcGLocs, [destGLoc]) ]);
+		}
 	}
 
-	public override void OnTick(Level lv)
+	public CmdCombine(IEnumerable<Tile> srcTls, Tile destTl, Func<IEnumerable<int>, int> combFunc) 
+		: this(srcTls.Select(tl => tl.GridLoc), destTl.GridLoc, combFunc) 
+	{ }
+
+
+	protected override void OnTick(Level lv)
 	{
-		Debug.AssertIs(lv.World.GetTile(DestGridLoc), typeof(Tile));
-		Debug.Assert(SrcGridLocs.All((l) => lv.World.GetTile(l) is Tile));
+		// Collect the values, 
+		// destroy the source items first just in case the destination overlaps with one, 
+		// spawn the combined item by processing the values.
+
+		var srcTls = SrcGridLocs.Select(lv.World.GetTile);
+		var finalVal = CombFunc.Invoke(srcTls.Select(tl => tl.Item.Value));
+		foreach (var tl in srcTls)
+		{
+			tl.DestroyItem();
+		}
 		
-		var destTile = lv.World.GetTile(DestGridLoc);
-		if (destTile.IsReserved())
-		{
-			PauseThisTick();
-			return;
-		}
+		// Before I tried collecting the values first using Linq, then calling CombFunc after
+		// destroying the items, which carshed because Linq is lazily evaluated.
 
-		if (SrcGridLocs.Any((l) => !lv.World.GetTile(l).HasItem()))
-		{
-			PauseThisTick();
-			return;
-		}
-
-		// This asserts that await was called before this command.
-		// TODO: Add sub-commands and remove the needs for the below assert.
-		Debug.Assert(SrcGridLocs.All((l) => !lv.World.GetTile(l).Item.IsMidAnimation()));
-
-		var values = SrcGridLocs.Select((l) => lv.World.GetTile(l).Item.GetValue());
-		foreach (var sgloc in SrcGridLocs)
-		{
-			lv.World.GetTile(sgloc).DestroyItem();
-		}
-		lv.World.SpawnItem(DestGridLoc, CombFunc.Invoke(values));
+		lv.World.SpawnItem(DestGridLoc, finalVal);
 	}
 
 	public override string ToString()

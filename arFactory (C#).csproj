@@ -8,6 +8,8 @@
   </PropertyGroup>
 
   <PropertyGroup>
+    <!-- We have: DEBUG, TEST, ASSERTIONS -->
+    <!-- <DefineConstants>TEST</DefineConstants> -->
     <DefineConstants>TEST</DefineConstants>
   </PropertyGroup>
 

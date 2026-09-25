@@ -2,25 +2,25 @@ using Godot;
 
 namespace ArFactory;
 
-public partial class CmdTeleport(Vector2I gfrom, Vector2I gto) : Command(0)
+/// <summary>
+/// Teleports an item from a location to another.
+/// </summary>
+public class CmdTeleport : Command
 {
-	public static CmdTeleport FromTiles(Tile tlFrom, Tile tlTo) 
-		=> new(tlFrom.GridLoc, tlTo.GridLoc);
+	public Vector2I SrcGridLoc { get; private set; }
+	public Vector2I DestGridLoc { get; private set; }
 
-	public Vector2I SrcGridLoc = gfrom;
-	public Vector2I DestGridLoc = gto;
-
-	public override void OnTick(Level lv)
+	public CmdTeleport(Vector2I gfrom, Vector2I gto) : base(0)
 	{
-		Debug.Assert(lv.World.GetTile(SrcGridLoc) is Tile);
-		Debug.Assert(lv.World.GetTile(DestGridLoc) is Tile);
-		var srcTile = lv.World.GetTile(SrcGridLoc);
-		if (!srcTile.HasItem() || srcTile.Item.IsMidAnimation())
-		{
-			PauseThisTick();
-			return;
-		}
+		SrcGridLoc = gfrom;
+		DestGridLoc = gto;
+		AddSubParallelCmds([ new CmdAwaitVacate([gfrom], [gto]) ]);
+	}
 
+	public CmdTeleport(Tile tlFrom, Tile tlTo) : this(tlFrom.GridLoc, tlTo.GridLoc) { }
+
+	protected override void OnTick(Level lv)
+	{
 		lv.World.TeleportItem(SrcGridLoc, DestGridLoc);
 	}
 

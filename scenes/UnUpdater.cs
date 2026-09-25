@@ -53,15 +53,15 @@ public partial class UnUpdater : Unit
 		{
 			return;
 		}
-		if (HasPendingCmds() && !IsJustAwaitingOutSlideAnim())
+		if (HasPendingCmds() && !m_Runner.IsJustAwaitingOutSlideAnim())
 		{
 			PauseThisTick();
 			return;
 		}
 
 		var tl = GetTile(Vector2I.Zero);
-		PendCmd(CmdUpdate.FromTiles(tl, (val) => Apply(m_UpType, val)));
-		PendCmd(CmdSlide.FromTiles(tl, Dir));
+		PendCmd(new CmdUpdate(tl, (val) => Apply(m_UpType, val)));
+		PendCmd(new CmdSlide(tl, Dir));
 	}
 
 	public override string ToString()

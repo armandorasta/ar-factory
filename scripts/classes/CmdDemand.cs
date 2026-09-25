@@ -2,24 +2,28 @@ using Godot;
 
 namespace ArFactory;
 
-public partial class CmdDemand(Vector2I gloc, int reqVal) : Command(1)
+/// <summary>
+/// Same as await, but expects a specific value, if it doesn't get it, will fail the program.
+/// </summary>
+public class CmdDemand : Command
 {
-	public static CmdDemand FromTiles(Tile tl, int reqVal) => new(tl.GridLoc, reqVal);
+	public Vector2I GridLoc { get; private set; }
+	public int Value { get; private set; }
 
-	public Vector2I GridLoc = gloc;
-	public int Value = reqVal;
-
-	public override void OnTick(Level lv)
+	public CmdDemand(Vector2I gloc, int reqVal) : base(1)
 	{
-		Debug.AssertIs(lv.World.GetTile(GridLoc), typeof(Tile));
-		var targetTile = lv.World.GetTile(GridLoc);
-		if (!targetTile.HasItem() || targetTile.Item.IsMidAnimation())
-		{
-			PauseThisTick();
-			return;
-		}
+		GridLoc = gloc;
+		Value = reqVal;
+		AddSubParallelCmds([ new CmdAwait([gloc]) ]);
+	}
 
-		var itVal = targetTile.Item.GetValue();
+	public CmdDemand(Tile tl, int reqVal) : this(tl.GridLoc, reqVal) { }
+
+
+	protected override void OnTick(Level lv)
+	{
+		var targetTile = lv.World.GetTile(GridLoc);
+		var itVal = targetTile.Item.Value;
 		if (itVal == Value)
 		{
 			GD.Print($"Expected {Value} and got it!");

@@ -166,7 +166,7 @@ public partial class Level : Node2D
 	/// <summary>
 	/// Waits a certain number of ticks, and returns after processing the last tick.
 	/// </summary>
-	public async Task WaitForTicks(int tickCount)
+	public async Task ProcessNextTicks(int tickCount)
 	{
 		for (var i = 0; i < tickCount; ++i)
 		{

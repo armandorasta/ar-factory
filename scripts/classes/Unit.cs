@@ -32,13 +32,22 @@ public abstract partial class Unit : Node2D
 	private Vector2I m_GridLoc;
 	private Direction m_Dir = Direction.East;
 	private Vector2I m_Dims;
-	public int m_Rate;
+	private int m_Rate;
+
+
+	//  Commands that need to finish for the unit to keep operating again
+	protected CommandRunner m_Runner = new([]);
+
+#if DEBUG
+	/// <summary>
+	/// Used to ensure <see cref="PendCmd"/> and <see cref="PendCmdSeq"/> are only called within
+	/// <see cref="PendNewCommands"/> in debug.
+	/// </summary>
+	private bool m_bPendingAllowed = false;
+#endif
 
 	// Keeps track of `Rate` every tick.
 	private int m_Count = 0;
-
-	//  Commands that need to finish for the unit to keep operating again
-	private List<Command> m_PendingCmds = [];
 
 	// These are checked by the on-demand units
 	// TODO: Add a way to add blocks to this list explicitly.
@@ -116,7 +125,7 @@ public abstract partial class Unit : Node2D
 	{
 		World = world;
 		m_TickType = TickType.Steady;
-		Position = world.GridToPos(m_Dims);
+		// Position = world.GridToPos(m_Dims);
 	}
 
 	#region Abstract Interface
@@ -181,23 +190,12 @@ public abstract partial class Unit : Node2D
 	/// commands you want executed at once when the queue is empty, then wait until the whole sequence
 	/// is executed.
 	/// </summary>
-	/// <returns></returns>
-	public bool HasPendingCmds() => m_PendingCmds.Count > 0;
+	public bool HasPendingCmds() => !m_Runner.IsDone();
 
 	/// <summary>
 	/// Called everytime on the tick pending commands queue size goes to zero.
 	/// </summary>
 	protected virtual void OnFinishingAllPendingCmds() { }
-
-	/// <summary>
-	/// Returns true if we are waiting for the animation of a slide command to end, that slide command
-	/// is on one of the outputs of the unit.
-	/// In this case, we can often just pend new commands before the end of the animation on the next
-	/// tick.
-	/// If there are no pending commands, it will return false!
-	/// </summary>
-	public bool IsJustAwaitingOutSlideAnim() // TODO: Make this function only check output tiles somehow!
-		=> m_PendingCmds.Count > 0 && m_PendingCmds.All((c) => c is CmdSlide sc && sc.IsAwaitingAnim());
 
 	
 	#region Direction Related Methods
@@ -440,10 +438,18 @@ public abstract partial class Unit : Node2D
 	public void DoPerFrame(double dt, Level lv)
 	{
 		Debug.AssertRefEq(lv.World, this.World);
-		foreach (var cmd in m_PendingCmds)
-		{
-			cmd.DoPerFrame(dt, lv);
-		}
+		m_Runner.DoPerFrame(dt, lv);
+	}
+
+	public void HandlePendingNewCommands()
+	{
+#if DEBUG
+		m_bPendingAllowed = true;
+		PendNewCommands();
+		m_bPendingAllowed = false;
+#else
+		PendNewCommands();
+#endif
 	}
 
 	/// <summary>
@@ -452,67 +458,7 @@ public abstract partial class Unit : Node2D
 	public void HandleCmdTick(Level lv)
 	{
         Debug.AssertRefEq(lv.World, this.World);
-        if (m_PendingCmds.Count == 0)
-		{
-			return;
-		}
-
-		// We have to execute all of them, because so of them are executed in different tiles in
-		// parallel. We will move the responsbility of them not clashing to the commands themselves.
-
-		// When a sleep is in the front, it will act as a checkpoint. It must finish before any
-		// commands after do anything.
-		if (m_PendingCmds[0] is not CmdSleep)
-		{
-			// When a sleep is not at the front, finish all the commands before it, then the above 
-			// applies.
-
-			var executedCmdCount = m_PendingCmds.Count;
-			for (var i = 0; i < m_PendingCmds.Count; ++i)
-			{
-				var cmd = m_PendingCmds[i];
-				if (cmd is CmdSleep)
-				{
-					executedCmdCount = i;
-					break;
-				}
-				cmd.OnTick(lv);
-			}
-
-			var passingCmds = new List<Command>();
-			for (var i = 0; i < executedCmdCount; ++i)
-			{
-				var cmd = m_PendingCmds[i];
-				if (!cmd.CountAndCheckIfDone())
-				{
-					passingCmds.Add(cmd);
-				}
-			}
-
-			for (var i = executedCmdCount; i < m_PendingCmds.Count; ++i)
-			{
-				// Sleep in the way, no counting nor OnTick.
-
-				passingCmds.Add(m_PendingCmds[i]);
-			}
-
-			m_PendingCmds.Clear();
-			m_PendingCmds = passingCmds;
-		}
-		
-		// This achieves the behaviour of stretching instant commands to take an entire tick
-		if (m_PendingCmds.Count > 0 && m_PendingCmds[0] is CmdSleep)
-		{
-			if (m_PendingCmds[0].CountAndCheckIfDone())
-			{
-				m_PendingCmds.RemoveAt(0);
-			}
-		}
-
-		if (m_PendingCmds.Count == 0)
-		{
-			OnFinishingAllPendingCmds();
-		}
+        m_Runner.OnTick(lv);
 	}
 
 	/// <summary>
@@ -524,33 +470,40 @@ public abstract partial class Unit : Node2D
 	}
 
 	/// <summary>
-	/// This only resets the unit state, it does not destroy any items located with the unit. <br/>
+	/// This only resets the unit state, it does not destroy any items located within the unit. <br/>
 	/// <b>Don't forget to override this function whenever you have extra fields the need to be reset
 	/// when the simulation is restarted!</b>
 	/// </summary>
 	public virtual void Reset()
 	{
 		m_Count = 0;
-		m_PendingCmds.Clear();
+		m_Runner.Clear();
 	}
 
 	/// <summary>
-	/// Adds a command to the queue, when this function is called outside of `pend_new_cmds` the 
-	/// behaviour is undefined.
-	/// I wanted to add a flag and stuff, but meh...
+	/// Adds a command to the queue, when this function is called outside of <see cref="PendNewCommands"/>
+	///  the behaviour is undefined. Now I made it crash on debug.
 	/// </summary>
 	protected void PendCmd(Command newCmd)
 	{
-		m_PendingCmds.Add(newCmd);
+#if DEBUG
+		// m_bPendingAllowed only exists on debug, idk if the compiler crashes on non-existing fields
+		// on conditioned functions so...
+		Debug.Assert(m_bPendingAllowed);
+#endif
+		m_Runner.PendCmd(newCmd);
 	}
 
 	/// <summary>
 	/// Adds a sequence of commands to the queue, when this function is called outside of 
-	/// `pend_new_cmds` the behaviour is undefined.
+	/// <see cref="PendNewCommands"/> the behaviour is undefined.
 	/// </summary>
 	protected void PendCmdSeq(IEnumerable<Command> cmdSeq)
 	{
-		m_PendingCmds.AddRange(cmdSeq);
+#if DEBUG
+		Debug.Assert(m_bPendingAllowed);
+#endif
+		m_Runner.PendParallel(cmdSeq);
 	}
 
 

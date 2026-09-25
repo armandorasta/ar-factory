@@ -2,21 +2,26 @@ using Godot;
 
 namespace ArFactory;
 
-public partial class CmdSpawn(Vector2I gloc, int val) : Command(0)
+/// <summary>
+/// Spawns an item into the specified location.
+/// </summary>
+public class CmdSpawn : Command
 {
-	public static CmdSpawn FromTiles(Tile tl, int val) => new(tl.GridLoc, val);
+	public Vector2I GridLoc { get; private set; }
+	public int Value { get; private set; }
 
-	public Vector2I GridLoc = gloc;
-	public int Value = val;
-
-	public override void OnTick(Level lv)
+	public CmdSpawn(Vector2I gloc, int val) : base(0)
 	{
-		if (lv.World.GetTile(GridLoc).IsReserved())
-		{
-			PauseThisTick();
-			return;
-		}
+		GridLoc = gloc;
+		Value = val;
+		AddSubParallelCmds([ new CmdVacate([gloc]) ]);
+	}
 
+	public CmdSpawn(Tile tl, int val) : this(tl.GridLoc, val) { }
+
+
+	protected override void OnTick(Level lv)
+	{
 		lv.World.SpawnItem(GridLoc, Value);
 	}
 

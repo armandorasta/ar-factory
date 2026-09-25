@@ -1,14 +1,14 @@
 using Godot;
 using System;
+using System.Reflection.Metadata;
 
 namespace ArFactory;
 
-// Waits for an item to arrive at a specific tile, makes sure if it's sliding in that the animation
-// is over.
-public partial class CmdSlide : Command
+/// <summary>
+/// Slides over an item from a specified tile into another adjacent tiles.
+/// </summary>
+public class CmdSlide : Command
 {
-	public static CmdSlide FromTiles(Tile tlFrom, Direction dir) => new(tlFrom.GridLoc, dir);
-
 	public Vector2I GridFrom { get; private set; }
 	public Direction Dir { get; private set; }
 	public Item TrackedItem { get; private set; }
@@ -20,12 +20,16 @@ public partial class CmdSlide : Command
 		GridFrom = gfrom;
 		Dir = dir;
 		m_StateFunc = HandleDefault;
+		AddSubParallelCmds([ new CmdAwait([gfrom]) ]);
 	}
+	
+	public CmdSlide(Tile tlFrom, Direction dir) : this(tlFrom.GridLoc, dir) { }
+	
 
 	public bool IsAwaitingAnim() => m_StateFunc == HandleAfterAnimation;
 	public Vector2I GetGridTo() => GridFrom + Dir.ToGrid();
 
-	public override void DoPerFrame(double dt, Level lv)
+	protected override void DoPerFrame(double dt, Level lv)
 	{
 		if (m_StateFunc != HandleAfterAnimation)
 		{
@@ -50,21 +54,19 @@ public partial class CmdSlide : Command
 		Debug.AssertNotNull(TrackedItem);
 		Debug.Assert(TrackedItem.IsAllowedToMove());
 
-		var gridTo = GetGridTo();
-		if (world.GetTile(gridTo).IsReserved())
+		// Can't really use vacate here, because this function is called in the same tick, and is
+		// called potentially multiple times.
+		if (world.GetTile(GetGridTo()).IsReserved())
 		{
 			return false;
 		}
 
-		TrackedItem = world.TeleportItem(GridFrom, gridTo);
-		TrackedItem.DisallowMovementThisTick();
-		TrackedItem.SetMidAnimationFlag(true);
+		PrepTrackedItemForSlidingAnim(world);
 		CountThisTick(); // Undo the pausing because the command has advanced.
-		m_StateFunc = HandleAfterAnimation;
 		return true;
 	}
 
-	public override void OnTick(Level lv)
+	protected override void OnTick(Level lv)
 	{
 		Debug.AssertNotNull(m_StateFunc);
 		m_StateFunc.Invoke(lv);
@@ -73,42 +75,28 @@ public partial class CmdSlide : Command
 	private void HandleDefault(Level lv)
 	{
 		// Debug.Assert(TrackedItem == null);
-		var gridTo = GetGridTo();
-		if (!lv.World.HasTile(gridTo))
-		{
-			PauseThisTick();
-			return; // Forever and ever...
-		}
-
 		var srcTile = lv.World.GetTile(GridFrom);
-		if (!srcTile.HasItem() || srcTile.Item.IsMidAnimation())
-		{
-			PauseThisTick();
-			return;
-		}
-
+		var destTile = lv.World.GetTile(GetGridTo());
 		TrackedItem = srcTile.Item;
 
-		var destTile = lv.World.GetTile(gridTo);
 		if (!destTile.CanItemEnter(Dir.Invert()))
 		{
+			// Probably will be blocked forever tho...
+			AddSubParallelCmds([ new CmdAwait([GridFrom]) ]);
 			PauseThisTick();
 			return; // Forever and ever probably...
 		}
 
 		if (destTile.IsReserved())
 		{
+			// This here is why CanItemEnter must be called before...
+			// The await command will be queued when we make sure we can't move in TryMovingByOverlap later.
 			lv.World.QueueBlockedSlideCmdByAnotherItem(this);
 			PauseThisTick();
 			return;
 		}
-		
-		// Can't use WorldPanel.TeleportItem because it will set the position to the destination 
-		// immediately.
-		lv.World.TeleportItemNoSync(srcTile.GridLoc, destTile.GridLoc);
-		TrackedItem.DisallowMovementThisTick();
-		TrackedItem.SetMidAnimationFlag(true);
-		m_StateFunc = HandleAfterAnimation;
+
+		PrepTrackedItemForSlidingAnim(lv.World);
 		// `DoPerFrame` animates until next tick.
 	}
 
@@ -121,4 +109,12 @@ public partial class CmdSlide : Command
 
 	public override string ToString()
 		=> Utilz.AppendToBaseToString(base.ToString(), $"Slide[at {GridFrom} -> {Dir}]");
+
+	private void PrepTrackedItemForSlidingAnim(WorldPanel world)
+	{
+		TrackedItem = world.TeleportItemNoSync(GridFrom, GetGridTo());
+		TrackedItem.DisallowMovementThisTick();
+		TrackedItem.SetMidAnimationFlag(true);
+		m_StateFunc = HandleAfterAnimation;
+	}
 }

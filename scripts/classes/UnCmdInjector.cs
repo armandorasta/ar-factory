@@ -7,30 +7,36 @@ namespace ArFactory;
 
 public partial class UnCmdInjector : Unit
 {
-	public List<Command> Commands;
+	public List<List<Command>> Commands = [];
 
 	// This is used in the reset function to re-enqueue the commands again for next run, otherwise
 	// the injector will only work for a single run.
-	private List<Command> m_CmdCache;
+	private List<List<Command>> m_CmdCache;
 
-	public void Setup(WorldPanel world, IEnumerable<Command> cmdsToInject)
+	public void Setup(WorldPanel world, IEnumerable<IEnumerable<Command>> cmdsToInject)
 	{
 		InjectorBaseInit(world);
-		Commands = [.. cmdsToInject];
+		foreach (var group in cmdsToInject)
+		{
+			Commands.Add([.. group]);
+		}
 	}
 
 	protected override void BuildTiles() { }
 	
 	public override void PendNewCommands()
 	{
-		if (HasPendingCmds() && !IsJustAwaitingOutSlideAnim())
+		if (HasPendingCmds() && !m_Runner.IsJustAwaitingOutSlideAnim())
 		{
 			return;
 		}
 
 		if (Commands is not null)
 		{
-			PendCmdSeq(Commands);
+			foreach (var group in Commands)
+			{
+				PendCmdSeq(group);
+			}
 			m_CmdCache = Commands;
 			Commands = null;
 		}
@@ -41,4 +47,8 @@ public partial class UnCmdInjector : Unit
 		base.Reset();
 		Commands = m_CmdCache;
 	}
+
+	public override string ToString() 
+		=> Utilz.ReplaceBaseNameInToString(base.ToString(), "CmdInjector");
+
 }

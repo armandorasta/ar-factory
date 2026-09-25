@@ -23,13 +23,13 @@ public partial class UnSlider : Unit
 		{
 			return;
 		}
-		if (HasPendingCmds() && !IsJustAwaitingOutSlideAnim())
+		if (HasPendingCmds() && !m_Runner.IsJustAwaitingOutSlideAnim())
 		{
 			PauseThisTick();
 			return;
 		}
 
-		PendCmd(CmdSlide.FromTiles(GetTile(Vector2I.Zero), Dir));
+		PendCmd(new CmdSlide(GetTile(Vector2I.Zero), Dir));
 	}
 
 	public override bool CanFaceDir(Direction dir) => true;

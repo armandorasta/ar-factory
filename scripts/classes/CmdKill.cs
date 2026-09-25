@@ -2,23 +2,25 @@ using Godot;
 
 namespace ArFactory;
 
-public partial class CmdKill(Vector2I gloc) : Command(0)
+/// <summary>
+/// Deletes an item in the specified location.
+/// </summary>
+public class CmdKill : Command
 {
-	public static CmdKill FromTiles(Tile tl) => new(tl.GridLoc);
+	public Vector2I GridLoc { get; private set; }
 
-	public Vector2I GridLoc = gloc;
-
-	public override void OnTick(Level lv)
+	public CmdKill(Vector2I gloc) : base(0)
 	{
-		Debug.AssertIs(lv.World.GetTile(GridLoc), typeof(Tile));
-		var targetTile = lv.World.GetTile(GridLoc);
-		if (!targetTile.HasItem() || targetTile.Item.IsMidAnimation())
-		{
-			PauseThisTick();
-			return;
-		}
+		GridLoc = gloc;
+		AddSubParallelCmds([new CmdAwait([gloc])]);
+	}
 
-		targetTile.DestroyItem();
+	public CmdKill (Tile tl) : this(tl.GridLoc) { }
+
+
+	protected override void OnTick(Level lv)
+	{
+		lv.World.GetTile(GridLoc).DestroyItem();
 	}
 
 	public override string ToString()

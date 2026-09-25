@@ -3,26 +3,28 @@ using Godot;
 
 namespace ArFactory;
 
-public partial class CmdUpdate(Vector2I gloc, Func<int, int> upFunc) : Command(0)
+/// <summary>
+/// Updates the value of an item in a specified location.
+/// </summary>
+public class CmdUpdate : Command
 {
-	public static CmdUpdate FromTiles(Tile tl, Func<int, int> upFunc) 
-		=> new(tl.GridLoc, upFunc);
+	public Vector2I GridLoc { get; private set; }
+	public Func<int, int> UpdateFunc { get; private set; }
 
-	public Vector2I GridLoc = gloc;
-	public Func<int, int> UpdateFunc = upFunc;
-
-	public override void OnTick(Level lv)
+	public CmdUpdate(Vector2I gloc, Func<int, int> upFunc) : base(0)
 	{
-		Debug.AssertIs(lv.World.GetTile(GridLoc), typeof(Tile));
-		var targetTile = lv.World.GetTile(GridLoc);
-		if (!targetTile.HasItem() || targetTile.Item.IsMidAnimation())
-		{
-			PauseThisTick();
-			return;
-		}
+		GridLoc = gloc;
+		UpdateFunc = upFunc;
+		AddSubParallelCmds([ new CmdAwait([gloc]) ]);
+	}
 
-		var it = targetTile.Item;
-		it.SetValue(UpdateFunc.Invoke(it.GetValue()));
+	public CmdUpdate(Tile tl, Func<int, int> upFunc) : this(tl.GridLoc, upFunc) { }
+
+
+	protected override void OnTick(Level lv)
+	{
+		var it = lv.World.GetTile(GridLoc).Item;
+		it.SetValue(UpdateFunc.Invoke(it.Value));
 	}
 
 	public override string ToString()

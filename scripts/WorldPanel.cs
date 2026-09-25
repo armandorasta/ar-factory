@@ -1,7 +1,9 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Reflection.Metadata.Ecma335;
 
 namespace ArFactory;
 
@@ -82,6 +84,12 @@ public partial class WorldPanel : Panel
 	/// </summary>
 	public bool HasTile(Vector2I gloc) => IsWithin(gloc) && m_Tiles[GridToIndex(gloc)] != null;
 	public Tile GetTile(Vector2I gloc) => IsWithin(gloc) ? m_Tiles[GridToIndex(gloc)] : null;
+	/// <summary>
+	/// Returns true if the tile is installed within this world, returns false if it's floating or
+	/// installed in another world somehow.
+	/// </summary>
+	public bool IsInstalled(Tile tl) 
+		=> IsWithin(tl.GridLoc) && object.ReferenceEquals(tl, GetTile(tl.GridLoc));
 
 	/// <summary>
 	/// Returns the whichever unit that <paramref name="gloc"/> lands on.
@@ -119,8 +127,11 @@ public partial class WorldPanel : Panel
 	/// <returns>The installed tile, or null when it fails</returns>
 	public Tile InstallTile(Tile tl, Vector2I gloc, bool bOverride = false)
 	{
+
 		Debug.AssertNotNull(tl);
+
 		Debug.Assert(IsWithin(gloc));
+
 		Debug.Assert(bOverride || !HasTile(gloc));
 		if (tl is not null)
 		{
@@ -139,11 +150,24 @@ public partial class WorldPanel : Panel
 	/// <param name="bMaybeNull">Only matters in debug mode</param>
 	public void DeleteTile(Vector2I gloc, bool bMaybeNull = false)
 	{
+
 		Debug.Assert(IsWithin(gloc));
+
 		Debug.Assert(bMaybeNull || HasTile(gloc));
 		var i = GridToIndex(gloc);
 		m_Tiles[i]?.DestroyItem(true);
 		m_Tiles[i] = null;
+	}
+
+	/// <summary>
+	/// Removes the tile from the world, destroys items within it, and sends it into oblivion.<br/>
+	/// <b>Tile must be in this world, otherwise the behaviour is undefined.</b>
+	/// </summary>
+	public void DeleteTile(Tile tl)
+	{
+
+		Debug.Assert(IsInstalled(tl));
+		DeleteTile(tl.GridLoc);
 	}
 
 	/// <summary>
@@ -157,9 +181,13 @@ public partial class WorldPanel : Panel
 	/// <param name="bOverride">Only matters in debug mode</param>
 	public Tile MoveTile(Vector2I gFrom, Vector2I gTo, bool bMaybeNull = false, bool bOverride = false)
 	{
+
 		Debug.Assert(IsWithin(gFrom));
+
 		Debug.Assert(IsWithin(gTo));
+
 		Debug.Assert(bMaybeNull || HasTile(gFrom));
+
 		Debug.Assert(bOverride || gFrom == gTo || !HasTile(gTo));
 		if (gFrom == gTo)
 		{
@@ -174,12 +202,25 @@ public partial class WorldPanel : Panel
 	}
 
 	/// <summary>
+	/// <b>Tile must be in this world, otherwise the behaviour is undefined.</b>
+	/// See <see cref="MoveTile(Vector2I, Vector2I, bool, bool)"/>
+	/// </summary>
+	public void MoveTile(Tile tl, Vector2I gTo, bool bOverride = false)
+	{
+
+		Debug.Assert(IsInstalled(tl));
+		MoveTile(tl.GridLoc, gTo, false, bOverride);
+	}
+
+	/// <summary>
 	/// Removes the tile from the world, and returns it.
 	/// </summary>
 	/// <param name="bMaybeNull">Only matters in debug mode</param>
 	public Tile ExtractTile(Vector2I gloc, bool bMaybeNull = false)
 	{
+
 		Debug.Assert(IsWithin(gloc));
+
 		Debug.Assert(bMaybeNull || HasTile(gloc));
 		var i = GridToIndex(gloc);
 		var myTile = m_Tiles[i];
@@ -197,8 +238,11 @@ public partial class WorldPanel : Panel
 	/// <param name="bMaybeNull">Only matters in debug mode</param>
 	public void SwapTiles(Vector2I gloc1, Vector2I gloc2, bool bMaybeNull = false)
 	{
+
 		Debug.Assert(IsWithin(gloc1));
+
 		Debug.Assert(IsWithin(gloc2));
+
 		Debug.Assert(bMaybeNull || HasTile(gloc1) && HasTile(gloc2));
 		if (gloc1 == gloc2)
 		{
@@ -220,6 +264,19 @@ public partial class WorldPanel : Panel
 		}
 	}
 
+	/// <summary>
+	/// <b>Both tiles must be in this world, otherwise the behaviour is undefined.</b>
+	/// See <see cref="SwapTiles(Vector2I, Vector2I, bool)"/>
+	/// </summary>
+	public void SwapTiles(Tile tl0, Tile tl1)
+	{
+
+		Debug.AssertRefEq(GetTile(tl0.GridLoc), tl0);
+
+		Debug.AssertRefEq(GetTile(tl1.GridLoc), tl1);
+		SwapTiles(tl0.GridLoc, tl1.GridLoc, false);
+	}
+
 
 	#endregion // Tile Methods
 	#region .Item Methods
@@ -230,7 +287,9 @@ public partial class WorldPanel : Panel
 	/// </summary>
 	public Item SpawnItem(Vector2I gloc, int value)
 	{
+
 		Debug.AssertNotNull(GetTile(gloc));
+
 		Debug.Assert(!GetTile(gloc).IsReserved());
 		var tl = GetTile(gloc);
 		if (tl is null || tl.IsReserved())
@@ -246,18 +305,33 @@ public partial class WorldPanel : Panel
 	}
 
 	/// <summary>
+	/// <b>Tile must be in this world, otherwise the behaviour is undefined.</b>
+	/// See <see cref="SpawnItem(Vector2I, int)"/>
+	/// </summary>
+	public Item SpawnItem(Tile tl, int value)
+	{
+
+		Debug.Assert(IsInstalled(tl));
+		return SpawnItem(tl.GridLoc, value);
+	}
+
+	/// <summary>
 	/// Returns the passed item itself or null when it fails. Null returns are considered errors
 	/// in debug and crash the program.
 	/// This very same passed item is gauranteed to be installed, no new items are made.
 	/// </summary>
-	public Item InstallItem(Item it)
+	public Item InstallItem(Item it, Vector2I gloc)
 	{
+
 		Debug.Assert(it.GetParent() is null); // No associated world.
-		// TODO: When you add the reference to the parent tile, add an assert here for that.
+
+		Debug.Assert(it.ParentTile is null);
+
 		Debug.AssertNotNull(GetTile(it.GridLoc));
+
 		Debug.Assert(!GetTile(it.GridLoc).IsReserved());
 		
-		var tl = GetTile(it.GridLoc);
+		var tl = GetTile(gloc);
 		if (tl is null || tl.IsReserved())
 		{
 			return null;
@@ -271,6 +345,17 @@ public partial class WorldPanel : Panel
 	}
 
 	/// <summary>
+	/// <b>Tile must be in this world, otherwise the behaviour is undefined.</b>
+	/// See <see cref="InstallItem(Item, Vector2I)"/>
+	/// </summary>
+	public Item InstallItem(Item it, Tile tl)
+	{
+
+		Debug.Assert(IsInstalled(tl));
+		return InstallItem(it, tl.GridLoc);
+	}
+
+	/// <summary>
 	/// Returns the clone, not the original, or null if the item does not exits in the first place.
 	/// Clones the item into another tile, or does nothing if <paramref name="gSrc"/> and 
 	/// <paramref name="gDest"/> are the same, or when the item or its tile does not exist, or when
@@ -280,11 +365,17 @@ public partial class WorldPanel : Panel
 	/// <param name="bOverride">Only matters in debug mode</param>
 	public Item CloneItem(Vector2I gSrc, Vector2I gDest, bool bMaybeNull = false, bool bOverride = false)
 	{
+
 		Debug.Assert(IsWithin(gSrc));
+
 		Debug.Assert(HasTile(gSrc));
+
 		Debug.Assert(bMaybeNull || GetTile(gSrc).HasItem());
+
 		Debug.Assert(IsWithin(gDest));
+
 		Debug.Assert(HasTile(gDest));
+
 		Debug.Assert(bOverride || gSrc == gDest || !GetTile(gDest).HasItem());
 		
 		var srcTl = GetTile(gSrc);
@@ -296,6 +387,19 @@ public partial class WorldPanel : Panel
 		
 		destTl.DestroyItem(true);
 		return SpawnItem(gDest, srcTl.Item.Value);
+	}
+
+	/// <summary>
+	/// <b>Tiles must be in this world, otherwise the behaviour is undefined.</b>
+	/// See <see cref="CloneItem(Vector2I, Vector2I, bool, bool)"/>
+	/// </summary>
+	public Item CloneItem(Tile tlSrc, Tile tlDest, bool bMaybeNull = false, bool bOverride = false)
+	{
+
+		Debug.Assert(IsInstalled(tlSrc));
+
+		Debug.Assert(IsInstalled(tlDest));
+		return CloneItem(tlSrc.GridLoc, tlDest.GridLoc, bMaybeNull, bOverride);
 	}
 
 	/// <summary>
@@ -315,19 +419,39 @@ public partial class WorldPanel : Panel
 	}
 
 	/// <summary>
-	/// Same as <see cref="TeleportItem"/> but does not change the position of the item in the world.
-	/// Calling <see cref="Item.SyncPosWithGrid"/> right after this is equivalent to <see cref="TeleportItem"/>.
+	/// <b>Tiles must be in this world, otherwise the behaviour is undefined.</b>
+	/// See <see cref="TeleportItem(Vector2I, Vector2I, bool, bool)"/>
+	/// </summary>
+	public Item TeleportItem(Tile tlSrc, Tile tlDest, bool bMaybeNull = false, bool bOverride = false)
+	{
+
+		Debug.Assert(IsInstalled(tlSrc));
+
+		Debug.Assert(IsInstalled(tlDest));
+		return TeleportItem(tlSrc.GridLoc, tlDest.GridLoc, bMaybeNull, bOverride);
+	}
+
+	/// <summary>
+	/// Same as <see cref="TeleportItem"/> but does not update the live position of the item in the world.
+	/// Calling <see cref="Item.SyncPosWithGrid"/> right after this is equivalent to 
+	/// <see cref="TeleportItem"/>.
 	/// This function is much faster than <see cref="TeleportItem"/> because it does no marsheling.
 	/// </summary>
 	/// <param name="bMaybeNull">Only matters in debug mode</param>
 	/// <param name="bOverride">Only matters in debug mode</param>
 	public Item TeleportItemNoSync(Vector2I gSrc, Vector2I gDest, bool bMaybeNull = false, bool bOverride = false)
 	{
+
 		Debug.Assert(IsWithin(gSrc));
+
 		Debug.Assert(IsWithin(gDest));
+
 		Debug.Assert(HasTile(gSrc));
+
 		Debug.Assert(HasTile(gDest));
+
 		Debug.Assert(bMaybeNull || GetTile(gSrc).HasItem());
+
 		Debug.Assert(bOverride || gSrc == gDest || !GetTile(gDest).HasItem());
 		
 		if (gSrc == gDest)
@@ -348,6 +472,19 @@ public partial class WorldPanel : Panel
 		return destTl.Item;
 	}
 
+	/// <summary>
+	/// <b>Tiles must be in this world, otherwise the behaviour is undefined.</b>
+	/// See <see cref="TeleportItemNoSync(Vector2I, Vector2I, bool, bool)"/>
+	/// </summary>
+	public Item TeleportItemNoSync(Tile tlSrc, Tile tlDest, bool bMaybeNull = false, bool bOverride = false)
+	{
+
+		Debug.Assert(IsInstalled(tlSrc));
+
+		Debug.Assert(IsInstalled(tlDest));
+		return TeleportItemNoSync(tlSrc.GridLoc, tlDest.GridLoc, bMaybeNull, bOverride);
+	}
+
 
 	#endregion // Item Methods
 	#endregion // Essential Functions
@@ -363,6 +500,7 @@ public partial class WorldPanel : Panel
 
 	public void OnTick(Level lv)
 	{
+
 		Debug.AssertRefEq(lv.World, this);
 		foreach (var tl in m_Tiles)
 		{
@@ -372,7 +510,7 @@ public partial class WorldPanel : Panel
 		// This must happen before HandleCmdTick, otherwise the first tick will handle nothing.
 		foreach (var u in m_Units)
 		{
-			u.PendNewCommands();
+			u.HandlePendingNewCommands();
 		}
 
 		foreach (var u in m_Units)
@@ -412,7 +550,7 @@ public partial class WorldPanel : Panel
 	{
 		Reset();
 		SetDims(m_Dims);
-		// PlaceSomeUnits();
+		PlaceSomeUnits();
 	}
 
 	public override void _Draw()
@@ -441,22 +579,9 @@ public partial class WorldPanel : Panel
 	#endregion // Godot Overrides
 	#region .Placement Functions
 
-	[System.Diagnostics.Conditional("DEBUG")]
+	[Conditional("DEBUG")]
 	private void PlaceSomeUnits()
 	{
-		// PlaceInjector([
-		// 	new CmdSpawn(new(2, 7), 1),
-		// 	new CmdSlide(new(2, 7), Direction.West),
-		// 	new CmdSpawn(new(2, 7), 2),
-		// 	new CmdSpawn(new(2, 7), 3),
-		// ]);
-		// PlaceSlider(new(1, 7), Direction.East);
-		// PlaceSlider(new(2, 7), Direction.East);
-		// PlaceSlider(new(3, 7), Direction.North);
-		// PlaceSlider(new(3, 6), Direction.East);
-		// PlaceUpdater(new(4, 6), Direction.East, 2, UpdateType.Double);
-		// return;
-
 		PlaceSupplier(new(0, 6), Direction.East, 3, [1, 2, 3, 4, 5, 6]);
 		PlaceSlider(new(2, 7), Direction.East);
 		PlaceSlider(new(3, 7), Direction.North);
@@ -471,7 +596,7 @@ public partial class WorldPanel : Panel
 		PlaceSlider(new(3, 8), Direction.North);
 	}
 
-	public UnCmdInjector PlaceInjector(IEnumerable<Command> cmdsToInject)
+	public UnCmdInjector PlaceInjector(IEnumerable<IEnumerable<Command>> cmdsToInject)
 	{
 		var u = new UnCmdInjector();
 		AddUnit(u);
@@ -603,14 +728,17 @@ public partial class WorldPanel : Panel
 
 	/// <summary>
 	/// Adds a slide command blocked by another item in the way only, all other types crash the
-	/// program.
+	/// program in debug.
 	/// </summary>
 	public void QueueBlockedSlideCmdByAnotherItem(CmdSlide cmd)
 	{
+
 		Debug.Assert(HasTile(cmd.GridFrom));
+
 		Debug.Assert(GetTile(cmd.GridFrom).HasItem()); // Is there an actual item?
+
 		Debug.Assert(GetTile(cmd.GetGridTo()).IsReserved()); // And is it blocked?
-		// For now dublication is not allowed, although logically it should be xd.
+
 		Debug.Assert(!m_BlockedSlideCmdsByItems.Contains(cmd));
 		
 		m_BlockedSlideCmdsByItems.Add(cmd);
@@ -625,22 +753,21 @@ public partial class WorldPanel : Panel
 		// repeat until a full pass happens with no updates.
 		while (1 + 1 == 2)
 		{
-			var dirtyIndex = -1;
+			var bSomethingMoved = false;
 			for (var i = 0; i < m_BlockedSlideCmdsByItems.Count; ++i)
 			{
 				if (m_BlockedSlideCmdsByItems[i].TryMovingByOverlap(this))
 				{
-					dirtyIndex = i;
+					// Something moved? can only move once per tick so bye-bye.
+					m_BlockedSlideCmdsByItems.RemoveAt(i);
+					bSomethingMoved = true;
 					break;
 				}
 			}
-			if (dirtyIndex == -1) // None has updated? it's over.
+			if (!bSomethingMoved) // None has updated? it's over.
 			{
 				break;
 			}
-
-			// Something moved? can only move once per tick so bye-bye.
-			m_BlockedSlideCmdsByItems.RemoveAt(dirtyIndex);
 		}
 		m_BlockedSlideCmdsByItems.Clear();
 	}

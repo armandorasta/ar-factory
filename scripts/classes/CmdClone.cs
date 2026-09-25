@@ -4,45 +4,38 @@ using System.Linq;
 
 namespace ArFactory;
 
-public partial class CmdClone : Command
+/// <summary>
+/// Clones an item into the specified tiles, it will spawn brand new items of course.
+/// </summary>
+public class CmdClone : Command
 {
-	public Vector2I SrcGridLoc;
-	public Vector2I[] DestGridLocs;
+	public Vector2I SrcGridLoc { get; private set; }
+	public Vector2I[] DestGridLocs { get; private set; }
 
-	public static CmdClone FromTiles(Tile srcTl, IEnumerable<Tile> destTls) 
-		=> new(srcTl.GridLoc, destTls.Select((tl) => tl.GridLoc));
 
 	public CmdClone(Vector2I srcGLoc, IEnumerable<Vector2I> destGLocs) : base(0)
 	{
 		SrcGridLoc = srcGLoc;
-		DestGridLocs = destGLocs.ToArray();
+		DestGridLocs = [.. destGLocs];
 		Debug.Assert(!DestGridLocs.IsEmpty());
+		AddSubParallelCmds([new CmdAwaitVacate([srcGLoc], destGLocs)]);
 	}
 
-	public override void OnTick(Level lv)
+	public CmdClone(Tile srcTl, IEnumerable<Tile> destTls) 
+		: this(srcTl.GridLoc, destTls.Select(tl => tl.GridLoc))
+	{ }
+
+
+	protected override void OnTick(Level lv)
 	{
 		// TODO: make it clone incrementaly, that is whenever one of the dest tiles is free, an item is
 		// is spawned there immediately instead of waiting for all dest tiles to be free at the same time
 		// first!
 
-		Debug.Assert(lv.World.GetTile(SrcGridLoc) is Tile);
-		Debug.Assert(DestGridLocs.All((l) => lv.World.GetTile(l) is Tile));
-		var srcTile = lv.World.GetTile(SrcGridLoc) as Tile;
-		if (!srcTile.HasItem() || srcTile.Item.IsMidAnimation())
-		{
-			PauseThisTick();
-			return;
-		}
-
-		if (DestGridLocs.Any((l) => lv.World.GetTile(l).IsReserved()))
-		{
-			PauseThisTick();
-			return;			
-		}
-
+		var value = lv.World.GetTile(SrcGridLoc).Item.Value;
 		foreach (var dgloc in DestGridLocs)
 		{
-			lv.World.CloneItem(SrcGridLoc, dgloc);
+			lv.World.SpawnItem(dgloc, value);
 		}
 	}
 

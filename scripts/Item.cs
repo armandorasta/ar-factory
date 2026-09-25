@@ -16,6 +16,7 @@ public partial class Item : Node2D
 
 	// Publics
 	public int Value => m_Value;
+	public Tile ParentTile => m_ParentTile;
 	/// <summary>
 	/// Crashes the program when the tile is floating!
 	/// </summary>
@@ -50,8 +51,6 @@ public partial class Item : Node2D
 		Sprite.ApplyScale(world.CellWidth / 200.0f * Vector2.One);
 		Sprite.Translate(0.5f * world.CellWidth * Vector2.One);
 	}
-
-	public int GetValue() => m_Value;
 
 	/// <summary>
 	/// Not mid sliding animation or something.

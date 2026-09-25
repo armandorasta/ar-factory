@@ -51,8 +51,8 @@ public class WorldPanelTests : ArTest.TestSuit
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(new(1, 2));
 		var tl1 = world.InstallEmptyTile(new(3, 4));
-		var it0 = world.SpawnItem(tl0.GridLoc, 5);
-		var cloneIt = world.CloneItem(tl0.GridLoc, tl1.GridLoc);
+		var it0 = world.SpawnItem(tl0, 5);
+		var cloneIt = world.CloneItem(tl0, tl1);
 		AssertTrue(tl0.HasItem());
 		AssertTrue(tl0.IsReserved());
 		AssertTrue(tl1.HasItem());
@@ -65,7 +65,7 @@ public class WorldPanelTests : ArTest.TestSuit
 		// Both have items, should just override the destination (requires bOverride in debug).
 		tl0.Item.SetValue(6); // Both items had the same value...
 		AssertNotEq(tl0.Item.Value, tl1.Item.Value);
-		cloneIt = world.CloneItem(tl0.GridLoc, tl1.GridLoc);
+		cloneIt = world.CloneItem(tl0, tl1);
 		AssertTrue(tl0.HasItem());
 		AssertTrue(tl0.IsReserved());
 		AssertTrue(tl1.HasItem());
@@ -77,7 +77,7 @@ public class WorldPanelTests : ArTest.TestSuit
 
 		// Clone null into a tile with an item, should just do nothing.
 		tl0.DestroyItem();
-		cloneIt = world.CloneItem(tl0.GridLoc, tl1.GridLoc);
+		cloneIt = world.CloneItem(tl0, tl1);
 		AssertNull(cloneIt);
 		AssertFalse(tl0.HasItem());
 		AssertFalse(tl0.IsReserved());
@@ -87,7 +87,7 @@ public class WorldPanelTests : ArTest.TestSuit
 
 		// Cloning null into null, should just do nothing.
 		tl1.DestroyItem();
-		cloneIt = world.CloneItem(tl0.GridLoc, tl1.GridLoc);
+		cloneIt = world.CloneItem(tl0, tl1);
 		AssertNull(cloneIt);
 		AssertFalse(tl0.HasItem());
 		AssertFalse(tl0.IsReserved());
@@ -100,8 +100,8 @@ public class WorldPanelTests : ArTest.TestSuit
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(new(1, 2));
 		var tl1 = world.InstallEmptyTile(new(3, 4));
-		var it0 = world.SpawnItem(tl0.GridLoc, 50);
-		var teleIt = world.TeleportItem(tl0.GridLoc, tl1.GridLoc);
+		var it0 = world.SpawnItem(tl0, 50);
+		var teleIt = world.TeleportItem(tl0, tl1);
 		AssertRefEq(it0, teleIt);
 		AssertRefEq(it0, tl1.Item);
 		AssertFalse(tl0.HasItem());
@@ -111,8 +111,8 @@ public class WorldPanelTests : ArTest.TestSuit
 		AssertEq(tl1.Item.Value, 50);
 
 		// Both have items, should just override the destination (requires bOverride in debug).
-		it0 = world.SpawnItem(tl0.GridLoc, 85);
-		teleIt = world.TeleportItem(tl0.GridLoc, tl1.GridLoc);
+		it0 = world.SpawnItem(tl0, 85);
+		teleIt = world.TeleportItem(tl0, tl1);
 		AssertRefEq(it0, teleIt);
 		AssertRefEq(it0, tl1.Item);
 		AssertEq(tl1.Item.Value, 85);
@@ -122,7 +122,7 @@ public class WorldPanelTests : ArTest.TestSuit
 		AssertTrue(tl1.IsReserved());
 
 		// Teleport null into a tile with an item, should just do nothing.
-		teleIt = world.TeleportItem(tl0.GridLoc, tl1.GridLoc);
+		teleIt = world.TeleportItem(tl0, tl1);
 		AssertNull(teleIt);
 		AssertEq(tl1.Item.Value, 85);
 		AssertFalse(tl0.HasItem());
@@ -132,7 +132,7 @@ public class WorldPanelTests : ArTest.TestSuit
 
 		// Cloning null into null, should just do nothing.
 		tl1.DestroyItem();
-		teleIt = world.TeleportItem(tl0.GridLoc, tl1.GridLoc);
+		teleIt = world.TeleportItem(tl0, tl1);
 		AssertNull(teleIt);
 		AssertFalse(tl0.HasItem());
 		AssertFalse(tl0.IsReserved());

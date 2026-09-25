@@ -299,7 +299,11 @@ public class Tile(Vector2I gloc)
 		}
 	}
 
-	public override string ToString() => $"Tile[{GridLoc}]";
+	public override string ToString() 
+	{
+		var itStr = m_Item != null ? $" with item {m_Item.Value}" : "";
+		return $"Tile[{GridLoc}]{itStr}";
+	}
 	#endregion // .Private Methods
 }
 

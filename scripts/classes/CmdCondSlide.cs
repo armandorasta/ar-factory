@@ -3,25 +3,21 @@ using Godot;
 
 namespace ArFactory;
 
-public partial class CmdCondSlide : Command
+/// <summary>
+/// Teleports and slides an item based on a condition.
+/// </summary>
+public class CmdCondSlide : Command
 {
 	public Func<Tile, bool> CheckFunc;
 	public Vector2I SrcGridLoc;
 
-	public Vector2I TrueGridLoc;
-	public Direction TrueDir;
+	public Vector2I TrueGridLoc { get; private set; }
+	public Direction TrueDir { get; private set; }
 
-	public Vector2I FalseGridLoc;
-	public Direction FalseDir;
+	public Vector2I FalseGridLoc { get; private set; }
+	public Direction FalseDir { get; private set; }
 
-
-	private CmdSlide m_SlideCmd;
 	private Action<Level> m_StateFunc;
-
-	public static CmdCondSlide FromTiles(Tile srcTl, Tile tlTrue, Direction dirTrue, 
-		Tile tlFalse, Direction dirFalse, Func<Tile, bool> checkFunc)
-		=> new(srcTl.GridLoc, tlTrue.GridLoc, dirTrue, tlFalse.GridLoc, dirFalse, 
-			checkFunc);
 
 	public CmdCondSlide(Vector2I srcGLoc, Vector2I gtrue, Direction dirTrue, Vector2I gfalse,
 		Direction dirFalse, Func<Tile, bool> checkFunc) : base(1)
@@ -34,57 +30,41 @@ public partial class CmdCondSlide : Command
 		FalseDir = dirFalse;
 
 		m_StateFunc = HandleDefault;
+		AddSubParallelCmds([ new CmdAwait([srcGLoc]) ]);
 	}
 
-	public override void OnTick(Level lv)
+	public CmdCondSlide(Tile srcTl, Tile tlTrue, Direction dirTrue, Tile tlFalse, 
+		Direction dirFalse, Func<Tile, bool> checkFunc)
+		: this(srcTl.GridLoc, tlTrue.GridLoc, dirTrue, tlFalse.GridLoc, dirFalse, checkFunc)
+	{ }
+
+
+	protected override void OnTick(Level lv)
 	{
 		m_StateFunc.Invoke(lv);
 	}
 
-	public override void DoPerFrame(double dt, Level lv)
-	{
-		m_SlideCmd?.DoPerFrame(dt, lv);
-	}
-
 	private void HandleDefault(Level lv)
 	{
-		Debug.Assert(lv.World.GetTile(SrcGridLoc) is Tile);	
-		Debug.Assert(lv.World.GetTile(TrueGridLoc) is Tile);	
-		Debug.Assert(lv.World.GetTile(FalseGridLoc) is Tile);
-		Debug.Assert(m_SlideCmd == null);
-
 		var srcTile = lv.World.GetTile(SrcGridLoc);
-		if (!srcTile.HasItem() || srcTile.Item.IsMidAnimation())
-		{
-			PauseThisTick();
-			return;
-		}
 
 		if (CheckFunc.Invoke(srcTile))
 		{
-			lv.World.TeleportItem(srcTile.GridLoc, TrueGridLoc);
-			m_SlideCmd = new(TrueGridLoc, TrueDir);
+			lv.World.TeleportItem(SrcGridLoc, TrueGridLoc);
+			AddSubParallelCmds([new CmdSlide(TrueGridLoc, TrueDir)]);
 		}
 		else
 		{
 			lv.World.TeleportItem(srcTile.GridLoc, FalseGridLoc);
-			m_SlideCmd = new(FalseGridLoc, FalseDir);
+			AddSubParallelCmds([new CmdSlide(FalseGridLoc, FalseDir)]);
 		}
 
 		m_StateFunc = HandleSlide;
 	}
 
-	private void HandleSlide(Level lv)
+	private void HandleSlide(Level lv) // Gets called after the slide is handled in the bg.
 	{
-		Debug.Assert(m_SlideCmd != null);
-		m_SlideCmd.OnTick(lv);
-		if (!m_SlideCmd.CountAndCheckIfDone())
-		{
-			PauseThisTick();
-			return;
-		}
-
-		m_SlideCmd = null;
+		// Empty function needed so the tick counter goes up...
 		m_StateFunc = HandleDefault;
 	}
 

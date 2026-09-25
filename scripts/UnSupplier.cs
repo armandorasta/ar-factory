@@ -32,14 +32,14 @@ public partial class UnSupplier : Unit
 		{
 			return;
 		}
-		if (HasPendingCmds() && !IsJustAwaitingOutSlideAnim())
+		if (HasPendingCmds() && !m_Runner.IsJustAwaitingOutSlideAnim())
 		{
 			PauseThisTick();
 			return;
 		}
 
-		PendCmd(CmdSpawn.FromTiles(m_Out0, PopNextValue()));
-		PendCmd(CmdSlide.FromTiles(m_Out0, Dir));
+		PendCmd(new CmdSpawn(m_Out0, PopNextValue()));
+		PendCmd(new CmdSlide(m_Out0, Dir));
 	}
 
 	public override string ToString()

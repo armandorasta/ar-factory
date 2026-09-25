@@ -78,13 +78,15 @@ public class TileTests : ArTest.TestSuit
 	{
 		var tl = m_Lv.World.InstallEmptyTile(Vector2I.Zero);
 		tl.MakeSolid(Direction.North);
-		tl.MakeOutput(Direction.East);
-		tl.MakeInput(Direction.South);
-		tl.ClearWall(Direction.West);
-		
 		AssertFalse(tl.CanItemEnter(Direction.North));
+		
+		tl.MakeOutput(Direction.East);
 		AssertFalse(tl.CanItemEnter(Direction.East));
+		
+		tl.MakeInput(Direction.South);
 		AssertTrue(tl.CanItemEnter(Direction.South));
+		
+		tl.ClearWall(Direction.West);
 		AssertTrue(tl.CanItemEnter(Direction.West));
 
 		// Function should not take held items into consideration.
@@ -137,14 +139,14 @@ public class TileTests : ArTest.TestSuit
 		var world = m_Lv.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
 		AssertFalse(world[0, 0].HasItem());
-		AssertNotNull(world.SpawnItem(tl.GridLoc, 7));
+		AssertNotNull(world.SpawnItem(tl, 7));
 		AssertEq(tl.Item.Value, 7);
-		AssertNull(world.SpawnItem(tl.GridLoc, 8)); // Should just give up in release.
+		AssertNull(world.SpawnItem(tl, 8)); // Should just give up in release.
 		AssertEq(tl.Item.Value, 7);
 
 		tl.DestroyItem();
 		AssertFalse(tl.HasItem());
-		AssertNotNull(world.SpawnItem(tl.GridLoc, 8));
+		AssertNotNull(world.SpawnItem(tl, 8));
 		AssertTrue(tl.HasItem());
 		AssertEq(tl.Item.Value, 8);
 
@@ -159,7 +161,7 @@ public class TileTests : ArTest.TestSuit
 	{
 		var world = m_Lv.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
-		var spawnedIt = world.SpawnItem(tl.GridLoc, 7);
+		var spawnedIt = world.SpawnItem(tl, 7);
 		AssertRefEq(spawnedIt.GetParent(), world);
 
 		var extractedIt = world[0, 0].ExtractItem();
@@ -169,7 +171,7 @@ public class TileTests : ArTest.TestSuit
 		AssertRefEq(spawnedIt, extractedIt);
 		AssertEq(extractedIt.Value, 7);
 
-		Item installedIt = world.InstallItem(extractedIt);
+		Item installedIt = world.InstallItem(extractedIt, extractedIt.GridLoc);
 		AssertRefEq(installedIt.GetParent(), world);
 		AssertRefEq(installedIt, extractedIt);
 		AssertRefEq(world.GetTile(Vector2I.Zero).Item, installedIt);
@@ -190,7 +192,7 @@ public class TileTests : ArTest.TestSuit
 		AssertFalse(world.HasTile(new(3, 4))); // Ignore the tile's grid-loc
 		AssertRefEq(anotherTl, extractedTl);
 
-		world.DeleteTile(anotherTl.GridLoc);
+		world.DeleteTile(anotherTl);
 
 		// Must pass bMaybeNull in debug.
 		AssertNull(world.ExtractTile(Vector2I.Zero));
