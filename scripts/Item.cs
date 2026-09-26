@@ -10,8 +10,8 @@ public partial class Item : Node2D
 	public const int MinValue = -MaxValue;
 
 	// Nodes
-	public Sprite2D Sprite {get; private set;}
-	public Label CenterLabel {get; private set;}
+	public Sprite2D Sprite { get; private set; }
+	public Label CenterLabel { get; private set; }
 
 
 	// Publics
@@ -35,6 +35,10 @@ public partial class Item : Node2D
 	private bool m_bDisallowMoveThisTick = false;
 	private bool m_bMidAnimation = false;
 	private int m_Value;
+
+
+	public static bool IsValueWithinRange(int val) => MinValue <= val && val <= MaxValue;
+	public static int Clamp(int val) => int.Clamp(val, MinValue, MaxValue);
 
 
 	public override void _Ready()
@@ -68,8 +72,8 @@ public partial class Item : Node2D
 	/// </summary>
 	public void SetValue(int newVal)
 	{
-		// Debug.Assert(MinValue <= newVal && newVal <= MaxValue);
-		m_Value = int.Clamp(newVal, Item.MinValue, Item.MaxValue);
+		// Debug.Assert(IsValueWithinRange(newValue));
+		m_Value = Clamp(newVal);
 		CenterLabel.Text = m_Value.ToString();
 	}
 

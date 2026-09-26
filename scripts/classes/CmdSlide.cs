@@ -79,6 +79,14 @@ public class CmdSlide : Command
 		var destTile = lv.World.GetTile(GetGridTo());
 		TrackedItem = srcTile.Item;
 
+		if (destTile is null)
+		{ 
+			// Only hits when the command is made non-blocking and it is directly at a null tile or
+			// the world border...
+			PauseThisTick();
+			return;
+		}
+
 		if (!destTile.CanItemEnter(Dir.Invert()))
 		{
 			// Probably will be blocked forever tho...
