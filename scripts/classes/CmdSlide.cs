@@ -1,6 +1,5 @@
 using Godot;
 using System;
-using System.Reflection.Metadata;
 
 namespace ArFactory;
 
@@ -20,6 +19,10 @@ public class CmdSlide : Command
 		GridFrom = gfrom;
 		Dir = dir;
 		m_StateFunc = HandleDefault;
+
+		// No AwaitVacate because we have multiple passes, AwaitVacate will block the command until
+		// no item is present in the destination tile, but we need to proceed then because we have
+		// an overlap algorithm.
 		AddSubParallelCmds([ new CmdAwait([gfrom]) ]);
 	}
 	
@@ -75,17 +78,17 @@ public class CmdSlide : Command
 	private void HandleDefault(Level lv)
 	{
 		// Debug.Assert(TrackedItem == null);
-		var srcTile = lv.World.GetTile(GridFrom);
-		var destTile = lv.World.GetTile(GetGridTo());
-		TrackedItem = srcTile.Item;
-
-		if (destTile is null)
+		if (!lv.World.HasTile(GetGridTo()))
 		{ 
 			// Only hits when the command is made non-blocking and it is directly at a null tile or
 			// the world border...
 			PauseThisTick();
 			return;
 		}
+
+		var srcTile = lv.World.GetTile(GridFrom);
+		var destTile = lv.World.GetTile(GetGridTo());
+		TrackedItem = srcTile.Item;
 
 		if (!destTile.CanItemEnter(Dir.Invert()))
 		{
@@ -110,6 +113,7 @@ public class CmdSlide : Command
 
 	private void HandleAfterAnimation(Level lv)
 	{
+		TrackedItem.SyncPosWithGrid(lv.World);
 		TrackedItem.SetMidAnimationFlag(false);
 		TrackedItem = null;
 		m_StateFunc = HandleDefault;

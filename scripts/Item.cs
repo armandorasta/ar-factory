@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Godot;
@@ -78,6 +79,16 @@ public partial class Item : Node2D
 	}
 
 	/// <summary>
+	/// Should not used directly, use <see cref="WorldPanel.TeleportItem"/> and other similar methods instead.
+	/// </summary>
+	public void SetParentTileUnsafe(Tile newParent)
+	{
+		Debug.AssertEq(GetParent(), null, "Use 'WorldPanel.SpawnItem' or 'WorldPanel.InstallItem'");
+		Debug.AssertRefEq(newParent.Item, this);
+		m_ParentTile = newParent;
+	}
+
+	/// <summary>
 	/// This function obviously crashes the program if the item is floating.
 	/// Syncs it's actual position on the grid with it's grid location.
 	/// <b>This function sets the position attribute, so ovoid using it in a loop.</b>
@@ -116,7 +127,8 @@ public partial class Item : Node2D
 
 	public override string ToString()
 	{
-		var bui = new StringBuilder($"Item[{m_Value} at {GridLoc}");
+		var bui = new StringBuilder($"Item[{m_Value} ");
+		bui.Append(m_ParentTile is null? "(floating)" : $"at {GridLoc}");
 		if (IsMidAnimation()) bui.Append(", anim");
 		if (!IsAllowedToMove()) bui.Append(", stuck");
 		return bui.Append(']').ToString();

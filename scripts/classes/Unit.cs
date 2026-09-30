@@ -56,7 +56,7 @@ public abstract partial class Unit : Node2D
 	
 	public static bool CanFitIn(WorldPanel world, Vector2I gloc, Vector2I dims)
 	{
-		if (!world.GetGridRect().Encloses(new Rect2I(gloc, dims)))
+		if (!world.GetGridRect().Encloses(new(gloc, dims)))
 		{
 			return false;
 		}
@@ -85,8 +85,8 @@ public abstract partial class Unit : Node2D
 	}
 
 	// This function is called on the `_Ready` function of sub-classes.
-	protected void BaseInit(WorldPanel world, TickType tickType, int workRate, Vector2I gloc,
-		Vector2I dims, Direction dir)
+	protected void BaseInit(WorldPanel world, TickType tickType, int workRate, Vector2I gloc, Vector2I dims, 
+		Direction dir)
 	{
 		Debug.Assert(Unit.CanFitIn(world, gloc, dims));
 		Debug.Assert(CanFaceDir(dir));
@@ -491,7 +491,7 @@ public abstract partial class Unit : Node2D
 		// on conditioned functions so...
 		Debug.Assert(m_bPendingAllowed);
 #endif
-		m_Runner.PendCmd(newCmd);
+		m_Runner.PendParallel([newCmd]);
 	}
 
 	/// <summary>

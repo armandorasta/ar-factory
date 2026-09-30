@@ -1,17 +1,36 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Godot;
 
 namespace ArFactory;
 
-public class CommandRunner(List<List<Command>> cmdGroups)
+public class CommandRunner(IEnumerable<IEnumerable<Command>> cmdGroups)
 {
-	private readonly List<List<Command>> m_Groups = cmdGroups;
+	private readonly List<List<Command>> m_Groups = [.. cmdGroups.Select(g => g.ToList())];
+	/// <summary>
+	/// In non-blocking mode as soon as one of the commands in the sequences blocks the runner will 
+	/// just stop executing and delete everything.
+	/// </summary>
+	private bool m_bFailed = false;
+	private bool m_bBlocking = true;
 
-	/// <returns>
-	/// <see langword="true"/> if the sequence was fully executed, <see langword="false"/> otherwise
-	/// </returns>
+	/// <summary>
+	/// Checks if the runner no longer needs to execute anything, either because it already executed
+	/// everything else (always the case in blocking mode), or it failed somewhere (only in non-blocking
+	/// mode).
+	/// </summary>
 	public bool IsDone() => m_Groups.Count == 0;
+	/// <summary>
+	/// If all the commands in the sequences executed start to finish.
+	/// This is the same as <see cref="IsDone"/> in normal blocking mode since failure is only 
+	/// possible in non-blocking mode.
+	/// </summary>
+	public bool IsDoneSuccessfully() => IsDone() && !m_bFailed;
+	/// <summary>
+	/// If we are in non-blocking mode and one of the commands blocked.
+	/// </summary>
+	public bool IsDoneWithFailure() => IsDone() && m_bFailed;
 
 	/// <summary>
 	/// Returns <see langword="true"/> if we are waiting for the animation of a slide command to end, 
@@ -23,20 +42,35 @@ public class CommandRunner(List<List<Command>> cmdGroups)
 	public bool IsJustAwaitingOutSlideAnim() // TODO: Make this function only check output tiles somehow!
 		=> m_Groups.Count > 0 && m_Groups[0].All(c => c is CmdSlide sc && sc.IsAwaitingAnim());
 	
+	public void MakeNonBlocking()
+	{
+		m_bBlocking = false;
+		MakeAllSubCmdsNonBlocking();
+	}
+
+	/// <summary>
+	/// As it says, so adding more commands after calling this will not automatically make the new
+	/// commands non-blocking.
+	/// </summary>
+	private void MakeAllSubCmdsNonBlocking()
+	{
+		foreach (var g in m_Groups)
+		{
+			foreach (var cmd in g)
+			{
+				cmd.MakeNonBlocking();
+			}
+		}
+	}
+
 	/// <summary>
 	/// Pends commands to be executed in parallel, until this entire group finishes executing the
 	/// runner will not move to next group.
 	/// </summary>
 	public void PendParallel(IEnumerable<Command> parallelCmds)
 	{
-		m_Groups.Add([.. parallelCmds]);
+		m_Groups.Add([.. parallelCmds.Select(c => m_bBlocking ? c : c.MakeNonBlocking())]);
 	}
-
-	/// <summary>
-	/// Pends a command to be executed on its own, until this command finishes executing the commands
-	/// after it will not. Same as pending a parralel group with one command in it.
-	/// </summary>
-	public void PendCmd(Command newCmd) => PendParallel([newCmd]);
 
 	public void OnTick(Level lv)
 	{
@@ -51,6 +85,12 @@ public class CommandRunner(List<List<Command>> cmdGroups)
 			foreach (var cmd in g0)
 			{
 				cmd.HandleTick(lv);
+				if (!m_bBlocking && !cmd.IsBlocking() && cmd.HasBlockedThisTick())
+				{
+					m_Groups.Clear();
+					m_bFailed = true;
+					return;
+				}
 			}
 
 			for (var i = g0.Count - 1; i >= 0; --i)

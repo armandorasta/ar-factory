@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace ArFactory;
@@ -12,6 +13,14 @@ public abstract class Command
 	public const int MaxTickCount = int.MaxValue >> 2;
 
 	/// <summary>
+	/// Code for failure of a non-blocking command.<br/>
+	/// A non-blocking command fails when it encounters a unsatisfied condition such as needing an
+	/// item but not finding one.
+	/// </summary>
+	private const int s_CodeCmdFailed = -5;
+
+	
+	/// <summary>
 	/// Returns the number of ticks the command takes to finish executing without getting interrupted.
 	/// Most commands take 0, 1 or 2 ticks. <br/>
 	/// Commands that take 0 ticks execute instantly and don't block any other commands, commands that
@@ -20,15 +29,21 @@ public abstract class Command
 	/// commands will take 2 ticks; one will block the other on the first tick. <br/>
 	/// <b>Can be overriden by commands that change tick count dynamically</b>
 	/// </summary>
-	public virtual int TickCount => m_Ticks;
+	public virtual int TickCount
+	{
+		get => m_Ticks;
+		protected set => m_Ticks = value;
+	}
+
 
 	/// <summary>
 	/// Number of ticks it takes to finish.
 	/// </summary>
-	protected int m_Ticks;
+	private int m_Ticks;
 	/// <summary>
 	/// Keeps track of ticks passed for this command.
-	/// Not that simple though, because sometimes the command has to wait for something and freezes.
+	/// Not that simple though, because sometimes the command has to wait for something and freezes,
+	/// sometimes the command fails as well.
 	/// </summary>
 	protected int m_Count = 0;
 	/// <summary>
@@ -43,17 +58,15 @@ public abstract class Command
 	/// </summary>
 	private bool m_bBlocking = true;
 
-#if DEBUG
 	/// <summary>
-	/// Makes sure <see cref="PauseThisTick"/> is only called once per tick
+	/// Indicates the command has blocked this tick.
 	/// </summary>
-	private bool m_bPausedThisTick = false;
-#endif
+	private bool m_bBlockedThisTick = false;
 
 
 	public Command(int tickCount)
 	{
-		Debug.Assert(tickCount >= 0);
+		Debug.Assert(0 <= tickCount && tickCount <= MaxTickCount);
 		m_Ticks = tickCount;
 	}
 
@@ -67,6 +80,8 @@ public abstract class Command
 	protected virtual void DoPerFrame(double dt, Level lv) {}
 
 
+	public bool IsBlocking() => m_bBlocking;
+
 	/// <summary>
 	/// Checks if the command is done based on the tick counter. If you are gonna increment and check, 
 	/// use <see cref="CountAndCheckIfDone"/>. <br/>
@@ -75,26 +90,28 @@ public abstract class Command
 	/// <summary>
 	/// Checks if the command is about to be deleted if it doesn't block this tick.
 	/// </summary>
-	public bool IsLastTick() => IsDoneNextTickNoSubCmds();
-	/// <returns>
-	/// <see langword="true"/> if the command blocked this tick
-	/// </returns>
-	public bool HasBlockedThisTick()
+	public bool IsLastTick() => IsLastTickNoSubCmds();
+	public bool HasBlockedThisTick() => m_bBlockedThisTick;
+
+	public override string ToString()
 	{
-		throw new NotImplementedException();	
+		var blockStr = !m_bBlocking ? ", nonblk" : "";
+		return $"Cmd[{m_Count}/{TickCount} ticks{blockStr}]";
 	}
 
-	public override string ToString() => $"Cmd[{m_Count}/{TickCount} ticks]";
 
 	/// <summary>
 	/// Makes the command terminate immediately when it can't proceed. <br/>
 	/// <b>Can be overriden to for example disable this ability</b>.
 	/// </summary>
-	/// <returns>The current command for convenience such as chaining it with <see langword="new"/></returns>
+	/// <returns>
+	/// The current command for convenience such as chaining it with <see langword="new"/>
+	/// </returns>
 	public virtual Command MakeNonBlocking()
 	{
-		Debug.Assert(m_bBlocking);
+		// Debug.Assert(m_bBlocking); // Because of CommandRunner.
 		m_bBlocking = false;
+		m_SubCmdRunner?.MakeNonBlocking();
 		return this;
 	}
 
@@ -114,10 +131,8 @@ public abstract class Command
 	/// </summary>
 	public void PauseThisTick() // Probably should rename this damn thing to just Block...
 	{
-#if DEBUG
-		Debug.Assert(!m_bPausedThisTick);
-		m_bPausedThisTick = true;
-#endif
+		Debug.Assert(!m_bBlockedThisTick);
+		m_bBlockedThisTick = true;
 		if (m_bBlocking)
 		{
 			m_Count -= 1;
@@ -126,19 +141,33 @@ public abstract class Command
 		{
 			ForceFinish();
 		}
+	}
+
+	/// <summary>
+	/// So far only used to pause until sub-commands finish executing... Really what I should be 
+	/// doing is finding the number of ticks that includes sub-commands and stuff, but meh... Already
+	/// wasted an entire day on nothing, that's more than enough.
+	/// </summary>
+	private void PauseEvenForNonBlocking()
+	{
+		Debug.Assert(!m_bBlockedThisTick);
+		m_bBlockedThisTick = true;
+		m_Count -= 1;
 	} 
 	
 	/// <summary>
 	/// Forces the command to be deleted by the end of this tick.
 	/// </summary>
-	public void ForceFinish() => m_Count = m_Ticks;
+	public void ForceFinish() => m_Count = m_Ticks + 1;
 
+	/// <summary>
+	/// Should be called inside a <c>OnTick</c> function of some sort when handling commands manually.
+	/// Generally speaking tho, you should be using <see cref="CommandRunner"/> for that.
+	/// </summary>
 	public void HandleTick(Level lv)
 	{
-#if DEBUG
-		m_bPausedThisTick = false;
-#endif
-		if (!RunSubCmdsAndCheckIfFinished(lv))
+		m_bBlockedThisTick = false;
+		if (!HandleSubCmdsOnTickAndCheckIfDone(lv))
 		{
 			return;
 		}
@@ -146,10 +175,7 @@ public abstract class Command
 		OnTick(lv);
 
 		// Commands pended this tick will utilize this tick as well.
-		if (!RunSubCmdsAndCheckIfFinished(lv))
-		{
-			return;
-		}
+		HandleSubCmdsOnTickAndCheckIfDone(lv);
 	}
 
 	public void HandleFrame(double dt, Level lv)
@@ -179,36 +205,52 @@ public abstract class Command
 	/// </summary>
 	protected void AddSubParallelCmds(IEnumerable<Command> newCmds)
 	{
-		// Pending sub-commands after finishing is not supported because it causes some unnecessary
-		// complications, you would have to do it manually if need that. Just use a runner...
+		// This should be impossible, pending commands on the last tick of a command will pause it
+		// automatically.
+		Debug.Assert(!IsDoneNoSubCmds());
+		Debug.Assert(newCmds.Any(_ => true)); // Any returns false for empty sequences.
+
+		var adjustedCmds = newCmds.Select(c => m_bBlocking ? c : c.MakeNonBlocking());
+		if (m_SubCmdRunner is null)
+		{
+			m_SubCmdRunner = new([adjustedCmds]);
+			if (!m_bBlocking)
+			{
+				m_SubCmdRunner.MakeNonBlocking();	
+			}
+		}
+		else
+		{
+			m_SubCmdRunner.PendParallel(adjustedCmds);
+		}
+	}
+
+	private bool HandleSubCmdsOnTickAndCheckIfDone(Level lv)
+	{
 		Debug.Assert(!IsDoneNoSubCmds());
 
 		if (m_SubCmdRunner is null)
 		{
-			m_SubCmdRunner = new([[.. newCmds]]);
+			return true;
 		}
-		else
+
+		m_SubCmdRunner.OnTick(lv);
+		
+		if (m_SubCmdRunner.IsDoneSuccessfully())
 		{
-			m_SubCmdRunner.PendParallel(newCmds);
+			return true;
 		}
-	}
 
-	private bool RunSubCmdsAndCheckIfFinished(Level lv)
-	{
-		if (m_SubCmdRunner != null)
+		if (m_SubCmdRunner.IsDoneWithFailure())
 		{
-			m_SubCmdRunner.OnTick(lv);
-			if (!m_SubCmdRunner.IsDone())
-			{
-				PauseThisTick();
-				return false;
-			}
-
-			Debug.Assert(!IsDoneNoSubCmds());
+			PauseThisTick();
+			return false;
 		}
 		
-		return true;
+		PauseEvenForNonBlocking();
+		return false;
 	}
+
 
 	/// <summary>
 	/// Checks if the command is done without considering sub-commands.
@@ -217,5 +259,8 @@ public abstract class Command
 	/// <see cref="CmdIf"/> when the condition is met.
 	/// </summary>
 	private bool IsDoneNoSubCmds() => m_Count > m_Ticks;
-	private bool IsDoneNextTickNoSubCmds() => m_Count == m_Ticks;
+	/// <summary>
+	/// Checks if the command is to be done next tick without considering sub-commands.
+	/// </summary>
+	private bool IsLastTickNoSubCmds() => m_Count == m_Ticks;
 }

@@ -1,28 +1,24 @@
 using Godot;
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Reflection.Metadata.Ecma335;
 
 namespace ArFactory;
 
-public partial class WorldPanel : Panel
+public partial class WorldPanel : Godot.Panel
 {
 	// Nodes
-	public static readonly PackedScene ItemScene = GD.Load<PackedScene>("res://scenes/item.tscn");
-	public static readonly PackedScene UnSupplierScene = GD.Load<PackedScene>("res://scenes/un_supplier.tscn");
-	public static readonly PackedScene UnSliderScene = GD.Load<PackedScene>("res://scenes/un_slider.tscn");
-	public static readonly PackedScene UnUpdaterScene = GD.Load<PackedScene>("res://scenes/un_updater.tscn");
-	public static readonly PackedScene UnBinScene = GD.Load<PackedScene>("res://scenes/un_bin.tscn");
-	public static readonly PackedScene UnDemanderScene = GD.Load<PackedScene>("res://scenes/un_demander.tscn");
-	public static readonly PackedScene UnCombinerScene = GD.Load<PackedScene>("res://scenes/un_combiner.tscn");
-	public static readonly PackedScene UnClonerScene = GD.Load<PackedScene>("res://scenes/un_cloner.tscn");
-	public static readonly PackedScene UnBranchScene = GD.Load<PackedScene>("res://scenes/un_branch.tscn");
-
+	public static readonly Godot.PackedScene ItemScene = GD.Load<Godot.PackedScene>("res://scenes/item.tscn");
+	public static readonly Godot.PackedScene UnSupplierScene = GD.Load<Godot.PackedScene>("res://scenes/un_supplier.tscn");
+	public static readonly Godot.PackedScene UnSliderScene = GD.Load<Godot.PackedScene>("res://scenes/un_slider.tscn");
+	public static readonly Godot.PackedScene UnUpdaterScene = GD.Load<Godot.PackedScene>("res://scenes/un_updater.tscn");
+	public static readonly Godot.PackedScene UnBinScene = GD.Load<Godot.PackedScene>("res://scenes/un_bin.tscn");
+	public static readonly Godot.PackedScene UnDemanderScene = GD.Load<Godot.PackedScene>("res://scenes/un_demander.tscn");
+	public static readonly Godot.PackedScene UnCombinerScene = GD.Load<Godot.PackedScene>("res://scenes/un_combiner.tscn");
+	public static readonly Godot.PackedScene UnClonerScene = GD.Load<Godot.PackedScene>("res://scenes/un_cloner.tscn");
+	public static readonly Godot.PackedScene UnBranchScene = GD.Load<Godot.PackedScene>("res://scenes/un_branch.tscn");
 
 	// Other statics
-	public static readonly Font DebugFont = GD.Load<Font>("res://resources/fonts/AnonymousPro-Regular.ttf");
+	public static readonly Godot.Font DebugFont = GD.Load<Godot.Font>("res://resources/fonts/AnonymousPro-Regular.ttf");
 
 
 	// Public interface
@@ -37,7 +33,6 @@ public partial class WorldPanel : Panel
 	private List<Tile> m_Tiles = [];
 	private List<CmdSlide> m_BlockedSlideCmdsByItems = [];
 
-
 	#region .Essential Functions
 
 	/// <summary>
@@ -48,12 +43,12 @@ public partial class WorldPanel : Panel
 	/// <summary>
 	/// Returns enclosing Rect2I in grid-space.
 	/// </summary>
-	public Rect2I GetGridRect() => new(Vector2I.Zero, m_Dims);
+	public Godot.Rect2I GetGridRect() => new(Vector2I.Zero, m_Dims);
 
 	/// <summary>
 	/// Returns enclosing Rect2 in world-space.
 	/// </summary>
-	public Rect2 GetWorldRect() => new(Vector2I.Zero, CellWidth * (Vector2)m_Dims);
+	public Godot.Rect2 GetWorldRect() => new(Vector2I.Zero, CellWidth * (Vector2)m_Dims);
 	
 	/// <summary>
 	/// Converts from grid-space to world-space. 
@@ -127,11 +122,8 @@ public partial class WorldPanel : Panel
 	/// <returns>The installed tile, or null when it fails</returns>
 	public Tile InstallTile(Tile tl, Vector2I gloc, bool bOverride = false)
 	{
-
 		Debug.AssertNotNull(tl);
-
 		Debug.Assert(IsWithin(gloc));
-
 		Debug.Assert(bOverride || !HasTile(gloc));
 		if (tl is not null)
 		{
@@ -150,9 +142,7 @@ public partial class WorldPanel : Panel
 	/// <param name="bMaybeNull">Only matters in debug mode</param>
 	public void DeleteTile(Vector2I gloc, bool bMaybeNull = false)
 	{
-
 		Debug.Assert(IsWithin(gloc));
-
 		Debug.Assert(bMaybeNull || HasTile(gloc));
 		var i = GridToIndex(gloc);
 		m_Tiles[i]?.DestroyItem(true);
@@ -165,7 +155,6 @@ public partial class WorldPanel : Panel
 	/// </summary>
 	public void DeleteTile(Tile tl)
 	{
-
 		Debug.Assert(IsInstalled(tl));
 		DeleteTile(tl.GridLoc);
 	}
@@ -181,13 +170,9 @@ public partial class WorldPanel : Panel
 	/// <param name="bOverride">Only matters in debug mode</param>
 	public Tile MoveTile(Vector2I gFrom, Vector2I gTo, bool bMaybeNull = false, bool bOverride = false)
 	{
-
 		Debug.Assert(IsWithin(gFrom));
-
 		Debug.Assert(IsWithin(gTo));
-
 		Debug.Assert(bMaybeNull || HasTile(gFrom));
-
 		Debug.Assert(bOverride || gFrom == gTo || !HasTile(gTo));
 		if (gFrom == gTo)
 		{
@@ -207,7 +192,6 @@ public partial class WorldPanel : Panel
 	/// </summary>
 	public void MoveTile(Tile tl, Vector2I gTo, bool bOverride = false)
 	{
-
 		Debug.Assert(IsInstalled(tl));
 		MoveTile(tl.GridLoc, gTo, false, bOverride);
 	}
@@ -218,9 +202,7 @@ public partial class WorldPanel : Panel
 	/// <param name="bMaybeNull">Only matters in debug mode</param>
 	public Tile ExtractTile(Vector2I gloc, bool bMaybeNull = false)
 	{
-
 		Debug.Assert(IsWithin(gloc));
-
 		Debug.Assert(bMaybeNull || HasTile(gloc));
 		var i = GridToIndex(gloc);
 		var myTile = m_Tiles[i];
@@ -238,11 +220,8 @@ public partial class WorldPanel : Panel
 	/// <param name="bMaybeNull">Only matters in debug mode</param>
 	public void SwapTiles(Vector2I gloc1, Vector2I gloc2, bool bMaybeNull = false)
 	{
-
 		Debug.Assert(IsWithin(gloc1));
-
 		Debug.Assert(IsWithin(gloc2));
-
 		Debug.Assert(bMaybeNull || HasTile(gloc1) && HasTile(gloc2));
 		if (gloc1 == gloc2)
 		{
@@ -270,9 +249,7 @@ public partial class WorldPanel : Panel
 	/// </summary>
 	public void SwapTiles(Tile tl0, Tile tl1)
 	{
-
 		Debug.AssertRefEq(GetTile(tl0.GridLoc), tl0);
-
 		Debug.AssertRefEq(GetTile(tl1.GridLoc), tl1);
 		SwapTiles(tl0.GridLoc, tl1.GridLoc, false);
 	}
@@ -287,9 +264,7 @@ public partial class WorldPanel : Panel
 	/// </summary>
 	public Item SpawnItem(Vector2I gloc, int value)
 	{
-
 		Debug.AssertNotNull(GetTile(gloc));
-
 		Debug.Assert(!GetTile(gloc).IsReserved());
 		var tl = GetTile(gloc);
 		if (tl is null || tl.IsReserved())
@@ -310,7 +285,6 @@ public partial class WorldPanel : Panel
 	/// </summary>
 	public Item SpawnItem(Tile tl, int value)
 	{
-
 		Debug.Assert(IsInstalled(tl));
 		return SpawnItem(tl.GridLoc, value);
 	}
@@ -322,13 +296,9 @@ public partial class WorldPanel : Panel
 	/// </summary>
 	public Item InstallItem(Item it, Vector2I gloc)
 	{
-
 		Debug.Assert(it.GetParent() is null); // No associated world.
-
 		Debug.Assert(it.ParentTile is null);
-
 		Debug.AssertNotNull(GetTile(it.GridLoc));
-
 		Debug.Assert(!GetTile(it.GridLoc).IsReserved());
 		
 		var tl = GetTile(gloc);
@@ -350,7 +320,6 @@ public partial class WorldPanel : Panel
 	/// </summary>
 	public Item InstallItem(Item it, Tile tl)
 	{
-
 		Debug.Assert(IsInstalled(tl));
 		return InstallItem(it, tl.GridLoc);
 	}
@@ -365,17 +334,11 @@ public partial class WorldPanel : Panel
 	/// <param name="bOverride">Only matters in debug mode</param>
 	public Item CloneItem(Vector2I gSrc, Vector2I gDest, bool bMaybeNull = false, bool bOverride = false)
 	{
-
 		Debug.Assert(IsWithin(gSrc));
-
 		Debug.Assert(HasTile(gSrc));
-
 		Debug.Assert(bMaybeNull || GetTile(gSrc).HasItem());
-
 		Debug.Assert(IsWithin(gDest));
-
 		Debug.Assert(HasTile(gDest));
-
 		Debug.Assert(bOverride || gSrc == gDest || !GetTile(gDest).HasItem());
 		
 		var srcTl = GetTile(gSrc);
@@ -395,9 +358,7 @@ public partial class WorldPanel : Panel
 	/// </summary>
 	public Item CloneItem(Tile tlSrc, Tile tlDest, bool bMaybeNull = false, bool bOverride = false)
 	{
-
 		Debug.Assert(IsInstalled(tlSrc));
-
 		Debug.Assert(IsInstalled(tlDest));
 		return CloneItem(tlSrc.GridLoc, tlDest.GridLoc, bMaybeNull, bOverride);
 	}
@@ -424,9 +385,7 @@ public partial class WorldPanel : Panel
 	/// </summary>
 	public Item TeleportItem(Tile tlSrc, Tile tlDest, bool bMaybeNull = false, bool bOverride = false)
 	{
-
 		Debug.Assert(IsInstalled(tlSrc));
-
 		Debug.Assert(IsInstalled(tlDest));
 		return TeleportItem(tlSrc.GridLoc, tlDest.GridLoc, bMaybeNull, bOverride);
 	}
@@ -441,17 +400,11 @@ public partial class WorldPanel : Panel
 	/// <param name="bOverride">Only matters in debug mode</param>
 	public Item TeleportItemNoSync(Vector2I gSrc, Vector2I gDest, bool bMaybeNull = false, bool bOverride = false)
 	{
-
 		Debug.Assert(IsWithin(gSrc));
-
 		Debug.Assert(IsWithin(gDest));
-
 		Debug.Assert(HasTile(gSrc));
-
 		Debug.Assert(HasTile(gDest));
-
 		Debug.Assert(bMaybeNull || GetTile(gSrc).HasItem());
-
 		Debug.Assert(bOverride || gSrc == gDest || !GetTile(gDest).HasItem());
 		
 		if (gSrc == gDest)
@@ -466,9 +419,9 @@ public partial class WorldPanel : Panel
 			return null;
 		}
 
-		var extractedTl = srcTl.ExtractItem();
-		destTl.SetItemUnsafe(extractedTl); // Must be before adding to tree.
-		AddChild(extractedTl);
+		var extractedIt = srcTl.ExtractItem();
+		destTl.SetItemUnsafe(extractedIt); // Must be before adding to tree.
+		AddChild(extractedIt);
 		return destTl.Item;
 	}
 
@@ -478,9 +431,7 @@ public partial class WorldPanel : Panel
 	/// </summary>
 	public Item TeleportItemNoSync(Tile tlSrc, Tile tlDest, bool bMaybeNull = false, bool bOverride = false)
 	{
-
 		Debug.Assert(IsInstalled(tlSrc));
-
 		Debug.Assert(IsInstalled(tlDest));
 		return TeleportItemNoSync(tlSrc.GridLoc, tlDest.GridLoc, bMaybeNull, bOverride);
 	}
@@ -500,7 +451,6 @@ public partial class WorldPanel : Panel
 
 	public void OnTick(Level lv)
 	{
-
 		Debug.AssertRefEq(lv.World, this);
 		foreach (var tl in m_Tiles)
 		{
@@ -570,9 +520,9 @@ public partial class WorldPanel : Panel
 		}
 		foreach (var u in m_Units)
 		{
-			DrawRect(new(GridToPos(u.GridLoc), CellWidth*(Vector2)u.Dims), Colors.Black, false, -2.0f);
+			DrawRect(new(GridToPos(u.GridLoc), CellWidth*(Vector2)u.Dims), Godot.Colors.Black, false, -2.0f);
 			DrawString(DebugFont, u.Position + new Vector2(0.0f, 15.0f), u.GetType().Name,
-				HorizontalAlignment.Left, CellWidth, 16, Colors.Black);
+				Godot.HorizontalAlignment.Left, CellWidth, 16, Godot.Colors.Black);
 		}
 	}
 
@@ -586,12 +536,12 @@ public partial class WorldPanel : Panel
 		PlaceSlider(new(2, 7), Direction.East);
 		PlaceSlider(new(3, 7), Direction.North);
 		PlaceSlider(new(3, 6), Direction.East);
-		PlaceUpdater(new(4, 6), Direction.East, 3, UpdateType.Double);
+		PlaceUpdater(new(4, 6), Direction.East, 3, UnUpdater.UpdateType.Double);
 		PlaceSlider(new(5, 6), Direction.East);
 		PlaceSlider(new(6, 6), Direction.South);
 		PlaceSlider(new(6, 7), Direction.South);
 		PlaceSlider(new(6, 8), Direction.West);
-		PlaceUpdater(new(5, 8), Direction.West, 3, UpdateType.Double);
+		PlaceUpdater(new(5, 8), Direction.West, 3, UnUpdater.UpdateType.Double);
 		PlaceSlider(new(4, 8), Direction.West);
 		PlaceSlider(new(3, 8), Direction.North);
 	}
@@ -620,7 +570,7 @@ public partial class WorldPanel : Panel
 		return u;
 	}
 
-	public UnUpdater PlaceUpdater(Vector2I gloc, Direction dir, int rate, UpdateType UpT)
+	public UnUpdater PlaceUpdater(Vector2I gloc, Direction dir, int rate, UnUpdater.UpdateType UpT)
 	{
 		var u = UnUpdaterScene.Instantiate<UnUpdater>();
 		AddUnit(u);
@@ -732,13 +682,9 @@ public partial class WorldPanel : Panel
 	/// </summary>
 	public void QueueBlockedSlideCmdByAnotherItem(CmdSlide cmd)
 	{
-
 		Debug.Assert(HasTile(cmd.GridFrom));
-
 		Debug.Assert(GetTile(cmd.GridFrom).HasItem()); // Is there an actual item?
-
 		Debug.Assert(GetTile(cmd.GetGridTo()).IsReserved()); // And is it blocked?
-
 		Debug.Assert(!m_BlockedSlideCmdsByItems.Contains(cmd));
 		
 		m_BlockedSlideCmdsByItems.Add(cmd);

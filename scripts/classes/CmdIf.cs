@@ -46,8 +46,6 @@ public class CmdIf : Command
 	public int CmpValue { get; private set; }
 	public List<Command> TrueCmdSeq { get; private set; }
 	public List<Command> FalseCmdSeq { get; private set; }
-	
-	// private CommandRunner m_BranchRunner;
 
 
 	public CmdIf(Vector2I gloc, CheckType check, int cmpVal,

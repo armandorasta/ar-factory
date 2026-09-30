@@ -204,9 +204,12 @@ public class Tile(Vector2I gloc)
 	public void SetItemUnsafe(Item newItem, bool bOverride = false)
 	{
 		Debug.AssertEq(newItem.GetParent(), null, "Use 'WorldPanel.SpawnItem' or 'WorldPanel.InstallItem'");
+		Debug.Assert(!ReferenceEquals(newItem.ParentTile, this), 
+			"For now SetItemUnsafe will crash when called twice on the same tile");
 		Debug.Assert(bOverride || !HasItem());
 		DestroyItem(true);
 		m_Item = newItem;
+		m_Item.SetParentTileUnsafe(this);
 	}
 
 	/// <summary>

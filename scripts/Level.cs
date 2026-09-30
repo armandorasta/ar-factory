@@ -1,12 +1,9 @@
-using ArFactory.Tests;
-using Godot;
 using System;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace ArFactory;
 
-public partial class Level : Node2D
+public partial class Level : Godot.Node2D
 {
 	public class SimulationAutoEnder(Level lv) : IDisposable
 	{
@@ -15,26 +12,33 @@ public partial class Level : Node2D
 		void IDisposable.Dispose()
 		{
 			Debug.Assert(m_Level.IsSimRunning());
-			m_Level.EndSimulation();
+			m_Level.HaltSimulation();
 		}
 	}
 
+	public const float MinTickRate = 0.1f;
+	public const float MaxTickRate = 1000.0f;
 
-	enum PlayMode { Off, Play, Debug }
+
+	enum PlayMode 
+	{ 
+		Off,
+		Play,
+		Debug,
+	}
 
 	/// <summary>
 	/// Emitted after a tick is fully processed. <paramref name="tickCount"/> is the number of ticks
 	/// processed up until now.
 	/// </summary>
-	[Signal]
+	[Godot.Signal]
 	public delegate void TickProcessedEventHandler(int tickCount);
-
 
 	// Nodes
 	public Godot.Camera2D Cam;
 	public WorldPanel World;
 	public Godot.Button PlayButt;
-	public Godot.Button PauseButt;
+	public Godot.Button HaltButt;
 	public Godot.Button DebugButt;
 	public Godot.HBoxContainer ToolsHBox;
 	public Godot.HBoxContainer PlayHBox;
@@ -56,34 +60,50 @@ public partial class Level : Node2D
 
 	public override void _Ready()
 	{
+		GetAllNodes();
+		
+		Cam.Position = World.Size * 0.5f;
+		
+		InitTimer();
+		InitSimButts();
+		InitSimSpeedSlider();
+		AddTools();
+	}
+
+	private void GetAllNodes()
+	{
 		Cam = GetNode<Godot.Camera2D>("WorldPanel/Cam");
 		World = GetNode<WorldPanel>("WorldPanel");
 		PlayButt = GetNode<Godot.Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PlayButt");
-		PauseButt = GetNode<Godot.Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PauseButt");
+		HaltButt = GetNode<Godot.Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PauseButt");
 		DebugButt = GetNode<Godot.Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/DebugButt");
 		ToolsHBox = GetNode<Godot.HBoxContainer>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/ToolsHBox");
 		PlayHBox = GetNode<Godot.HBoxContainer>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox");
 		TicksLabel = GetNode<Godot.Label>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TicksLabel");
 		SpeedSlider = GetNode<Godot.HSlider>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/SpeedHSlider");
 		TickSpeedLabel = GetNode<Godot.Label>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TickSpeedLabel");
+	}
 
-		// World.SetDims(new(5, 5));
-		Cam.Position = World.Size * 0.5f;
-		
+	private void InitTimer()
+	{
 		m_TickTimer.OneShot = true;
 		AddChild(m_TickTimer);
 		m_TickTimer.Timeout += OnTickTimer_TimeOut;
+	}
 
+	private void InitSimButts()
+	{
 		PlayButt.Pressed += OnPlayButt_Pressed;
 		DebugButt.Pressed += OnDebugButt_Pressed;
-		PauseButt.Pressed += OnPauseButt_Pressed;
+		HaltButt.Pressed += OnHaltButt_Pressed;
 		SyncButtStates();
-
+	}
+	
+	private void InitSimSpeedSlider()
+	{
 		SpeedSlider.ValueChanged += OnSpeedSlider_ValueChanged;
 		ResetTickRate();
 		SpeedSlider.Value = GetTickRate();
-
-		AddTools();
 	}
 
 	public override void _EnterTree()
@@ -96,7 +116,7 @@ public partial class Level : Node2D
 	{
 		switch (m_CurrPlayMode) {
 		case PlayMode.Off: break;
-		case PlayMode.Debug: break;
+		case PlayMode.Debug:
 		case PlayMode.Play: 
 			World.DoPerFrame((float)dt, this);
 			break;
@@ -113,41 +133,94 @@ public partial class Level : Node2D
 
 	public bool IsSimRunning() => m_CurrPlayMode != PlayMode.Off;
 	public bool IsDebugging() => m_CurrPlayMode == PlayMode.Debug;
+	public bool IsPaused() => m_TickTimer.TimeLeft == 0.0;
+
+	/// <summary>
+	/// Checks if we are in debug mode waiting for a button press to proceed.
+	/// </summary>
+	private bool IsPausedRightBeforeOnTick() => m_TickTimer.TimeLeft == 0;
 
 
 	private void OnTick()
 	{
 		World.OnTick(this);
-		TicksLabel.Text = $"ticks: {m_TickCount}";
 		m_TickCount += 1;
+		UpdateTickCountLabel();
 		EmitSignal(SignalName.TickProcessed, m_TickCount);
 	}
 
 	/// <summary>
+	/// Same as pressing the play button on the level.
+	/// </summary>
+	/// <returns>
+	/// A proxy that can be used in a using statement which will automatically end the simulation.
+	/// </returns>
+	public SimulationAutoEnder Play() => StartSimulation(bPauseOnEntry: false);
+	/// <summary>
+	/// Same as pressing the debug button to start the level. This pauses the simulation before the
+	/// first tick is processed then <see cref="TickOnce"/> or <see cref="ResumeSimulation"/> can
+	/// be used to proceed.
+	/// </summary>
+	/// <returns>
+	/// A proxy that can be used in a using statement which will automatically end the simulation.
+	/// </returns>
+	public SimulationAutoEnder PlayButPauseOnEntry() => StartSimulation(bPauseOnEntry: true);
+
+	/// <summary>
 	/// Returns a proxy that can be used in a using statement which will automatically end the simulation.
 	/// </summary>
-	public SimulationAutoEnder StartSimulation(bool bWasteFirstTick = false)
+	private SimulationAutoEnder StartSimulation(bool bPauseOnEntry = false) 
 	{
 		Debug.Assert(m_CurrPlayMode != PlayMode.Play);
-		m_CurrPlayMode = PlayMode.Play;
-		SyncButtStates();
+		switch (m_CurrPlayMode) {
+		case PlayMode.Off:
+			// When it's off, both values for bPauseOnEntry work because of the tests...
+			SetPlayMode(bPauseOnEntry ? PlayMode.Debug : PlayMode.Play);
+			break;
+		
+		case PlayMode.Play:
+			throw new InvalidProgramException();
+
+		case PlayMode.Debug:
+			// In debug mode, bPauseOnEntry must be true!
+			Debug.Assert(bPauseOnEntry);
+			break;
+		}
+		
 		OnSimulationStart();
-
 		m_TickTimer.Paused = false;
-
-		if (bWasteFirstTick)
-		{
-			m_TickTimer.Start(m_TickMillis * 0.001f);
-		}
-		else
-		{
-			OnTickTimer_TimeOut();
-		}
+		OnTickTimer_TimeOut();
 
 		return new(this);
 	}
 
-	public void EndSimulation()
+	/// <summary>
+	/// Same as hitting the play button mid-simlation to exit debug mode.
+	/// </summary>
+	public void ResumeSimulation()
+	{
+		Debug.Assert(m_CurrPlayMode == PlayMode.Debug);
+		SetPlayMode(PlayMode.Play);
+		
+		if (IsPausedRightBeforeOnTick())
+		{
+			TickOnce();
+		}
+	}
+	
+	/// <summary>
+	/// Same as hitting the debug button mid-simlation the first time to enter debug mode.
+	/// </summary>
+	public void PauseSimulation()
+	{
+		Debug.Assert(m_CurrPlayMode == PlayMode.Play);
+		SetPlayMode(PlayMode.Debug);
+	}
+	
+	/// <summary>
+	/// Halts everything, bombs all items, resets all the units, etc...
+	/// </summary>
+	public void HaltSimulation()
 	{
 		Debug.Assert(m_CurrPlayMode != PlayMode.Off);
 		
@@ -164,9 +237,54 @@ public partial class Level : Node2D
 	}
 
 	/// <summary>
-	/// Waits a certain number of ticks, and returns after processing the last tick.
+	/// Calls <see cref="OnTick"/> first, then starts the timer, so ticks process at the begining
+	/// not the end of the tick. It has to be in this order, otherwise smooth commands get confused.<br/>
+	/// <b>Calling this function again before the timer finishes is undefined behaviour</b>
 	/// </summary>
-	public async Task ProcessNextTicks(int tickCount)
+	public void TickOnce()
+	{
+		Debug.Assert(m_CurrPlayMode != PlayMode.Off);
+		Debug.Assert(!m_TickTimer.Paused);
+		Debug.Assert(IsPausedRightBeforeOnTick());
+
+		m_TickTimer.Start(m_TickMillis * 0.001f);
+		OnTick();
+	}
+
+	/// <summary>
+	/// <see cref="TickOnce"/> usually finishes instantly then fires a timer that controls tick speed.
+	/// In debug calling <see cref="TickOnce"/> before the timer is finished crashes the program,
+	/// in release, it will instantly skip to next tick (undefined behaviour).
+	/// This function however will wait for the timer if it's not finished yet and return right after
+	/// <see cref="TickOnce"/> is called.
+	/// </summary>
+	public async Task TickOnceAsync()
+	{
+		if (m_TickTimer.TimeLeft > 0.0)
+		{
+			await ToSignal(m_TickTimer, Godot.Timer.SignalName.Timeout);
+		}
+		TickOnce();
+	}
+	
+	/// <summary>
+	/// Same as calling <see cref="TickOnceAsync"/> n times. Returns after the nth tick is fully
+	/// processed.
+	/// </summary>
+	public async Task TickNTimesAsync(int tickCount)
+	{
+		for (var i = 0; i < tickCount; ++i)
+		{
+			await TickOnceAsync();
+		}
+	}
+
+	/// <summary>
+	/// Waits a certain number of ticks, and returns after processing the last tick.
+	/// This function does not start or resume the simulation, it simply waits for 
+	/// <see cref="TickProcessed"/> signal n times.
+	/// </summary>
+	public async Task WaitForNTicks(int tickCount)
 	{
 		for (var i = 0; i < tickCount; ++i)
 		{
@@ -179,26 +297,63 @@ public partial class Level : Node2D
 
 	private void OnTickTimer_TimeOut()
 	{
-		Debug.Assert(m_CurrPlayMode != PlayMode.Off);
-		OnTick();
-		m_TickTimer.Start(m_TickMillis * 0.001f);
+		Debug.Assert(m_CurrPlayMode != PlayMode.Off);		
+		switch (m_CurrPlayMode) {
+		case PlayMode.Off:
+			throw new InvalidProgramException();
+		
+		case PlayMode.Play:
+			TickOnce();
+			break;
+		
+		case PlayMode.Debug:
+			break;
+		}
 	}
 
 	private void OnPlayButt_Pressed()
 	{
-		StartSimulation();
+		Debug.Assert(m_CurrPlayMode != PlayMode.Play);
+		switch (m_CurrPlayMode) {
+		case PlayMode.Off:
+			StartSimulation(bPauseOnEntry: false);
+			break;
+		
+		case PlayMode.Play:
+			throw new InvalidProgramException();
+
+		case PlayMode.Debug:
+			ResumeSimulation();
+			break;
+		}
 	}
 
-	private void OnPauseButt_Pressed()
+	private void OnHaltButt_Pressed()
 	{
-		EndSimulation();
+		HaltSimulation();
 	}
 
 	private void OnDebugButt_Pressed()
 	{
-		m_CurrPlayMode = PlayMode.Debug;
-		SyncButtStates();
-		GD.Print("Debug thick meaty butt");
+		switch (m_CurrPlayMode) {
+		case PlayMode.Off:
+			SetPlayMode(PlayMode.Debug);
+			StartSimulation(bPauseOnEntry: true);
+			break;
+		
+		case PlayMode.Play:
+			PauseSimulation();
+			break;
+		
+		case PlayMode.Debug:
+			if (!IsPausedRightBeforeOnTick()) // Spamming the debug key while the tick is in progress.
+			{
+				return;	
+			}
+
+			TickOnce();
+			break;
+		}
 	}
 
 	private void OnSpeedSlider_ValueChanged(double newVal)
@@ -216,7 +371,7 @@ public partial class Level : Node2D
 		switch (m_CurrPlayMode) {
 		case PlayMode.Off:
 			PlayButt.Disabled = false;
-			PauseButt.Disabled = true;
+			HaltButt.Disabled = true;
 			DebugButt.Disabled = false;
 			PlayHBox.Hide();
 			ToolsHBox.Show();
@@ -224,7 +379,7 @@ public partial class Level : Node2D
 		
 		case PlayMode.Play:
 			PlayButt.Disabled = true;
-			PauseButt.Disabled = false;
+			HaltButt.Disabled = false;
 			DebugButt.Disabled = false;
 			PlayHBox.Show();
 			ToolsHBox.Hide();
@@ -232,7 +387,7 @@ public partial class Level : Node2D
 		
 		case PlayMode.Debug:
 			PlayButt.Disabled = false;
-			PauseButt.Disabled = false;
+			HaltButt.Disabled = false;
 			DebugButt.Disabled = false;
 			PlayHBox.Show();
 			ToolsHBox.Hide();
@@ -242,6 +397,7 @@ public partial class Level : Node2D
 
 	private void OnSimulationStart()
 	{
+		UpdateTickCountLabel();
 	}
 
 	private void OnSimulationEnd()
@@ -249,6 +405,22 @@ public partial class Level : Node2D
 		m_TickTimer.Paused = true;
 		m_TickCount = 0;
 		World.CleanUpAfterSim();
+	}
+
+	private void SetPlayMode(PlayMode newPlayMode)
+	{
+		if (newPlayMode == m_CurrPlayMode)
+		{
+			return;
+		}
+
+		m_CurrPlayMode = newPlayMode;
+		SyncButtStates();
+	}
+
+	private void UpdateTickCountLabel()
+	{
+		TicksLabel.Text = $"tick: {m_TickCount}";
 	}
 
 	private void AddTools()

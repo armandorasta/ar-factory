@@ -4,7 +4,7 @@ using Godot;
 namespace ArFactory.Tests;
 using static ArTest.Asserts;
 
-public class UnitTests : ArTest.TestSuit
+public class LevelTests : ArTest.TestSuit
 {
 	private Level m_Lv;
 
@@ -33,18 +33,16 @@ public class UnitTests : ArTest.TestSuit
 		RemoveNode(m_Lv);
 	}
 
-
-	[ArTest.Test] public async Task TestSupplier()
+	[ArTest.Test] public async Task TestWaitForTicks()
 	{
-		var world = m_Lv.World;
-		world.PlaceSupplier(Vector2I.Zero, Direction.East, 1, [1, 2, 3]);
-		world.PlaceInjector([
-			
-		]);
-
 		using (m_Lv.PlayButPauseOnEntry())
 		{
-			
+			await m_Lv.TickOnceAsync();
+			AssertEq(m_Lv.GetTicksSinceStart(), 1); 
+			await m_Lv.TickNTimesAsync(5);
+			AssertEq(m_Lv.GetTicksSinceStart(), 6);
+			await m_Lv.TickNTimesAsync(5);
+			AssertEq(m_Lv.GetTicksSinceStart(), 11);
 		}
 	}
 }
