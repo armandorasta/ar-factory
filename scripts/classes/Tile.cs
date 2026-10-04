@@ -1,10 +1,9 @@
 using System;
-using System.Diagnostics;
 using Godot;
 
 namespace ArFactory;
 
-public class Tile(Vector2I gloc)
+public class Tile
 {
 	[Flags]
 	private enum WallType : Int32
@@ -22,8 +21,8 @@ public class Tile(Vector2I gloc)
 	// Publics
 	public Vector2I GridLoc => m_GridLoc;
 	/// <summary>
-	/// This accessor crashes the program in debug mode if the item is null, use 
-	/// <see cref="GetItemMaybeNull"/> if that behaviour is not desired.
+	/// This accessor crashes the program in debug mode if the item is null, use <see cref="GetItemMaybeNull"/> if that
+	/// behaviour is not desired.
 	/// </summary>
 	public Item Item
 	{
@@ -36,7 +35,7 @@ public class Tile(Vector2I gloc)
 
 
 	// Privates
-	private Vector2I m_GridLoc = gloc;
+	private Vector2I m_GridLoc = Vector2I.Zero;
 	// High to low: west -> south -> east -> north.
 	private Int32 m_WallFlags;
 	private Item m_Item;
@@ -46,14 +45,13 @@ public class Tile(Vector2I gloc)
 
 	#region .Factory Methods
 
-	public static Tile CreateSolid(Vector2I gloc)
+	public static Tile CreateSolid()
 	{
-		var res = new Tile(gloc);
-		res.SetWall(Direction.North, WallType.Solid);
-		res.SetWall(Direction.East, WallType.Solid);
-		res.SetWall(Direction.South, WallType.Solid);
-		res.SetWall(Direction.West, WallType.Solid);
-		return res;
+		return new Tile()
+			.SetWall(Direction.North, WallType.Solid)
+			.SetWall(Direction.East, WallType.Solid)
+			.SetWall(Direction.South, WallType.Solid)
+			.SetWall(Direction.West, WallType.Solid);
 	}
 
 	#endregion // .Factory Methods
@@ -92,7 +90,7 @@ public class Tile(Vector2I gloc)
 	/// <summary>
 	/// Items are not allowed to slide into reserved tiles.<br/>
 	/// </summary>
-	public bool IsReserved() => m_bReserved || m_Item is not null;
+	public bool IsReserved() => m_bReserved || m_Item != null;
 
 	/// <summary>
 	/// Items are not allowed to slide into reserved tiles. <br/>
@@ -248,7 +246,7 @@ public class Tile(Vector2I gloc)
 	public virtual void DebugDraw(WorldPanel world)
 	{
 		var myPos = world.GridToPos(GridLoc);
-		var col = Colors.DarkGray;
+		var col = Godot.Colors.DarkGray;
 
 		// I know I can make the following checks faster with some bit arithmatic, but I just don't
 		// feel like it.
@@ -257,7 +255,7 @@ public class Tile(Vector2I gloc)
 		if (IsInput(Direction.North) || IsInput(Direction.East)  || IsInput(Direction.South) ||
 			IsInput(Direction.West))
 		{
-			col = Colors.IndianRed;
+			col = Godot.Colors.IndianRed;
 		}
 
 		// At least one output?
@@ -265,17 +263,17 @@ public class Tile(Vector2I gloc)
 			IsOutput(Direction.West))
 		{
 			// Has input as well? yellow, otherwise green.
-			col = (col == Colors.IndianRed) ? Colors.Orange : Colors.LightGreen;
+			col = (col == Godot.Colors.IndianRed) ? Godot.Colors.Orange : Godot.Colors.LightGreen;
 		}
 
 		// Is completely solid?
 		if (IsSolid(Direction.North) && IsSolid(Direction.East)  && IsSolid(Direction.South) &&
 			IsSolid(Direction.West))
 		{
-			col = Colors.DarkBlue;
+			col = Godot.Colors.DarkBlue;
 		}
 
-		world.DrawRect(new Rect2(myPos, world.CellWidth * Vector2.One), col);
+		world.DrawRect(new Godot.Rect2(myPos, world.CellWidth * Vector2.One), col);
 		for (var i = 0; i < 4; ++i)
 		{
 			var d = (Direction)i;
@@ -286,7 +284,7 @@ public class Tile(Vector2I gloc)
 			}
 
 			var edgePos = myPos + world.CellWidth * (0.5f * Vector2.One + 0.4f * (Vector2)gdir);
-			var myCol = IsInput(d) ? Colors.DarkRed : Colors.DarkGreen;
+			var myCol = IsInput(d) ? Godot.Colors.DarkRed : Godot.Colors.DarkGreen;
 
 			var myScale = 0.15f;
 			if (IsInput(d) && 

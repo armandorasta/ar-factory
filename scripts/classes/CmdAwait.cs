@@ -12,7 +12,7 @@ public class CmdAwait : Command
 {
 	public Vector2I[] GridLocs { get; private set; }
 
-	public CmdAwait(IEnumerable<Vector2I> glocs) : base(0)
+	public CmdAwait(IEnumerable<Vector2I> glocs) : base(1)
 	{
 		GridLocs = [.. glocs];
 		Debug.Assert(GridLocs.Length > 0);

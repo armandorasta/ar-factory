@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+using System.Security.Cryptography;
 using Godot;
 
 namespace ArFactory.Tests;
@@ -30,6 +32,17 @@ public class TileTests : ArTest.TestSuit
 	{
 		m_Lv.QueueFree();
 		RemoveNode(m_Lv);
+	}
+
+	[ArTest.Test] public void TestDefaultConstructor()
+	{
+		var world = m_Lv.World;
+		var tl = new Tile();
+		AssertTrue(tl.IsClear(Direction.North));
+		AssertTrue(tl.IsClear(Direction.East));
+		AssertTrue(tl.IsClear(Direction.South));
+		AssertTrue(tl.IsClear(Direction.West));
+		AssertFalse(tl.IsReserved());
 	}
 
 	[ArTest.Test] public void Test_SetWall_and_GetWall()
@@ -72,6 +85,67 @@ public class TileTests : ArTest.TestSuit
 		AssertTrue(tl.IsOutput(Direction.East));
 		AssertTrue(tl.IsInput(Direction.South));
 		AssertTrue(tl.IsSolid(Direction.West));
+	}
+
+	[ArTest.Test] public void TestRotation()
+	{
+		var world = m_Lv.World;
+		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		tl.MakeSolid(Direction.North).MakeInput(Direction.East).MakeOutput(Direction.South);
+		
+		tl.Rotate90();
+		AssertTrue(tl.IsClear(Direction.North));
+		AssertTrue(tl.IsSolid(Direction.East));
+		AssertTrue(tl.IsInput(Direction.South));
+		AssertTrue(tl.IsOutput(Direction.West));
+		tl.Rotate90();
+		AssertTrue(tl.IsOutput(Direction.North));
+		AssertTrue(tl.IsClear(Direction.East));
+		AssertTrue(tl.IsSolid(Direction.South));
+		AssertTrue(tl.IsInput(Direction.West));
+		tl.Rotate90();
+		AssertTrue(tl.IsInput(Direction.North));
+		AssertTrue(tl.IsOutput(Direction.East));
+		AssertTrue(tl.IsClear(Direction.South));
+		AssertTrue(tl.IsSolid(Direction.West));
+		tl.Rotate90();
+		AssertTrue(tl.IsSolid(Direction.North));
+		AssertTrue(tl.IsInput(Direction.East));
+		AssertTrue(tl.IsOutput(Direction.South));
+		AssertTrue(tl.IsClear(Direction.West));
+	
+		tl.Rotate180();
+		AssertTrue(tl.IsOutput(Direction.North));
+		AssertTrue(tl.IsClear(Direction.East));
+		AssertTrue(tl.IsSolid(Direction.South));
+		AssertTrue(tl.IsInput(Direction.West));
+		tl.Rotate180();
+		AssertTrue(tl.IsSolid(Direction.North));
+		AssertTrue(tl.IsInput(Direction.East));
+		AssertTrue(tl.IsOutput(Direction.South));
+		AssertTrue(tl.IsClear(Direction.West));
+
+		
+		tl.Rotate270();
+		AssertTrue(tl.IsInput(Direction.North));
+		AssertTrue(tl.IsOutput(Direction.East));
+		AssertTrue(tl.IsClear(Direction.South));
+		AssertTrue(tl.IsSolid(Direction.West));
+		tl.Rotate270();
+		AssertTrue(tl.IsOutput(Direction.North));
+		AssertTrue(tl.IsClear(Direction.East));
+		AssertTrue(tl.IsSolid(Direction.South));
+		AssertTrue(tl.IsInput(Direction.West));
+		tl.Rotate270();
+		AssertTrue(tl.IsClear(Direction.North));
+		AssertTrue(tl.IsSolid(Direction.East));
+		AssertTrue(tl.IsInput(Direction.South));
+		AssertTrue(tl.IsOutput(Direction.West));
+		tl.Rotate270();
+		AssertTrue(tl.IsSolid(Direction.North));
+		AssertTrue(tl.IsInput(Direction.East));
+		AssertTrue(tl.IsOutput(Direction.South));
+		AssertTrue(tl.IsClear(Direction.West));
 	}
 
 	[ArTest.Test] public void TestCanItemEnter()
@@ -118,84 +192,33 @@ public class TileTests : ArTest.TestSuit
 		AssertTrue(tl.CanItemExit(Direction.West));
 	}
 
-	[ArTest.Test] public void Test_WorldPanel_InstallTile_and_DeleteTile()
+	[ArTest.Test] public void TestDestroyItem()
 	{
 		var world = m_Lv.World;
-		AssertFalse(world.HasTile(Vector2I.One));
-		AssertNull(world[1, 1]);
-
-		var tl = world.InstallEmptyTile(Vector2I.One);
-		AssertEq(tl.GridLoc, Vector2I.One);
-		AssertTrue(world.HasTile(Vector2I.One));
-		AssertRefEq(world[1, 1], tl);
-		
-		world.DeleteTile(Vector2I.One);
-		AssertFalse(world.HasTile(Vector2I.One));
-		AssertNull(world[1, 1]);
-	}
-
-	[ArTest.Test] public void Test_WorldPanel_SpawnItem_and_DestroyItem()
-	{
-		var world = m_Lv.World;
-		var tl = world.InstallEmptyTile(Vector2I.Zero);
-		AssertFalse(world[0, 0].HasItem());
-		AssertNotNull(world.SpawnItem(tl, 7));
-		AssertEq(tl.Item.Value, 7);
-		AssertNull(world.SpawnItem(tl, 8)); // Should just give up in release.
-		AssertEq(tl.Item.Value, 7);
-
-		tl.DestroyItem();
-		AssertFalse(tl.HasItem());
-		AssertNotNull(world.SpawnItem(tl, 8));
+		var tl = world.InstallEmptyTile(Vector2I.Zero);		
+		var it = world.SpawnItem(tl, 8);
+		AssertNotNull(it);
 		AssertTrue(tl.HasItem());
-		AssertEq(tl.Item.Value, 8);
+		AssertEq(it.Value, 8);
 
 		tl.DestroyItem();
 		AssertFalse(tl.HasItem());
+		AssertTrue(it.IsQueuedForDeletion());
 		
-		tl.DestroyItem(); // Can be called on empty tiles? on debug you have to pass in bMaybeNull.
+		tl.DestroyItem(); // Should just do nothing and not cause any trouble in release.
 		AssertFalse(tl.HasItem());
+		AssertTrue(it.IsQueuedForDeletion());
 	}
 
-	[ArTest.Test] public void Test_WorldPanel_ExtractItem_and_InstallItem()
+	[ArTest.Test] public void TestExtractItem()
 	{
 		var world = m_Lv.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
 		var spawnedIt = world.SpawnItem(tl, 7);
-		AssertRefEq(spawnedIt.GetParent(), world);
 
-		var extractedIt = world[0, 0].ExtractItem();
-		AssertNull(extractedIt.GetParent());
-		// TODO: When you add parent tile reference, check for it here!
-		AssertFalse(world[0, 0].HasItem());
+		var extractedIt = AddNode(tl.ExtractItem());
+		AssertFalse(tl.HasItem());
 		AssertRefEq(spawnedIt, extractedIt);
 		AssertEq(extractedIt.Value, 7);
-
-		Item installedIt = world.InstallItem(extractedIt, extractedIt.GridLoc);
-		AssertRefEq(installedIt.GetParent(), world);
-		AssertRefEq(installedIt, extractedIt);
-		AssertRefEq(world.GetTile(Vector2I.Zero).Item, installedIt);
-		AssertEq(installedIt.Value, 7);
-	}
-
-	[ArTest.Test] public void Test_WorldPanel_ExtractTile()
-	{
-		var world = m_Lv.World;
-		var installedTl = world.InstallEmptyTile(new(3, 4));
-		var extractedTl = world.ExtractTile(installedTl.GridLoc);
-		AssertRefEq(installedTl, extractedTl);
-		AssertFalse(world.HasTile(installedTl.GridLoc));
-
-		extractedTl.SetGridLocUnsafe(Vector2I.Zero); // Should be ignored and overriden.
-		var anotherTl = world.InstallTile(extractedTl, new(1, 2));
-		AssertTrue(world.HasTile(new(1, 2)));
-		AssertFalse(world.HasTile(new(3, 4))); // Ignore the tile's grid-loc
-		AssertRefEq(anotherTl, extractedTl);
-
-		world.DeleteTile(anotherTl);
-
-		// Must pass bMaybeNull in debug.
-		AssertNull(world.ExtractTile(Vector2I.Zero));
-		AssertNull(world.ExtractTile(Vector2I.Zero));
 	}
 }

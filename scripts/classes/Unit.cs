@@ -46,25 +46,28 @@ public abstract partial class Unit : Node2D
 	private bool m_bPendingAllowed = false;
 #endif
 
-	// Keeps track of `Rate` every tick.
-	private int m_Count = 0;
+	/// <summary>
+	/// Keeps track of <see cref="Rate"/> every tick.
+	/// </summary>
+	private int m_Count = 1;
 
-	// These are checked by the on-demand units
-	// TODO: Add a way to add blocks to this list explicitly.
+	/// <summary>
+	/// These are checked by the on-demand units
+	/// </summary>
 	private List<Tile> m_TickTiles = [];
 
 	
-	public static bool CanFitIn(WorldPanel world, Vector2I gloc, Vector2I dims)
+	public static bool CanFitIn(WorldPanel world, Vector2I gloc, Vector2I dims, Direction dir)
 	{
-		if (!world.GetGridRect().Encloses(new(gloc, dims)))
+		var bLeftRight = dir == Direction.East || dir == Direction.West;
+		var adjustedDims = bLeftRight ? dims : new(dims.Y, dims.X);
+		if (!world.GetGridRect().Encloses(new(gloc, adjustedDims)))
 		{
 			return false;
 		}
-
-
-		for (var y = 0; y < dims.Y; ++y)
+		for (int y = 0; y < adjustedDims.Y; ++y)
 		{
-			for (var x = 0; x < dims.X; ++x)
+			for (int x = 0; x < adjustedDims.X; ++x)
 			{
 				if (world.HasTile(gloc + new Vector2I(x, y)))
 				{
@@ -88,7 +91,7 @@ public abstract partial class Unit : Node2D
 	protected void BaseInit(WorldPanel world, TickType tickType, int workRate, Vector2I gloc, Vector2I dims, 
 		Direction dir)
 	{
-		Debug.Assert(Unit.CanFitIn(world, gloc, dims));
+		Debug.Assert(Unit.CanFitIn(world, gloc, dims, dir));
 		Debug.Assert(CanFaceDir(dir));
 		Debug.Assert(workRate > 0);
 		Debug.Assert(Enum.IsDefined(tickType));
@@ -111,7 +114,7 @@ public abstract partial class Unit : Node2D
 			for (var x = 0; x < dims.X; ++x)
 			{
 				var myLoc = gloc + new Vector2I(x, y);
-				world.InstallTile(Tile.CreateSolid(Vector2I.Zero), myLoc);
+				world.InstallTile(Tile.CreateSolid(), myLoc);
 			}
 		}
 
@@ -191,6 +194,12 @@ public abstract partial class Unit : Node2D
 	/// is executed.
 	/// </summary>
 	public bool HasPendingCmds() => !m_Runner.IsDone();
+
+	/// <summary>
+	/// Checks if there's either no commands left, or there are only slide commands that are just
+	/// animating the slide for the user.
+	/// </summary>
+	protected bool IsSafeToPendCmds() => m_Runner.IsDone() || m_Runner.IsJustAwaitingOutSlideAnim();
 
 	/// <summary>
 	/// Called everytime on the tick pending commands queue size goes to zero.
@@ -455,10 +464,24 @@ public abstract partial class Unit : Node2D
 	/// <summary>
 	/// Handles <see cref="Command.OnTick"/> for pending commands.
 	/// </summary>
-	public void HandleCmdTick(Level lv)
+	public void HandleCmdOnTick(Level lv)
 	{
         Debug.AssertRefEq(lv.World, this.World);
         m_Runner.OnTick(lv);
+	}
+
+	/// <summary>
+	/// Handles <see cref="Command.OnEdge"/> for pending commands.
+	/// </summary>
+	public void HandleCmdOnEdge(Level lv)
+	{
+        Debug.AssertRefEq(lv.World, this.World);
+#if DEBUG
+		var res = m_Runner.OnEdge(lv);
+        Debug.Assert(res != CommandRunner.Result.DoneWithFailure);
+#else
+		m_Runner.OnEdge(lv);
+#endif
 	}
 
 	/// <summary>

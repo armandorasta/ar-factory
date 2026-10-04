@@ -10,7 +10,7 @@ public class CmdSpawn : Command
 	public Vector2I GridLoc { get; private set; }
 	public int Value { get; private set; }
 
-	public CmdSpawn(Vector2I gloc, int val) : base(0)
+	public CmdSpawn(Vector2I gloc, int val) : base(1)
 	{
 		GridLoc = gloc;
 		Value = val;

@@ -10,7 +10,7 @@ public class CmdTeleport : Command
 	public Vector2I SrcGridLoc { get; private set; }
 	public Vector2I DestGridLoc { get; private set; }
 
-	public CmdTeleport(Vector2I gfrom, Vector2I gto) : base(0)
+	public CmdTeleport(Vector2I gfrom, Vector2I gto) : base(1)
 	{
 		SrcGridLoc = gfrom;
 		DestGridLoc = gto;

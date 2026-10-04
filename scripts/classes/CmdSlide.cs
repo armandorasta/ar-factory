@@ -10,11 +10,11 @@ public class CmdSlide : Command
 {
 	public Vector2I GridFrom { get; private set; }
 	public Direction Dir { get; private set; }
-	public Item TrackedItem { get; private set; }
+	public WeakReference<Item> TrackedItemRef { get; private set; }
 	
 	private Action<Level> m_StateFunc;
 
-	public CmdSlide(Vector2I gfrom, Direction dir) : base(1)
+	public CmdSlide(Vector2I gfrom, Direction dir) : base(1, true)
 	{
 		GridFrom = gfrom;
 		Dir = dir;
@@ -22,43 +22,29 @@ public class CmdSlide : Command
 
 		// No AwaitVacate because we have multiple passes, AwaitVacate will block the command until
 		// no item is present in the destination tile, but we need to proceed then because we have
-		// an overlap algorithm.
+		// an overlap algorithm that might clear the item away.
 		AddSubParallelCmds([ new CmdAwait([gfrom]) ]);
 	}
 	
 	public CmdSlide(Tile tlFrom, Direction dir) : this(tlFrom.GridLoc, dir) { }
 	
 
-	public bool IsAwaitingAnim() => m_StateFunc == HandleAfterAnimation;
+	public bool IsAwaitingAnim() => m_StateFunc is null;
 	public Vector2I GetGridTo() => GridFrom + Dir.ToGrid();
 
-	protected override void DoPerFrame(double dt, Level lv)
-	{
-		if (m_StateFunc != HandleAfterAnimation)
-		{
-			return;
-		}
-
-		Debug.Assert(TrackedItem != null);
-
-		var srcLoc = lv.World.GridToPos(GridFrom);
-		var destLoc = lv.World.GridToPos(GetGridTo());
-		var weight = 0.001f*lv.GetTickElapsedMillis() * lv.GetTickRate();
-		TrackedItem.Position = srcLoc.Lerp(destLoc, weight);
-	}
-
 	/// <summary>
-	/// If <see cref="TrackedItem"/> can move, it will move it and return true, otherwise it will 
+	/// If <see cref="TrackedItemRef"/> can move, it will move it and return true, otherwise it will 
 	/// return false.
 	/// </summary>
 	public bool TryMovingByOverlap(WorldPanel world)
 	{
 		Debug.Assert(m_StateFunc == HandleDefault);
-		Debug.AssertNotNull(TrackedItem);
-		Debug.Assert(TrackedItem.IsAllowedToMove());
+		Debug.AssertNotNull(TrackedItemRef);
+		Debug.Assert(TrackedItemRef.TryGetTarget(out var it) && it.IsAllowedToMove());
 
 		// Can't really use vacate here, because this function is called in the same tick, and is
 		// called potentially multiple times.
+
 		if (world.GetTile(GetGridTo()).IsReserved())
 		{
 			return false;
@@ -71,13 +57,45 @@ public class CmdSlide : Command
 
 	protected override void OnTick(Level lv)
 	{
-		Debug.AssertNotNull(m_StateFunc);
 		m_StateFunc.Invoke(lv);
+	}
+
+	protected override void DoPerFrame(double dt, Level lv)
+	{
+		if (!IsAwaitingAnim())
+		{
+			return;
+		}
+
+		Debug.Assert(TrackedItemRef != null);
+		if (TrackedItemRef.TryGetTarget(out var trackedIt))
+		{
+			var srcLoc = lv.World.GridToPos(GridFrom);
+			var destLoc = lv.World.GridToPos(GetGridTo());
+			var weight = 0.001f*lv.GetTickElapsedMillis() * lv.GetTickRate();
+			trackedIt.Position = srcLoc.Lerp(destLoc, weight);
+		}
+	}
+
+	protected override void OnEdge(Level lv)
+	{
+		if (!IsAwaitingAnim())
+		{
+			return;
+		}
+
+		Debug.Assert(TrackedItemRef != null);
+		if (TrackedItemRef.TryGetTarget(out var trackedIt))
+		{
+			trackedIt.SyncPosWithGrid(lv.World);
+			trackedIt.SetMidAnimationFlag(false);
+			m_StateFunc = HandleDefault; // We have to do this because of IsAwaitingAnim
+		}
 	}
 
 	private void HandleDefault(Level lv)
 	{
-		// Debug.Assert(TrackedItem == null);
+		Debug.Assert(TrackedItemRef is null);
 		if (!lv.World.HasTile(GetGridTo()))
 		{ 
 			// Only hits when the command is made non-blocking and it is directly at a null tile or
@@ -86,10 +104,7 @@ public class CmdSlide : Command
 			return;
 		}
 
-		var srcTile = lv.World.GetTile(GridFrom);
 		var destTile = lv.World.GetTile(GetGridTo());
-		TrackedItem = srcTile.Item;
-
 		if (!destTile.CanItemEnter(Dir.Invert()))
 		{
 			// Probably will be blocked forever tho...
@@ -111,22 +126,15 @@ public class CmdSlide : Command
 		// `DoPerFrame` animates until next tick.
 	}
 
-	private void HandleAfterAnimation(Level lv)
-	{
-		TrackedItem.SyncPosWithGrid(lv.World);
-		TrackedItem.SetMidAnimationFlag(false);
-		TrackedItem = null;
-		m_StateFunc = HandleDefault;
-	}
-
 	public override string ToString()
 		=> Utilz.AppendToBaseToString(base.ToString(), $"Slide[at {GridFrom} -> {Dir}]");
 
 	private void PrepTrackedItemForSlidingAnim(WorldPanel world)
 	{
-		TrackedItem = world.TeleportItemNoSync(GridFrom, GetGridTo());
-		TrackedItem.DisallowMovementThisTick();
-		TrackedItem.SetMidAnimationFlag(true);
-		m_StateFunc = HandleAfterAnimation;
+		var trackedIt = world.TeleportItemNoSync(GridFrom, GetGridTo());
+		trackedIt.DisallowMovementThisTick();
+		trackedIt.SetMidAnimationFlag(true);
+		TrackedItemRef = new(trackedIt);
+		m_StateFunc = null;
 	}
 }

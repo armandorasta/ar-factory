@@ -22,7 +22,7 @@ public class CmdCombine : Command
 	/// </summary>
 	public CmdCombine(
 		IEnumerable<Vector2I> srcGLocs, Vector2I destGLoc, Func<IEnumerable<int>, int> combFunc) 
-		: base(0)
+		: base(1)
 	{
 		SrcGridLocs = [.. srcGLocs];
 		Debug.Assert(!SrcGridLocs.IsEmpty());

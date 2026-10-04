@@ -31,7 +31,7 @@ public class CmdUpdate : Command
 	public UpdateType UpType { get; private set; }
 	public int Value { get; private set; }
 
-	public CmdUpdate(Vector2I gloc, UpdateType upT, int val) : base(0)
+	public CmdUpdate(Vector2I gloc, UpdateType upT, int val) : base(1)
 	{
 		GridLoc = gloc;
 		UpType = upT;

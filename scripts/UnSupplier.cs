@@ -13,26 +13,18 @@ public partial class UnSupplier : Unit
 
 	public void Setup(WorldPanel world, Vector2I gloc, int workRate, Direction dir, IEnumerable<int> seq)
 	{
-		BaseInit(world, TickType.Steady, workRate, gloc, new(2, 3), dir);
-		m_Sequence = seq.ToArray();
+		BaseInit(world, TickType.Steady, workRate, gloc, Vector2I.One, dir);
+		m_Sequence = [.. seq];
 	}
 
 	protected override void BuildTiles()
 	{
-		m_Out0 = AddOutput(new(1, 1), Direction.East);
+		m_Out0 = AddOutput(Vector2I.Zero, Direction.East);
 	}
 
 	public override void PendNewCommands()
 	{
-		if (IsDoneWithSeq())
-		{
-			return;
-		}
-		if (!IsWorkTick())
-		{
-			return;
-		}
-		if (HasPendingCmds() && !m_Runner.IsJustAwaitingOutSlideAnim())
+		if (IsDoneWithInputSeq() || !IsWorkTick() || !IsSafeToPendCmds())
 		{
 			PauseThisTick();
 			return;
@@ -41,6 +33,8 @@ public partial class UnSupplier : Unit
 		PendCmd(new CmdSpawn(m_Out0, PopNextValue()));
 		PendCmd(new CmdSlide(m_Out0, Dir));
 	}
+
+	public bool IsDoneWithInputSeq() => m_Index >= m_Sequence.Length - 1;
 
 	public override string ToString()
 	{
@@ -53,12 +47,10 @@ public partial class UnSupplier : Unit
 		base.Reset();
 		m_Index = -1;
 	}
-
-	private bool IsDoneWithSeq() => m_Index >= m_Sequence.Length - 1;
 	
 	private int PopNextValue()
 	{
-		Debug.Assert(!IsDoneWithSeq());
+		Debug.Assert(!IsDoneWithInputSeq());
 		m_Index += 1;
 		return m_Sequence[m_Index];
 	}

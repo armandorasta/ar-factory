@@ -129,14 +129,27 @@ public partial class Level : Godot.Node2D
 	public int GetTicksSinceStart() => m_TickCount;
 
 	public void ResetTickRate() { m_TickMillis = DefaultTickMillis; }
-	public void SetTickRate(float ratePerSec) { m_TickMillis = 1000.0f / ratePerSec; }
-
-	public bool IsSimRunning() => m_CurrPlayMode != PlayMode.Off;
-	public bool IsDebugging() => m_CurrPlayMode == PlayMode.Debug;
-	public bool IsPaused() => m_TickTimer.TimeLeft == 0.0;
+	public void SetTickRate(float ratePerSec) { m_TickMillis = 1000.0f / float.Clamp(ratePerSec, MinTickRate, MaxTickRate); }
 
 	/// <summary>
-	/// Checks if we are in debug mode waiting for a button press to proceed.
+	/// Checks if we started the simulation with no regard to which mode we are in.
+	/// </summary>
+	public bool IsSimRunning() => m_CurrPlayMode != PlayMode.Off;
+	/// <summary>
+	/// Checks if we are in debug mode.
+	/// </summary>
+	public bool IsDebugging() => m_CurrPlayMode == PlayMode.Debug;
+	/// <summary>
+	/// Checks if the simulation is paused just before the next tick is to be processed.
+	/// This function only returns <see langword="true"/> in debug mode, only when <see cref="IsDebugging"/> 
+	/// returns <see langword="true"/>.
+	/// </summary>
+	public bool IsPaused() => IsDebugging() && IsPausedRightBeforeOnTick();
+
+	/// <summary>
+	/// Checks if the tick timer has timed out, this almost certainly means we are in debug mode waiting
+	/// for the user to advance, but there's an extremely small chance this function returns 
+	/// <see langword="true"/> in normal mode...
 	/// </summary>
 	private bool IsPausedRightBeforeOnTick() => m_TickTimer.TimeLeft == 0;
 
@@ -155,7 +168,7 @@ public partial class Level : Godot.Node2D
 	/// <returns>
 	/// A proxy that can be used in a using statement which will automatically end the simulation.
 	/// </returns>
-	public SimulationAutoEnder Play() => StartSimulation(bPauseOnEntry: false);
+	public SimulationAutoEnder PlaySimulation() => StartSimulation(bPauseOnEntry: false);
 	/// <summary>
 	/// Same as pressing the debug button to start the level. This pauses the simulation before the
 	/// first tick is processed then <see cref="TickOnce"/> or <see cref="ResumeSimulation"/> can
@@ -164,14 +177,14 @@ public partial class Level : Godot.Node2D
 	/// <returns>
 	/// A proxy that can be used in a using statement which will automatically end the simulation.
 	/// </returns>
-	public SimulationAutoEnder PlayButPauseOnEntry() => StartSimulation(bPauseOnEntry: true);
+	public SimulationAutoEnder PlaySimulationInDebug() => StartSimulation(bPauseOnEntry: true);
 
 	/// <summary>
 	/// Returns a proxy that can be used in a using statement which will automatically end the simulation.
 	/// </summary>
 	private SimulationAutoEnder StartSimulation(bool bPauseOnEntry = false) 
 	{
-		Debug.Assert(m_CurrPlayMode != PlayMode.Play);
+		Debug.Assert(m_CurrPlayMode == PlayMode.Off);
 		switch (m_CurrPlayMode) {
 		case PlayMode.Off:
 			// When it's off, both values for bPauseOnEntry work because of the tests...
@@ -179,16 +192,13 @@ public partial class Level : Godot.Node2D
 			break;
 		
 		case PlayMode.Play:
-			throw new InvalidProgramException();
-
 		case PlayMode.Debug:
-			// In debug mode, bPauseOnEntry must be true!
-			Debug.Assert(bPauseOnEntry);
-			break;
+			throw new InvalidProgramException();
 		}
 		
 		OnSimulationStart();
 		m_TickTimer.Paused = false;
+		m_TickTimer.Stop();
 		OnTickTimer_TimeOut();
 
 		return new(this);
@@ -209,7 +219,7 @@ public partial class Level : Godot.Node2D
 	}
 	
 	/// <summary>
-	/// Same as hitting the debug button mid-simlation the first time to enter debug mode.
+	/// Same as hitting the debug button mid-simlation in normal mode to enter debug mode.
 	/// </summary>
 	public void PauseSimulation()
 	{
@@ -231,15 +241,14 @@ public partial class Level : Godot.Node2D
 			OnSimulationEnd();
 		}		
 
-		m_CurrPlayMode = PlayMode.Off;
-		SyncButtStates();
-
+		SetPlayMode(PlayMode.Off);
 	}
 
 	/// <summary>
 	/// Calls <see cref="OnTick"/> first, then starts the timer, so ticks process at the begining
 	/// not the end of the tick. It has to be in this order, otherwise smooth commands get confused.<br/>
-	/// <b>Calling this function again before the timer finishes is undefined behaviour</b>
+	/// <b>Calling this function again before the timer finishes is undefined behaviour</b> use
+	/// <see cref="TickOnceAsync"/> to avoid that situation.
 	/// </summary>
 	public void TickOnce()
 	{
@@ -247,23 +256,34 @@ public partial class Level : Godot.Node2D
 		Debug.Assert(!m_TickTimer.Paused);
 		Debug.Assert(IsPausedRightBeforeOnTick());
 
+		// Start the timer so it progresses in parallel with the tick process.
 		m_TickTimer.Start(m_TickMillis * 0.001f);
 		OnTick();
 	}
 
 	/// <summary>
-	/// <see cref="TickOnce"/> usually finishes instantly then fires a timer that controls tick speed.
-	/// In debug calling <see cref="TickOnce"/> before the timer is finished crashes the program,
-	/// in release, it will instantly skip to next tick (undefined behaviour).
-	/// This function however will wait for the timer if it's not finished yet and return right after
-	/// <see cref="TickOnce"/> is called.
+	/// Ticks process at the start then wait for a timer, this returns after timer times out and 
+	/// <see cref="Command.OnEdge"/> is called.
 	/// </summary>
-	public async Task TickOnceAsync()
+	public async Task EndTickAsync()
 	{
+		Debug.Assert(m_CurrPlayMode != PlayMode.Off);
 		if (m_TickTimer.TimeLeft > 0.0)
 		{
 			await ToSignal(m_TickTimer, Godot.Timer.SignalName.Timeout);
 		}
+	}
+
+	/// <summary>
+	/// <see cref="TickOnce"/> usually finishes instantly then fires a timer that controls tick speed.<br/>
+	/// <b><see cref="TickOnce"/> may not be called again before the timer is finished (undefined behaviour).</b><br/>
+	/// This function however will wait for the timer if it's not finished yet and return right after
+	/// <see cref="TickOnce"/> is called.<br/>
+	/// Same as calling <see cref="EndTickAsync"/> followed by <see cref="TickOnce"/>.
+	/// </summary>
+	public async Task TickOnceAsync()
+	{
+		await EndTickAsync();
 		TickOnce();
 	}
 	
@@ -273,6 +293,7 @@ public partial class Level : Godot.Node2D
 	/// </summary>
 	public async Task TickNTimesAsync(int tickCount)
 	{
+		Debug.Assert(m_CurrPlayMode != PlayMode.Off);
 		for (var i = 0; i < tickCount; ++i)
 		{
 			await TickOnceAsync();
@@ -286,6 +307,7 @@ public partial class Level : Godot.Node2D
 	/// </summary>
 	public async Task WaitForNTicks(int tickCount)
 	{
+		Debug.Assert(m_CurrPlayMode != PlayMode.Off);
 		for (var i = 0; i < tickCount; ++i)
 		{
 			await ToSignal(this, SignalName.TickProcessed);
@@ -297,7 +319,10 @@ public partial class Level : Godot.Node2D
 
 	private void OnTickTimer_TimeOut()
 	{
-		Debug.Assert(m_CurrPlayMode != PlayMode.Off);		
+		Debug.Assert(m_CurrPlayMode != PlayMode.Off);
+		
+		World.OnEdge(this);
+
 		switch (m_CurrPlayMode) {
 		case PlayMode.Off:
 			throw new InvalidProgramException();
@@ -409,7 +434,7 @@ public partial class Level : Godot.Node2D
 
 	private void SetPlayMode(PlayMode newPlayMode)
 	{
-		if (newPlayMode == m_CurrPlayMode)
+		if (newPlayMode == m_CurrPlayMode) // Avoid unecessary marshaling
 		{
 			return;
 		}

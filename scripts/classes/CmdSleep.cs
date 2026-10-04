@@ -5,14 +5,14 @@ namespace ArFactory;
 /// </summary>
 public class CmdSleep : Command
 {
-	public CmdSleep(int tickCount) : base(tickCount)
+	public CmdSleep(int tickCount) : base(tickCount, true)
 	{
 		Debug.Assert(tickCount > 0);
 	}
 
-	protected override void OnTick(Level lv)
-	{
-	}
+	protected override void OnTick(Level lv) { }
+	protected override void OnEdge(Level lv) { }
+
 
 	public override string ToString() => Utilz.ReplaceBaseNameInToString(base.ToString(), "Sleep");
 }

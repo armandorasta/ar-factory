@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Godot;
 
@@ -33,9 +34,9 @@ public class LevelTests : ArTest.TestSuit
 		RemoveNode(m_Lv);
 	}
 
-	[ArTest.Test] public async Task TestWaitForTicks()
+	[ArTest.Test] public async Task TestDebugMode()
 	{
-		using (m_Lv.PlayButPauseOnEntry())
+		using (m_Lv.PlaySimulationInDebug())
 		{
 			await m_Lv.TickOnceAsync();
 			AssertEq(m_Lv.GetTicksSinceStart(), 1); 
@@ -44,5 +45,69 @@ public class LevelTests : ArTest.TestSuit
 			await m_Lv.TickNTimesAsync(5);
 			AssertEq(m_Lv.GetTicksSinceStart(), 11);
 		}
+	}
+
+	[ArTest.Test] public async Task TestPausingAndResuming()
+	{
+		AssertFalse(m_Lv.IsSimRunning());
+
+		m_Lv.PlaySimulation();
+		AssertTrue(m_Lv.IsSimRunning());
+		AssertFalse(m_Lv.IsPaused());
+		AssertFalse(m_Lv.IsDebugging());
+
+		m_Lv.PauseSimulation();
+		AssertTrue(m_Lv.IsSimRunning());
+		AssertFalse(m_Lv.IsPaused()); // Tick has to end first, then simulation actually pauses.
+		AssertTrue(m_Lv.IsDebugging());
+		
+		await m_Lv.EndTickAsync(); // NOW the simulation is paused for real.
+		AssertTrue(m_Lv.IsSimRunning());
+		AssertTrue(m_Lv.IsPaused());
+		AssertTrue(m_Lv.IsDebugging());
+
+		var nTicksBefore = m_Lv.GetTicksSinceStart();
+		m_Lv.TickOnce();
+		AssertTrue(m_Lv.IsSimRunning());
+		AssertFalse(m_Lv.IsPaused());
+		AssertTrue(m_Lv.IsDebugging());
+		AssertEq(m_Lv.GetTicksSinceStart(), nTicksBefore + 1);
+
+		nTicksBefore = m_Lv.GetTicksSinceStart();
+		m_Lv.ResumeSimulation();
+		await m_Lv.WaitForNTicks(3);
+		AssertTrue(m_Lv.IsSimRunning());
+		AssertFalse(m_Lv.IsPaused());
+		AssertFalse(m_Lv.IsDebugging());
+		AssertEq(m_Lv.GetTicksSinceStart(), nTicksBefore + 3);
+
+		m_Lv.HaltSimulation();
+		AssertFalse(m_Lv.IsSimRunning());
+
+		m_Lv.PlaySimulationInDebug();
+		AssertTrue(m_Lv.IsSimRunning());
+		AssertTrue(m_Lv.IsPaused());
+		AssertTrue(m_Lv.IsDebugging());
+		AssertEq(m_Lv.GetTicksSinceStart(), 0);
+		
+		m_Lv.TickOnce();
+		AssertTrue(m_Lv.IsSimRunning());
+		AssertFalse(m_Lv.IsPaused());
+		AssertTrue(m_Lv.IsDebugging());
+		AssertEq(m_Lv.GetTicksSinceStart(), 1);
+
+		await m_Lv.TickOnceAsync();
+		AssertTrue(m_Lv.IsSimRunning());
+		AssertFalse(m_Lv.IsPaused());
+		AssertTrue(m_Lv.IsDebugging());
+		AssertEq(m_Lv.GetTicksSinceStart(), 2);
+
+		await m_Lv.TickNTimesAsync(2);
+		AssertTrue(m_Lv.IsSimRunning());
+		AssertFalse(m_Lv.IsPaused());
+		AssertTrue(m_Lv.IsDebugging());
+		AssertEq(m_Lv.GetTicksSinceStart(), 4);
+
+		m_Lv.HaltSimulation();
 	}
 }

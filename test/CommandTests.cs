@@ -54,7 +54,7 @@ public class CommandTests : ArTest.TestSuit
 			],
 		]);
 
-		using (m_Lv.PlayButPauseOnEntry())
+		using (m_Lv.PlaySimulationInDebug())
 		{
 			await m_Lv.TickOnceAsync();
 			AssertEq(m_Lv.GetTicksSinceStart(), 1);
@@ -162,7 +162,7 @@ public class CommandTests : ArTest.TestSuit
 			]
 		]);
 
-		using (m_Lv.PlayButPauseOnEntry())
+		using (m_Lv.PlaySimulationInDebug())
 		{
 			AssertFalse(tl.HasItem());
 
@@ -262,7 +262,7 @@ public class CommandTests : ArTest.TestSuit
 				new CmdSlide(tlSouth0, Direction.South),
 				new CmdSlide(tlNorth0, Direction.North),
 				new CmdSlide(tlWest0, Direction.West),
-				new CmdSleep(2),
+				new CmdSleep(1),
 			],
 
 			// For now on I will only test east and assume the rest will work similarly because
@@ -279,50 +279,47 @@ public class CommandTests : ArTest.TestSuit
 
 				new CmdSpawn(tlEast0, 1),
 				new CmdSpawn(tlEast1, 2),
-				new CmdSlide(tlEast0, Direction.East),
-				new CmdSleep(3), // Leak protection
+				new CmdSlide(tlEast0, Direction.East), // + Leak protection
 			],
 			[ // The kill is internal to the unit, shouldnt matter since units are just a hoax xd
-				// Tick 7
+				// Tick 3
 				new CmdKill(tlEast1),
+
 				new CmdSpawn(tlEast0, 1),
 				new CmdSpawn(tlEast1, 2),
-				new CmdSlide(tlEast0, Direction.East),
+				new CmdSlide(tlEast0, Direction.East), // + Leak protection
 				new CmdKill(tlEast1), // Here the kill happens, then the above slide overlaps.
-				new CmdSleep(2), // Leak protection
 			],
 
 			// 3. Source has yet to have an item
 			[
 				new CmdKill(tlEast1),
-				new CmdSlide(tlEast0, Direction.East),
+				new CmdSlide(tlEast0, Direction.East), // + Leak protection
 				// The overlap algo doesn't cover this case... when an item spawns after the slide
 				// command, because almost always the spawn command is placed before.
 				new CmdSpawn(tlEast0, 67),
-				new CmdSleep(3),
 			],
 
 			// 4. Non-blocking stuff
 			[
 				new CmdKill(tlEast1),
 				nonBlockingSlides[0].MakeNonBlocking(), // Failure (nothing to slide)
-				new CmdSleep(1),
+				new CmdSleep(1), // Leak protection
 			],
 			[
 				new CmdSpawn(tlEast0, -13),
 				new CmdSpawn(tlEast1, -107),
 				nonBlockingSlides[1].MakeNonBlocking(), // Failure (destination blocked)
-				new CmdSleep(1),
+				new CmdSleep(1), // Leak protection
 			],
 			[
 				new CmdKill(tlEast1),
-				nonBlockingSlides[2].MakeNonBlocking(), // Works
-				new CmdSleep(2),
+				nonBlockingSlides[2].MakeNonBlocking(), // Works + Leak protection
 			],
 			[
 				new CmdKill(tlEast1),
 				new CmdSlide(new Vector2I(0, 1), Direction.South).MakeNonBlocking(), // Fails (no tile in (0,1))
-				new CmdSleep(1),
+				new CmdSleep(1), // Leak protection
 			],
 
 			// 5. Directed at the border of the world (non-blocking)
@@ -334,14 +331,14 @@ public class CommandTests : ArTest.TestSuit
 
 		var injy1 = world.PlaceInjector([
 			[
-				new CmdSleep(4),
+				new CmdSleep(3),
 			],
 			[ // 2
-				new CmdKill(tlEast1), // Tick 4
+				new CmdKill(tlEast1), // Tick 3
 			],
 		]);
 
-		using (m_Lv.PlayButPauseOnEntry())
+		using (m_Lv.PlaySimulationInDebug())
 		{
 			// 1
 			await m_Lv.TickOnceAsync();
@@ -376,7 +373,7 @@ public class CommandTests : ArTest.TestSuit
 			AssertRefEq(itNorth, tlNorth1.Item);
 			AssertRefEq(itWest, tlWest1.Item);
 
-			await m_Lv.TickOnceAsync();
+			await m_Lv.EndTickAsync();
 			AssertFalse(tlEast0.HasItem());
 			AssertTrue(tlEast1.HasItem());
 			AssertFalse(tlEast1.Item.IsMidAnimation());
@@ -408,7 +405,7 @@ public class CommandTests : ArTest.TestSuit
 			AssertTrue(tlEast1.Item.IsMidAnimation());
 			AssertEq(tlEast1.Item.Value, 1);
 
-			await m_Lv.TickOnceAsync();
+			await m_Lv.EndTickAsync();
 			AssertFalse(tlEast0.HasItem());
 			AssertTrue(tlEast1.HasItem());
 			AssertFalse(tlEast1.Item.IsMidAnimation());
@@ -422,7 +419,7 @@ public class CommandTests : ArTest.TestSuit
 			AssertTrue(tlEast1.Item.IsMidAnimation());
 			AssertEq(tlEast1.Item.Value, 1);
 
-			await m_Lv.TickOnceAsync();
+			await m_Lv.EndTickAsync();
 			AssertFalse(tlEast0.HasItem());
 			AssertTrue(tlEast1.HasItem());
 			AssertFalse(tlEast1.Item.IsMidAnimation());
@@ -437,7 +434,7 @@ public class CommandTests : ArTest.TestSuit
 			AssertTrue(tlEast1.HasItem());
 			AssertTrue(tlEast1.Item.IsMidAnimation());
 
-			await m_Lv.TickOnceAsync();
+			await m_Lv.EndTickAsync();
 			AssertFalse(tlEast0.HasItem());
 			AssertTrue(tlEast1.HasItem());
 			AssertFalse(tlEast1.Item.IsMidAnimation());
@@ -455,7 +452,7 @@ public class CommandTests : ArTest.TestSuit
 			AssertTrue(tlEast1.HasItem());
 			AssertTrue(tlEast1.Item.IsMidAnimation());
 
-			await m_Lv.TickOnceAsync();
+			await m_Lv.EndTickAsync();
 			AssertTrue(nonBlockingSlides[2].IsDone());
 			AssertFalse(tlEast0.HasItem());
 			AssertTrue(tlEast1.HasItem());
@@ -470,6 +467,7 @@ public class CommandTests : ArTest.TestSuit
 			AssertTrue(tlEast0.HasItem());
 			AssertFalse(tlEast0.Item.IsMidAnimation());
 
+			await m_Lv.EndTickAsync();
 			AssertFalse(injy0.HasPendingCmds());
 		}
 	}
@@ -534,7 +532,7 @@ public class CommandTests : ArTest.TestSuit
 			],
 		]);
 
-		using (m_Lv.PlayButPauseOnEntry())
+		using (m_Lv.PlaySimulationInDebug())
 		{
 			// 1
 			await m_Lv.TickOnceAsync();
@@ -590,7 +588,7 @@ public class CommandTests : ArTest.TestSuit
 			new(tl1),
 		};
 
-		var injy = world.PlaceInjector([
+		var injy0 = world.PlaceInjector([
 			[
 				new CmdSpawn(tl0, 7),
 				waits[0], // Here it does nothing.
@@ -609,12 +607,16 @@ public class CommandTests : ArTest.TestSuit
 			]
 		]);
 
-		var altInjy = world.PlaceInjector([
-			[new CmdSleep(3)],
-			[waits[2]], // Waits for the next spawn for 3 ticks.
+		var injy1 = world.PlaceInjector([
+			[
+				new CmdSleep(3),
+			],
+			[
+				waits[2], // Waits for the next spawn for 3 ticks.
+			],
 		]);
 
-		using (m_Lv.PlayButPauseOnEntry())
+		using (m_Lv.PlaySimulationInDebug())
 		{
 			await m_Lv.TickOnceAsync();
 			AssertTrue(tl0.HasItem());
@@ -633,20 +635,20 @@ public class CommandTests : ArTest.TestSuit
 			await m_Lv.TickOnceAsync();
 			AssertFalse(tl1.HasItem());
 			AssertFalse(waits[2].IsDone());
-			AssertTrue(injy.HasPendingCmds());
-			AssertTrue(altInjy.HasPendingCmds());
+			AssertTrue(injy0.HasPendingCmds());
+			AssertTrue(injy1.HasPendingCmds());
 
 			await m_Lv.TickOnceAsync();
 			AssertFalse(tl1.HasItem());
 			AssertFalse(waits[2].IsDone());
-			AssertTrue(injy.HasPendingCmds());
-			AssertTrue(altInjy.HasPendingCmds());
+			AssertTrue(injy0.HasPendingCmds());
+			AssertTrue(injy1.HasPendingCmds());
 
 			await m_Lv.TickOnceAsync();
 			AssertTrue(tl1.HasItem());
 			AssertTrue(waits[2].IsDone());
-			AssertFalse(injy.HasPendingCmds());
-			AssertFalse(altInjy.HasPendingCmds());
+			AssertFalse(injy0.HasPendingCmds());
+			AssertFalse(injy1.HasPendingCmds());
 		}
 	}
 
@@ -683,7 +685,7 @@ public class CommandTests : ArTest.TestSuit
 			]
 		]);
 
-		using (m_Lv.PlayButPauseOnEntry())
+		using (m_Lv.PlaySimulationInDebug())
 		{
 			await m_Lv.TickOnceAsync();
 			AssertFalse(tl00.HasItem());
@@ -750,7 +752,7 @@ public class CommandTests : ArTest.TestSuit
 			]
 		]);
 
-		using (m_Lv.PlayButPauseOnEntry())
+		using (m_Lv.PlaySimulationInDebug())
 		{
 			// 1
 			await m_Lv.TickOnceAsync();
@@ -844,7 +846,7 @@ public class CommandTests : ArTest.TestSuit
 			],
 		]);
 
-		using (m_Lv.PlayButPauseOnEntry())
+		using (m_Lv.PlaySimulationInDebug())
 		{
 			// 1
 			await m_Lv.TickOnceAsync();
@@ -946,7 +948,7 @@ public class CommandTests : ArTest.TestSuit
 			],
 		]);
 
-		using (m_Lv.PlayButPauseOnEntry())
+		using (m_Lv.PlaySimulationInDebug())
 		{
 			// 1
 			await m_Lv.TickOnceAsync();
@@ -985,7 +987,7 @@ public class CommandTests : ArTest.TestSuit
 
 			// Taking extra tick because the teleport executes before the slide, so it doesn't know
 			// any changes it makes until next tick.
-			await m_Lv.TickOnceAsync();
+			await m_Lv.EndTickAsync();
 			AssertTrue(tl0.HasItem());
 			AssertFalse(tl1.HasItem());
 			AssertFalse(tl0.Item.IsMidAnimation());
@@ -1061,6 +1063,7 @@ public class CommandTests : ArTest.TestSuit
 		AssertTrue(CmdIf.Apply(CmdIf.CheckType.LessEq, tl0, 10));
 	}
 
+	[ArTest.RunThisOnly]
 	[ArTest.Test] public async Task TestIf()
 	{
 		// All operation types were tested above, so I will be using random one's here, and NOT test
@@ -1072,13 +1075,19 @@ public class CommandTests : ArTest.TestSuit
 		var injy = world.PlaceInjector([
 			// 1. Vanilla (no blocking encountered)
 			[ // 1 tick command
-				new CmdIf(tl0, CmdIf.CheckType.NoItem, -1, [new CmdSpawn(tl0, 5)]),
+				new CmdIf(tl0, CmdIf.CheckType.NoItem, -1, 
+				[
+					new CmdSpawn(tl0, 5)
+				]),
 				new CmdSleep(1), // Leak protection
 			],
 			[ // Another one.
 				new CmdKill(tl0),
 				new CmdSpawn(tl0, 5),
-				new CmdIf(tl0, CmdIf.CheckType.HasItem, -1, [new CmdKill(tl0)]),
+				new CmdIf(tl0, CmdIf.CheckType.HasItem, -1, 
+				[
+					new CmdKill(tl0)
+				]),
 				new CmdSleep(1), // Leak protection
 			],
 			[ // 2 ticks command.
@@ -1092,15 +1101,22 @@ public class CommandTests : ArTest.TestSuit
 			],
 			[ // Condition not satistfied, check types are tested from extensively above.
 				new CmdSpawn(tl0, 918),
-				new CmdIf(tl0, CmdIf.CheckType.Equal, 500, [new CmdSlide(tl0, Direction.South)]),
+				new CmdIf(tl0, CmdIf.CheckType.Equal, 500, 
+				[
+					new CmdSlide(tl0, Direction.South)
+				]),
 				new CmdSleep(1), // Leak protection
 			],
 			[ // Condition not satisfied with an else command
 				new CmdKill(tl0),
 				new CmdSpawn(tl0, 918),
 				new CmdIf(tl0, CmdIf.CheckType.Less, 0,
-					[new CmdKill(tl0)],
-					[new CmdSpawn(tl1, -292)]),
+				[
+					new CmdKill(tl0)
+				],
+				[
+					new CmdSpawn(tl1, -292)
+				]),
 				new CmdSleep(1), // Leak protection
 			],
 
@@ -1109,7 +1125,8 @@ public class CommandTests : ArTest.TestSuit
 				new CmdKill(tl0),
 				new CmdKill(tl1),
 				new CmdSpawn(tl1, -161),
-				new CmdIf(tl1, CmdIf.CheckType.Less, 0, [
+				new CmdIf(tl1, CmdIf.CheckType.Less, 0, 
+				[
 					new CmdKill(tl0),
 					new CmdSpawn(tl1, 645),
 				]),
@@ -1120,7 +1137,10 @@ public class CommandTests : ArTest.TestSuit
 			[ // Else branch this time
 				new CmdKill(tl1),
 				new CmdSpawn(tl1, -631),
-				new CmdIf(tl1, CmdIf.CheckType.GreaterEq, 0, [], [
+				new CmdIf(tl1, CmdIf.CheckType.GreaterEq, 0,
+				[
+				], 
+				[
 					new CmdKill(tl0),
 					new CmdSpawn(tl1, -733),
 				]),
@@ -1164,7 +1184,7 @@ public class CommandTests : ArTest.TestSuit
 			],
 		]);
 
-		using (m_Lv.PlayButPauseOnEntry())
+		using (m_Lv.PlaySimulationInDebug())
 		{
 			// 1
 			await m_Lv.TickOnceAsync();
@@ -1180,10 +1200,17 @@ public class CommandTests : ArTest.TestSuit
 			AssertTrue(tl1.Item.IsMidAnimation());
 			AssertEq(tl1.Item.Value, -530);
 
+			await m_Lv.EndTickAsync();
+			AssertFalse(tl0.HasItem());
+			AssertTrue(tl1.HasItem());
+			AssertFalse(tl1.Item.IsMidAnimation());
+			AssertEq(tl1.Item.Value, -530);
+
 			await m_Lv.TickOnceAsync();
 			AssertFalse(tl0.HasItem());
 			AssertFalse(tl1.HasItem());
 
+			await m_Lv.EndTickAsync();
 			await m_Lv.TickOnceAsync();
 			AssertTrue(tl0.HasItem());
 			AssertFalse(tl1.HasItem());
@@ -1217,6 +1244,7 @@ public class CommandTests : ArTest.TestSuit
 			AssertEq(tl1.Item.Value, -733);
 
 			// 3
+			await m_Lv.EndTickAsync();
 			await m_Lv.TickOnceAsync();
 			AssertTrue(tl0.HasItem());
 			AssertEq(tl0.Item.Value, -542);

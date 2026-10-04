@@ -13,7 +13,7 @@ public class CmdClone : Command
 	public Vector2I[] DestGridLocs { get; private set; }
 
 
-	public CmdClone(Vector2I srcGLoc, IEnumerable<Vector2I> destGLocs) : base(0)
+	public CmdClone(Vector2I srcGLoc, IEnumerable<Vector2I> destGLocs) : base(1)
 	{
 		SrcGridLoc = srcGLoc;
 		DestGridLocs = [.. destGLocs];

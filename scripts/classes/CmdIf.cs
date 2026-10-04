@@ -51,7 +51,7 @@ public class CmdIf : Command
 	public CmdIf(Vector2I gloc, CheckType check, int cmpVal,
 		IEnumerable<Command> trueBranch, 
 		IEnumerable<Command> elseBranch = null) 
-		: base(0)
+		: base(1, true)
 	{
 		Debug.Assert(Item.IsValueWithinRange(cmpVal));
 		Debug.AssertNotNull(trueBranch);
@@ -72,13 +72,13 @@ public class CmdIf : Command
 
 	protected override void OnTick(Level lv)
 	{
-		if (CmpValue == int.MaxValue) // Means the branch was already executed.
+		if (CmpValue == int.MaxValue) // Second time around after branch is done?
 		{
 			return;
 		}
 
-		var isCondMet = Apply(Check, lv.World.GetTile(GridLoc), CmpValue);
-		var winnerBranch = isCondMet ? TrueCmdSeq : FalseCmdSeq;
+		var bCondMet = Apply(Check, lv.World.GetTile(GridLoc), CmpValue);
+		var winnerBranch = bCondMet ? TrueCmdSeq : FalseCmdSeq;
 		if (winnerBranch is null)
 		{
 			ForceFinish();
@@ -86,7 +86,12 @@ public class CmdIf : Command
 		}
 
 		AddSubParallelCmds(winnerBranch);
-		CmpValue = int.MaxValue; // For indication.
+		CmpValue = int.MaxValue; // Indicate this function doesn't need to run again.
+	}
+
+	protected override void OnEdge(Level lv)
+	{
+		// Required for smooth commands.
 	}
 
 	/// <summary>

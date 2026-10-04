@@ -7,6 +7,13 @@ namespace ArFactory;
 
 public class CommandRunner(IEnumerable<IEnumerable<Command>> cmdGroups)
 {
+	public enum Result
+	{
+		DoneWithFailure,
+		DoneSuccessfully,
+		NotDoneYet,
+	}
+
 	private readonly List<List<Command>> m_Groups = [.. cmdGroups.Select(g => g.ToList())];
 	/// <summary>
 	/// In non-blocking mode as soon as one of the commands in the sequences blocks the runner will 
@@ -26,11 +33,11 @@ public class CommandRunner(IEnumerable<IEnumerable<Command>> cmdGroups)
 	/// This is the same as <see cref="IsDone"/> in normal blocking mode since failure is only 
 	/// possible in non-blocking mode.
 	/// </summary>
-	public bool IsDoneSuccessfully() => IsDone() && !m_bFailed;
+	private bool IsDoneSuccessfully() => IsDone() && !m_bFailed;
 	/// <summary>
 	/// If we are in non-blocking mode and one of the commands blocked.
 	/// </summary>
-	public bool IsDoneWithFailure() => IsDone() && m_bFailed;
+	private bool IsDoneWithFailure() => IsDone() && m_bFailed;
 
 	/// <summary>
 	/// Returns <see langword="true"/> if we are waiting for the animation of a slide command to end, 
@@ -72,33 +79,37 @@ public class CommandRunner(IEnumerable<IEnumerable<Command>> cmdGroups)
 		m_Groups.Add([.. parallelCmds.Select(c => m_bBlocking ? c : c.MakeNonBlocking())]);
 	}
 
-	public void OnTick(Level lv)
+	/// <summary>
+	/// Should be called on the beginning of the tick, this does nothing when no commands are left to be executed.
+	/// </summary>
+	public Result OnTick(Level lv)
 	{
-        if (m_Groups.Count == 0)
-		{
-			return;
-		}
-
 		while (m_Groups.Count > 0)
 		{
 			var g0 = m_Groups[0];
 			foreach (var cmd in g0)
 			{
-				cmd.HandleTick(lv);
-				if (!m_bBlocking && !cmd.IsBlocking() && cmd.HasBlockedThisTick())
+				cmd.HandleOnTick(lv);
+				if (!m_bBlocking && cmd.HasFailedThisTick())
 				{
 					m_Groups.Clear();
 					m_bFailed = true;
-					return;
+					return Result.DoneWithFailure;
 				}
 			}
 
 			for (var i = g0.Count - 1; i >= 0; --i)
 			{
-				if (g0[i].CountAndCheckIfDone())
+				var cmd = g0[i];
+				Debug.Assert(!cmd.IsSmooth() || !cmd.IsDone()); // These should have already been bombed in OnEdge.
+				if (!cmd.IsSmooth())
 				{
-					g0.RemoveAt(i);
+					if (cmd.CountAndCheckIfDone())
+					{
+						g0.RemoveAt(i);
+					}
 				}
+
 			}
 
 			if (g0.Count == 0)
@@ -112,13 +123,62 @@ public class CommandRunner(IEnumerable<IEnumerable<Command>> cmdGroups)
 				break; // Unfinished group? must be finished before we move on, so wait for next tick.
 			}
 		}
+
+		return IsDone() ? Result.DoneSuccessfully : Result.NotDoneYet;
 	}
 
-	public void DoPerFrame(double dt, Level lv)
+	/// <summary>
+	/// Should be called at the end of the tick, this does nothing when no commands are left to be executed.
+	/// </summary>
+	public Result OnEdge(Level lv)
 	{
 		if (m_Groups.Count == 0)
 		{
-			return;
+			return IsDoneSuccessfully() ? Result.DoneSuccessfully : Result.DoneWithFailure;
+		}
+
+		// No loop here like OnTick because we know that commands on next group have not called OnTick yet.
+
+		var g0 = m_Groups[0];
+		foreach (var cmd in g0.Where(c => c.IsSmooth()))
+		{
+			cmd.HandleOnEdge(lv);
+			if (!m_bBlocking && cmd.HasFailedThisTick())
+			{
+				m_Groups.Clear();
+				m_bFailed = true;
+				return Result.DoneWithFailure;
+			}
+		}
+
+		for (var i = g0.Count - 1; i >= 0; --i)
+		{
+			var cmd = g0[i];
+			// Instant commands get popped in OnTick, only smooth commands are handled at the end here.
+			Debug.Assert(cmd.IsSmooth() || !cmd.IsDone());
+			if (cmd.IsSmooth())
+			{
+				if (cmd.CountAndCheckIfDone())
+				{
+					g0.RemoveAt(i);
+				}
+			}
+		}
+
+		if (g0.Count == 0)
+		{
+			m_Groups.RemoveAt(0);
+			return Result.DoneSuccessfully;
+		}
+
+		return Result.NotDoneYet;
+	}
+
+	public Result DoPerFrame(double dt, Level lv)
+	{
+		if (m_Groups.Count == 0)
+		{
+			return IsDoneSuccessfully() ? Result.DoneSuccessfully : Result.DoneWithFailure;
 		}
 
 		var g0 = m_Groups[0];
@@ -126,6 +186,8 @@ public class CommandRunner(IEnumerable<IEnumerable<Command>> cmdGroups)
 		{
 			cmd.HandleFrame(dt, lv);
 		}
+
+		return Result.NotDoneYet;
 	}
 
 	public void Clear() => m_Groups.Clear();

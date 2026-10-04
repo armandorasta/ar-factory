@@ -12,7 +12,7 @@ public class CmdVacate : Command
 {
 	public Vector2I[] GridLocs { get; private set; }
 
-	public CmdVacate(IEnumerable<Vector2I> glocs) : base(0)
+	public CmdVacate(IEnumerable<Vector2I> glocs) : base(1)
 	{
 		GridLocs = [.. glocs];
 		Debug.Assert(GridLocs.Length > 0);

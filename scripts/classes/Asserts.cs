@@ -100,6 +100,27 @@ public static class Asserts
 			msg);
 	}
 
+	[StackTraceHidden] 
+	[DebuggerStepThrough]
+	public static void AssertThrow(Action whatToDo, Type exType = null, string msg = null)
+	{
+		if (exType != null && !exType.IsAssignableTo( typeof(Exception) ))
+		{
+			throw new InvalidOperationException($"AssertThrow: Expected an exception type but got {exType}");
+		}
+
+		try 
+		{ 
+			whatToDo.Invoke(); 
+			HandleImpl(false, $"Expected to throw {Green}{exType}{Reset} but {Red}nothing was thrown{Reset}", msg);
+		}
+		catch (Exception ex)
+		{
+			HandleImpl(exType is null || ex.GetType() == exType,
+				$"Expected to throw {Green}{exType}{Reset} but got {Red}{ex.GetType()}{Reset}", 
+				msg);
+		}
+	}
 
 	[StackTraceHidden] 
 	[DebuggerHidden]

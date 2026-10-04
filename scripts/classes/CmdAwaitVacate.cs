@@ -13,7 +13,7 @@ public class CmdAwaitVacate : Command
 	public Vector2I[] VacateGridLocs { get; private set; }
 
 	public CmdAwaitVacate(IEnumerable<Vector2I> waitGLocs, IEnumerable<Vector2I> vacateGLocs) 
-		: base(0)
+		: base(1)
 	{
 		WaitGridLocs = [.. waitGLocs];
 		VacateGridLocs = [.. vacateGLocs];

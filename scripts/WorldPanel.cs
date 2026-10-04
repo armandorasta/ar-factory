@@ -1,4 +1,5 @@
 using Godot;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 
@@ -6,6 +7,9 @@ namespace ArFactory;
 
 public partial class WorldPanel : Godot.Panel
 {
+	public static readonly Vector2I MinDims = new(3, 3);
+	public static readonly Vector2I MaxDims = new(100, 100);
+
 	// Nodes
 	public static readonly Godot.PackedScene ItemScene = GD.Load<Godot.PackedScene>("res://scenes/item.tscn");
 	public static readonly Godot.PackedScene UnSupplierScene = GD.Load<Godot.PackedScene>("res://scenes/un_supplier.tscn");
@@ -78,13 +82,20 @@ public partial class WorldPanel : Godot.Panel
 	/// Same as <seealso cref="IsWithin"/>, but also checks if a tile is allocated in that spot.
 	/// </summary>
 	public bool HasTile(Vector2I gloc) => IsWithin(gloc) && m_Tiles[GridToIndex(gloc)] != null;
+	/// <summary>
+	/// Gets the tile in the location specified, but also returns null for out of bounds locations.
+	/// </summary>
 	public Tile GetTile(Vector2I gloc) => IsWithin(gloc) ? m_Tiles[GridToIndex(gloc)] : null;
+	/// <summary>
+	/// Gets the tile in the location specified, and does no bounds checking whatsoever, meaning getting
+	/// tiles out of bounds is undefined behaviour.
+	/// </summary>
+	public Tile GetTileUnchecked(Vector2I gloc) => m_Tiles[GridToIndex(gloc)];
 	/// <summary>
 	/// Returns true if the tile is installed within this world, returns false if it's floating or
 	/// installed in another world somehow.
 	/// </summary>
-	public bool IsInstalled(Tile tl) 
-		=> IsWithin(tl.GridLoc) && object.ReferenceEquals(tl, GetTile(tl.GridLoc));
+	public bool IsInstalled(Tile tl) => IsWithin(tl.GridLoc) && object.ReferenceEquals(tl, GetTile(tl.GridLoc));
 
 	/// <summary>
 	/// Returns the whichever unit that <paramref name="gloc"/> lands on.
@@ -111,7 +122,7 @@ public partial class WorldPanel : Godot.Panel
 	/// <returns>The installed tile, or null when it fails</returns>
 	public Tile InstallEmptyTile(Vector2I gloc, bool bOverride = false)
 	{
-		return InstallTile(new Tile(Vector2I.Zero), gloc, bOverride);
+		return InstallTile(new Tile(), gloc, bOverride);
 	}
 
 	/// <summary>
@@ -176,7 +187,7 @@ public partial class WorldPanel : Godot.Panel
 		Debug.Assert(bOverride || gFrom == gTo || !HasTile(gTo));
 		if (gFrom == gTo)
 		{
-			return GetTile(gFrom);
+			return GetTileUnchecked(gFrom);
 		}
 		var myTile = ExtractTile(gFrom, true);
 		if (myTile is not null)
@@ -190,10 +201,10 @@ public partial class WorldPanel : Godot.Panel
 	/// <b>Tile must be in this world, otherwise the behaviour is undefined.</b>
 	/// See <see cref="MoveTile(Vector2I, Vector2I, bool, bool)"/>
 	/// </summary>
-	public void MoveTile(Tile tl, Vector2I gTo, bool bOverride = false)
+	public Tile MoveTile(Tile tl, Vector2I gTo, bool bOverride = false)
 	{
 		Debug.Assert(IsInstalled(tl));
-		MoveTile(tl.GridLoc, gTo, false, bOverride);
+		return MoveTile(tl.GridLoc, gTo, false, bOverride);
 	}
 
 	/// <summary>
@@ -225,18 +236,17 @@ public partial class WorldPanel : Godot.Panel
 		Debug.Assert(bMaybeNull || HasTile(gloc1) && HasTile(gloc2));
 		if (gloc1 == gloc2)
 		{
+			// Should technically throw for out of bounds, but meh...
 			return;
 		}
 
 		// Extract both out of the way
 		var tl1 = ExtractTile(gloc1, true);
 		var tl2 = ExtractTile(gloc2, true);
-		
 		if (tl1 != null)
 		{
 			InstallTile(tl1, gloc2);
 		}
-		
 		if (tl2 != null)
 		{
 			InstallTile(tl2, gloc1);
@@ -266,7 +276,8 @@ public partial class WorldPanel : Godot.Panel
 	{
 		Debug.AssertNotNull(GetTile(gloc));
 		Debug.Assert(!GetTile(gloc).IsReserved());
-		var tl = GetTile(gloc);
+		
+		var tl = GetTileUnchecked(gloc);
 		if (tl is null || tl.IsReserved())
 		{
 			return null;
@@ -296,12 +307,13 @@ public partial class WorldPanel : Godot.Panel
 	/// </summary>
 	public Item InstallItem(Item it, Vector2I gloc)
 	{
+		Debug.AssertNotNull(it); // No installing nulls!
 		Debug.Assert(it.GetParent() is null); // No associated world.
 		Debug.Assert(it.ParentTile is null);
 		Debug.AssertNotNull(GetTile(it.GridLoc));
 		Debug.Assert(!GetTile(it.GridLoc).IsReserved());
-		
-		var tl = GetTile(gloc);
+
+		var tl = GetTileUnchecked(gloc);
 		if (tl is null || tl.IsReserved())
 		{
 			return null;
@@ -341,8 +353,8 @@ public partial class WorldPanel : Godot.Panel
 		Debug.Assert(HasTile(gDest));
 		Debug.Assert(bOverride || gSrc == gDest || !GetTile(gDest).HasItem());
 		
-		var srcTl = GetTile(gSrc);
-		var destTl = GetTile(gDest);
+		var srcTl = GetTileUnchecked(gSrc);
+		var destTl = GetTileUnchecked(gDest);
 		if (srcTl is null || !srcTl.HasItem() || destTl is null)
 		{
 			return null;
@@ -412,8 +424,8 @@ public partial class WorldPanel : Godot.Panel
 			return GetTile(gSrc)?.GetItemMaybeNull();
 		}
 
-		var srcTl = GetTile(gSrc);
-		var destTl = GetTile(gDest);
+		var srcTl = GetTileUnchecked(gSrc);
+		var destTl = GetTileUnchecked(gDest);
 		if (srcTl is null || !srcTl.HasItem() || destTl is null)
 		{
 			return null;
@@ -470,12 +482,20 @@ public partial class WorldPanel : Godot.Panel
 
 		foreach (var u in m_Units)
 		{
-			u.HandleCmdTick(lv);
+			u.HandleCmdOnTick(lv);
 		}
 
 		// Must happen after HandleCmdTick, otherwise it will do nothing since the queue is populated 
 		// by HandleCmdTick.
 		HandleSlideCmdOverlapping();
+	}
+
+	public void OnEdge(Level lv)
+	{
+		foreach (var u in m_Units)
+		{
+			u.HandleCmdOnEdge(lv);
+		}
 	}
 
 	public void CleanUpAfterSim()
@@ -617,38 +637,39 @@ public partial class WorldPanel : Godot.Panel
 	#endregion // Placement Functions
 	#region .Other Methods
 
-	public void SetDims(Vector2I newDims)
+	public void SetDims(Vector2I toWhat)
 	{
 		var oldDims = m_Dims;
+		var newDims = toWhat.Clamp(MinDims, MaxDims);
+		if (oldDims == newDims)
+		{
+			return;		
+		}
+		
 		m_Dims = newDims;
-		Size = CellWidth * (Vector2)newDims;
+		Size = CellWidth * (Vector2)m_Dims;
 
 		var oldTiles = m_Tiles;
 		m_Tiles = [];
-		for (var i = 0; i < m_Dims.X * m_Dims.Y; ++i)
+		for (var i = 0; i < newDims.X * newDims.Y; ++i)
 		{
 			m_Tiles.Add(null);
 		}
 
 		// Remove cut-off units
-		m_Units = [];
-		for (var i = m_Units.Count - 1; i >= 0;)
+		for (var i = m_Units.Count - 1; i >= 0; --i)
 		{
 			var u = m_Units[i];
-			if (!Unit.CanFitIn(this, u.GridLoc, u.Dims))
+			if (!Unit.CanFitIn(this, u.GridLoc, u.Dims, u.Dir))
 			{
 				DeleteUnit(u);
-			}
-			else
-			{
-				--i;
 			}
 		}
 
 		// Copy over the tiles.
-		for (var y = 0; y < int.Min(oldDims.Y, newDims.Y); ++y)
+		for (int y = 0, ylim = int.Min(oldDims.Y, newDims.Y); y < ylim; ++y)
 		{
-			for (var x = 0; x < int.Min(oldDims.X, newDims.X); ++x)
+			for (int x = 0, xlim = int.Min(oldDims.X, newDims.X); x < xlim; ++x)
 			{
 				m_Tiles[y * newDims.X + x] = oldTiles[y * oldDims.X + x];
 			}
@@ -742,9 +763,11 @@ public partial class WorldPanel : Godot.Panel
 		RemoveChild(u);
 		u.QueueFree();
 		m_Units.Remove(u);
-		for (var y = 0; y < u.Dims.Y; ++y)
+
+		var bLeftRight = u.Dir == Direction.East || u.Dir == Direction.West;
+		for (int y = 0, ylim = bLeftRight ? u.Dims.Y : u.Dims.X; y < ylim; ++y)
 		{
-			for (var x = 0; x < u.Dims.X; ++x)
+			for (int x = 0, xlim = bLeftRight ? u.Dims.X : u.Dims.Y; x < xlim; ++x)
 			{
 				DeleteTile(u.GridLoc + new Vector2I(x, y));
 			}

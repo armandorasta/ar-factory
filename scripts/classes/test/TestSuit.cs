@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 namespace ArTest;
 
 public abstract class TestSuit
@@ -9,6 +7,15 @@ public abstract class TestSuit
 	public virtual void AfterAll()   { }
 	public virtual void AfterEach()  { }
 
-	public void AddNode(Godot.Node node) => TestHandler.GetInstance().AddChild(node);
-	public void RemoveNode(Godot.Node node) => TestHandler.GetInstance().RemoveChild(node);
+	public T AddNode<T>(T node) where T : Godot.Node
+	{
+		TestHandler.GetInstance().AddChild(node);
+		return node;
+	}
+
+	public T RemoveNode<T>(T node) where T : Godot.Node
+	{
+		TestHandler.GetInstance().RemoveChild(node);
+		return node;
+	}
 }

@@ -9,7 +9,7 @@ public class CmdKill : Command
 {
 	public Vector2I GridLoc { get; private set; }
 
-	public CmdKill(Vector2I gloc) : base(0)
+	public CmdKill(Vector2I gloc) : base(1)
 	{
 		GridLoc = gloc;
 		AddSubParallelCmds([new CmdAwait([gloc])]);
