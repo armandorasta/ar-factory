@@ -12,9 +12,9 @@ public class CmdDemand : Command
 
 	public CmdDemand(Vector2I gloc, int reqVal) : base(1)
 	{
+		Debug.Assert(Item.IsValueWithinRange(reqVal));
 		GridLoc = gloc;
 		Value = reqVal;
-		AddSubParallelCmds([ new CmdAwait([gloc]) ]);
 	}
 
 	public CmdDemand(Tile tl, int reqVal) : this(tl.GridLoc, reqVal) { }

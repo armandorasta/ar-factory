@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 namespace ArFactory;
@@ -5,26 +6,23 @@ namespace ArFactory;
 /// <summary>
 /// Spawns an item into the specified location.
 /// </summary>
-public class CmdSpawn : Command
+public class CmdSpawn(Vector2I gloc, int val) : Command(1)
 {
-	public Vector2I GridLoc { get; private set; }
-	public int Value { get; private set; }
-
-	public CmdSpawn(Vector2I gloc, int val) : base(1)
-	{
-		GridLoc = gloc;
-		Value = val;
-		AddSubParallelCmds([ new CmdVacate([gloc]) ]);
-	}
+	public Vector2I GLocation { get; private set; } = gloc;
+	public int Value { get; private set; } = val;
 
 	public CmdSpawn(Tile tl, int val) : this(tl.GridLoc, val) { }
 
 
 	protected override void OnTick(Level lv)
 	{
-		lv.World.SpawnItem(GridLoc, Value);
+		Debug.Assert(HasTileUnreserved(lv.World, GLocation));
+		if (lv.World.SpawnItem(GLocation, Value) is null)
+		{
+			throw new InvalidProgramException();
+		}
 	}
 
 	public override string ToString()
-		=> Utilz.AppendToBaseToString(base.ToString(), $"Spawn[at {GridLoc} with val {Value}]");
+		=> Utilz.AppendToBaseToString(base.ToString(), $"Spawn[at {GLocation} with val {Value}]");
 }

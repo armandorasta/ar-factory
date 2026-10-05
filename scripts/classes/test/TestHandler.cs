@@ -88,14 +88,14 @@ public partial class TestHandler : Godot.Node
 				for (var i = 0; i < runFirstMeths.Length; ++i)
 				{
 					var meth = runFirstMeths[i];
-					GD.Print($"[{i+1}] {Cyan}{meth.Name}{Reset} from {Pink}{meth.DeclaringType.Name}{Reset}");
+					GD.Print($"[{i+1}] #{Cyan}{meth.Name}{Reset} from {Pink}{meth.DeclaringType.Name}{Reset}");
 				}
 
 				return;
 			}
 
 			onlyTest = runFirstMeths[0];
-			GD.Print($"Only running test: {Cyan}{onlyTest.Name}{Reset} from {Pink}{onlyTest.DeclaringType.Name}{Reset}.");
+			GD.Print($"Only running test: {FormatTestName(onlyTest)} from {Pink}{onlyTest.DeclaringType.Name}{Reset}.");
 
 			testClasses = [onlyTest.DeclaringType];
 		}
@@ -210,7 +210,7 @@ public partial class TestHandler : Godot.Node
 				res.PassingTestCount += 1;
 				if (m_bShowPassingTests)
 				{
-					GD.Print($"    {Cyan}{tmeth.Name} {Green}passes!{Reset}");
+					GD.Print($"    {FormatTestName(tmeth)} {Green}passes!{Reset}");
 				}
 			}
 			catch (Exception ex)
@@ -222,12 +222,8 @@ public partial class TestHandler : Godot.Node
 					bPrintClassIntro = false;
 				}
 
-				GD.Print(ex.InnerException.Message.Indent("    "));
-
-				if (ex.InnerException is not TestAssertFailedException)
-				{
-					throw;
-				}
+				var preMsg = (ex is TestAssertFailedException) ? "" : $"Unexpected '{ex.GetType()}': ";
+				GD.Print(ex.Message.Indent($"    {Red}{preMsg}{Reset}"));
 			}
 		}
 		tclass.GetMethod("AfterAll")?.Invoke(instance, []);
@@ -278,5 +274,28 @@ public partial class TestHandler : Godot.Node
 		}
 
 		m_OrphanCount = allOrphanBros.Count;
+	}
+
+	private static string FormatTestName(MethodInfo tmeth)
+	{
+		var name = tmeth.Name;
+		if (!name.StartsWith("Test"))
+		{
+			return $"{Cyan}{name}{Reset}"; // Skip formatting for ill-formed names or simple names.
+		}
+
+		if (!name.Contains('_'))
+		{
+			return $"{Cyan}test {name[4..]}{Reset}";
+		}
+		else if (name.StartsWith("Test_"))
+		{
+			return $"{Cyan}test {name[5..]}{Reset}";
+		}
+
+		var firstUnderscoreIndex = name.IndexOf('_');
+		var mainPart = name[4..firstUnderscoreIndex]; // Exclude the Test- prefix
+		var rest = name[(firstUnderscoreIndex + 1)..].Replace('_', ' ');
+		return $"{Cyan}test {mainPart} ({rest}){Reset}";
 	}
 }

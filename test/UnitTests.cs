@@ -115,10 +115,9 @@ public class UnitTests : ArTest.TestSuit
 		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, new(1, 2), Direction.South));
 	}
 
-	[ArTest.Test] public async Task TestSupplier()
+	[ArTest.Test] public async Task TestSupplier_tick_rate()
 	{
 		var world = m_Lv.World;
-
 		var supp = world.PlaceSupplier(Vector2I.Zero, Direction.East, 3, [237, 68, 236]);
 		var tl1 = world.InstallEmptyTile(new Vector2I(1, 0));
 		AssertTrue(world.HasTile(supp.GridLoc));
@@ -133,24 +132,27 @@ public class UnitTests : ArTest.TestSuit
 			AssertTrue(tl1.Item.IsMidAnimation());
 			AssertEq(tl1.Item.Value, 237);
 
-			await m_Lv.TickOnceAsync(); // Tick 3 processed
+			await m_Lv.EndTickAsync();
 			AssertTrue(tl1.HasItem());
 			AssertFalse(tl1.Item.IsMidAnimation());
 			tl1.DestroyItem();
 		
+			await m_Lv.TickOnceAsync(); // Tick 3 processed
+			AssertFalse(tl1.HasItem());
 			await m_Lv.TickOnceAsync(); // Tick 4 processed
 			AssertFalse(tl1.HasItem());
-		
 			await m_Lv.TickOnceAsync(); // Tick 5 processed, second item
 			AssertTrue(tl1.HasItem());
 			AssertTrue(tl1.Item.IsMidAnimation());
 			AssertEq(tl1.Item.Value, 68);
 
-			await m_Lv.TickOnceAsync(); // Tick 6 processed
+			await m_Lv.EndTickAsync();
 			AssertTrue(tl1.HasItem());
 			AssertFalse(tl1.Item.IsMidAnimation());
 			tl1.DestroyItem();
 		
+			await m_Lv.TickOnceAsync(); // Tick 6 processed
+			AssertFalse(tl1.HasItem());
 			await m_Lv.TickOnceAsync(); // Tick 7 processed
 			AssertFalse(tl1.HasItem());
 
@@ -160,11 +162,14 @@ public class UnitTests : ArTest.TestSuit
 			AssertEq(tl1.Item.Value, 236);
 			AssertTrue(supp.IsDoneWithInputSeq());
 		}
+	}
 
-		// Trying a different direction.
+	[ArTest.Test] public async Task TestSupplier_different_direction()
+	{
+		var world = m_Lv.World;
 		world.Reset();
-		supp = world.PlaceSupplier(Vector2I.One, Direction.South, 1, [261, 296]);
-		tl1 = world.InstallEmptyTile(supp.GridLoc + new Vector2I(0, 1));
+		var supp = world.PlaceSupplier(Vector2I.One, Direction.South, 1, [261, 296]);
+		var tl1 = world.InstallEmptyTile(supp.GridLoc + new Vector2I(0, 1));
 		AssertTrue(world.HasTile(supp.GridLoc));
 		using (m_Lv.PlaySimulationInDebug())
 		{
@@ -175,7 +180,51 @@ public class UnitTests : ArTest.TestSuit
 		}
 	}
 
-	// [ArTest.RunThisOnly]
+	[ArTest.RunThisOnly]
+	[ArTest.Test] public async Task TestSupplier_clogged()
+	{
+		var world = m_Lv.World;
+		world.Reset();
+		var supp = world.PlaceSupplier(Vector2I.One, Direction.South, 2, [261, 296]);
+		var sTl = world.GetTile(supp.GridLoc);
+		var tl1 = world.InstallEmptyTile(supp.GridLoc + new Vector2I(0, 1));
+
+		using (m_Lv.PlaySimulationInDebug())
+		{
+			world.SpawnItem(tl1, -217); // In the way
+			await m_Lv.TickOnceAsync(); // Nothing happens
+			AssertFalse(sTl.HasItem());
+			
+			await m_Lv.TickOnceAsync(); // First item spawns
+			AssertTrue(sTl.HasItem());
+			AssertFalse(sTl.Item.IsMidAnimation());
+			AssertEq(sTl.Item.Value, 261);
+
+			await m_Lv.TickOnceAsync(); // Nothing happens
+
+			await m_Lv.TickOnceAsync(); // Blocked, and differred to next tick not the next time around.
+			AssertTrue(sTl.HasItem());
+			AssertFalse(sTl.Item.IsMidAnimation());
+			AssertEq(sTl.Item.Value, 261);
+
+			tl1.DestroyItem(); // Remove the obsticle
+			await m_Lv.TickOnceAsync();
+			// Clogged item should spawn as soon as it can regardless of the tick rate, 
+			// clogged this tick? try next tick again and again.
+
+			AssertTrue(sTl.HasItem());
+			AssertFalse(sTl.Item.IsMidAnimation());
+			AssertEq(sTl.Item.Value, 296);
+			
+			AssertTrue(tl1.HasItem());
+			AssertTrue(tl1.Item.IsMidAnimation());
+			AssertEq(tl1.Item.Value, 261);
+
+			AssertTrue(supp.IsDoneWithInputSeq());
+		}
+	}
+
+	[ArTest.Ignore]
 	[ArTest.Test] public async Task TestSlider()
 	{
 		var world = m_Lv.World;

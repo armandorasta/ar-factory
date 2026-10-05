@@ -24,14 +24,22 @@ public partial class UnSupplier : Unit
 
 	public override void PendNewCommands()
 	{
-		if (IsDoneWithInputSeq() || !IsWorkTick() || !IsSafeToPendCmds())
+		if (IsDoneWithInputSeq() || !IsWorkTick())
+		{
+			return;
+		}
+		if (!IsSafeToPendCmds())
 		{
 			PauseThisTick();
 			return;
 		}
 
+		PendCmd(new CmdVacate([m_Out0]));
 		PendCmd(new CmdSpawn(m_Out0, PopNextValue()));
-		PendCmd(new CmdSlide(m_Out0, Dir));
+		if (World.HasTile(m_Out0.GridLoc + Dir.ToGrid()))
+		{
+			PendCmd(new CmdSlide(m_Out0, Dir));
+		}
 	}
 
 	public bool IsDoneWithInputSeq() => m_Index >= m_Sequence.Length - 1;

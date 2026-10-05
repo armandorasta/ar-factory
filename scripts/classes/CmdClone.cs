@@ -1,4 +1,5 @@
 using Godot;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -9,16 +10,15 @@ namespace ArFactory;
 /// </summary>
 public class CmdClone : Command
 {
-	public Vector2I SrcGridLoc { get; private set; }
-	public Vector2I[] DestGridLocs { get; private set; }
+	public Vector2I SourceGL { get; private set; }
+	public Vector2I[] DestinationGLs { get; private set; }
 
 
 	public CmdClone(Vector2I srcGLoc, IEnumerable<Vector2I> destGLocs) : base(1)
 	{
-		SrcGridLoc = srcGLoc;
-		DestGridLocs = [.. destGLocs];
-		Debug.Assert(!DestGridLocs.IsEmpty());
-		AddSubParallelCmds([new CmdAwaitVacate([srcGLoc], destGLocs)]);
+		SourceGL = srcGLoc;
+		DestinationGLs = [.. destGLocs];
+		Debug.Assert(!DestinationGLs.IsEmpty());
 	}
 
 	public CmdClone(Tile srcTl, IEnumerable<Tile> destTls) 
@@ -28,22 +28,29 @@ public class CmdClone : Command
 
 	protected override void OnTick(Level lv)
 	{
-		// TODO: make it clone incrementaly, that is whenever one of the dest tiles is free, an item is
-		// is spawned there immediately instead of waiting for all dest tiles to be free at the same time
-		// first!
+		Debug.Assert(HasTileWithItem(lv.World, SourceGL));
+		Debug.Assert(!DestinationGLs.All( l => HasTileUnreserved(lv.World, l) ));
 
-		var value = lv.World.GetTile(SrcGridLoc).Item.Value;
-		foreach (var dgloc in DestGridLocs)
+		Item it = lv.World.GetTile(SourceGL).Item;
+		if (it.IsMidAnimation())
 		{
-			lv.World.SpawnItem(dgloc, value);
+			throw new InvalidProgramException();
+		}
+
+		foreach (var dgloc in DestinationGLs)
+		{
+			if (lv.World.SpawnItem(dgloc, it.Value) is null)
+			{
+				throw new InvalidProgramException();
+			}
 		}
 	}
 
 	public override string ToString()
 	{
-		var myStr = DestGridLocs.Length > 1 
-			? $"[{string.Join(", ", DestGridLocs)}]"
-			: DestGridLocs[0].ToString();
-		return Utilz.AppendToBaseToString(base.ToString(), $"Clone[at {SrcGridLoc} to {myStr}]");	
+		var myStr = DestinationGLs.Length > 1 
+			? $"[{string.Join(", ", DestinationGLs)}]"
+			: DestinationGLs[0].ToString();
+		return Utilz.AppendToBaseToString(base.ToString(), $"Clone[at {SourceGL} to {myStr}]");	
 	} 
 }

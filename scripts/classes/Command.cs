@@ -1,7 +1,4 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
 using Godot;
 
 namespace ArFactory;
@@ -34,13 +31,6 @@ public abstract class Command
 	/// Number of ticks it takes to finish.
 	/// </summary>
 	private int m_Ticks;
-	/// <summary>
-	/// A blocking command is a command that can wait for condition to be met before proceeding,
-	/// like for example a blocking spawn will wait unit target tile is empty, then proceed, then
-	/// mark itself as finished. <br/>
-	/// A non-blocking command will terminate the moment it's unable to proceed.
-	/// </summary>
-	private bool m_bBlocking = true;
 	private readonly bool m_bSmooth = false;
 
 	/// <summary>
@@ -54,10 +44,17 @@ public abstract class Command
 	/// sometimes the command fails as well.
 	/// </summary>
 	protected int m_Count = 0;
-	/// <summary>
-	/// Used for running sub-commands
-	/// </summary>
-	protected CommandRunner m_SubCmdRunner;
+
+
+	protected static bool HasTileWithItem(WorldPanel world, Vector2I gloc)
+	{
+		return world.HasTile(gloc) && world.GetTile(gloc).HasItem() && !world.GetTile(gloc).Item.IsMidAnimation();
+	}
+
+	protected static bool HasTileUnreserved(WorldPanel world, Vector2I gloc)
+	{
+		return world.HasTile(gloc) && !world.GetTile(gloc).IsReserved();
+	}
 
 
 	public Command(int tickCount, bool bSmooth = false)
@@ -90,40 +87,21 @@ public abstract class Command
 	/// at the start of one.
 	/// </summary>
 	public bool IsSmooth() => m_bSmooth;
-	public bool IsBlocking() => m_bBlocking;
 
 	/// <summary>
 	/// Checks if the command is done based on the tick counter. If you are gonna increment and check, 
 	/// use <see cref="CountAndCheckIfDone"/>. <br/>
 	/// </summary>
-	public bool IsDone() => IsDoneNoSubCmds();
+	public bool IsDone() => m_Count >= m_Ticks;
 	/// <summary>
 	/// Checks if the command is about to be deleted if it doesn't block this tick.
 	/// </summary>
-	public bool IsLastTick() => IsLastTickNoSubCmds();
+	public bool IsLastTick() => m_Count == m_Ticks - 1;
 	public bool HasBlockedThisTick() => m_bBlockedThisTick;
-	public bool HasFailedThisTick() => !IsBlocking() && HasBlockedThisTick();
 
 	public override string ToString()
 	{
-		var blockStr = !m_bBlocking ? ", nonblk" : "";
-		return $"Cmd[{m_Count}/{TickCount} ticks{blockStr}]";
-	}
-
-
-	/// <summary>
-	/// Makes the command terminate immediately when it can't proceed. <br/>
-	/// <b>Can be overriden to for example disable this ability</b>.
-	/// </summary>
-	/// <returns>
-	/// The current command for convenience such as chaining it with <see langword="new"/>
-	/// </returns>
-	public virtual Command MakeNonBlocking()
-	{
-		// Debug.Assert(m_bBlocking); // Because of CommandRunner.
-		m_bBlocking = false;
-		m_SubCmdRunner?.MakeNonBlocking();
-		return this;
+		return $"Cmd[{m_Count}/{TickCount} ticks]";
 	}
 
 	/// <summary>
@@ -145,27 +123,8 @@ public abstract class Command
 	{
 		Debug.Assert(!m_bBlockedThisTick);
 		m_bBlockedThisTick = true;
-		if (m_bBlocking)
-		{
-			m_Count -= 1;
-		}
-		else
-		{
-			ForceFinish();
-		}
-	}
-
-	/// <summary>
-	/// So far only used to pause until sub-commands finish executing... Really what I should be 
-	/// doing is finding the number of ticks that includes sub-commands and stuff, but meh... Already
-	/// wasted an entire day on nothing, that's more than enough.
-	/// </summary>
-	private void BlockForSubCmds()
-	{
-		Debug.Assert(!m_bBlockedThisTick);
-		m_bBlockedThisTick = true;
 		m_Count -= 1;
-	} 
+	}
 	
 	/// <summary>
 	/// Forces the command to be deleted right after <see cref="OnTick"/> or <see cref="OnEdge"/>.
@@ -178,11 +137,7 @@ public abstract class Command
 	/// </summary>
 	public void HandleOnTick(Level lv)
 	{
-		if (HandleSubCmdsOnTickAndCheck(lv))
-		{
-			OnTick(lv);
-			HandleSubCmdsOnTickAndCheck(lv);
-		}
+		OnTick(lv);
 	}
 
 	/// <summary>
@@ -192,54 +147,11 @@ public abstract class Command
 	public void HandleOnEdge(Level lv)
 	{
 		Debug.Assert(m_bSmooth);
-		if (HandleSubCmdsOnEdgeAndCheck(lv) && !m_bBlockedThisTick)
-		{ // Order is important! OnEdge for sub-commands must run even if the parent command blocks.
-			OnEdge(lv);
-			HandleSubCmdsOnEdgeAndCheck(lv);
-		}
-	}
-
-	private bool HandleSubCmdsOnTickAndCheck(Level lv)
-	{
-		Debug.Assert(!IsDoneNoSubCmds());
-		return m_SubCmdRunner is null || HandleSubCmdsPostCheck(m_SubCmdRunner.OnTick(lv));
-	}
-
-	private bool HandleSubCmdsOnEdgeAndCheck(Level lv)
-	{
-		Debug.Assert(!IsDoneNoSubCmds());
-		return m_SubCmdRunner is null || HandleSubCmdsPostCheck(m_SubCmdRunner.OnEdge(lv));
-	}
-
-	private bool HandleSubCmdsPostCheck(CommandRunner.Result res)
-	{
-		switch (res) {
-		case CommandRunner.Result.NotDoneYet:
-			BlockForSubCmds();
-			return false;
-		
-		case CommandRunner.Result.DoneWithFailure:
-			// Sub-runners can only fail in non-blocking commands, so we pause to fail the this parent command as
-			// well and keep it propagating.
-			PauseThisTick();
-			return false;
-		
-		case CommandRunner.Result.DoneSuccessfully:
-			return true;
-		
-		default:
-			throw new NotImplementedException();
-		}
-
+		OnEdge(lv);
 	}
 
 	public void HandleFrame(double dt, Level lv)
 	{
-		if (m_SubCmdRunner != null && m_SubCmdRunner.DoPerFrame(dt, lv) == CommandRunner.Result.NotDoneYet)
-		{
-			return;
-		}
-
 		DoPerFrame(dt, lv);
 	}
 
@@ -252,43 +164,4 @@ public abstract class Command
 		CountThisTick();
 		return IsDone();
 	}
-	
-	/// <summary>
-	/// Adds sub-commands that will be executed in parallel before the command itself, every call
-	/// to this function adds a parallel set, each set will executed after the other finishes.
-	/// </summary>
-	protected void AddSubParallelCmds(IEnumerable<Command> newCmds)
-	{
-		// This should be impossible, pending commands on the last tick of a command will pause it
-		// automatically.
-		Debug.Assert(!IsDoneNoSubCmds());
-		Debug.Assert(newCmds.Any(_ => true)); // Any returns false for empty sequences.
-
-		var adjustedCmds = newCmds.Select(c => m_bBlocking ? c : c.MakeNonBlocking());
-		if (m_SubCmdRunner is null)
-		{
-			m_SubCmdRunner = new([adjustedCmds]);
-			if (!m_bBlocking)
-			{
-				m_SubCmdRunner.MakeNonBlocking();	
-			}
-		}
-		else
-		{
-			m_SubCmdRunner.PendParallel(adjustedCmds);
-		}
-	}
-
-
-	/// <summary>
-	/// Checks if the command is done without considering sub-commands.
-	/// Usually the command waits for sub-commands first, then finishes its work, but sometimes some
-	/// commands pend commands after they are done and wait for these to finish such as
-	/// <see cref="CmdIf"/> when the condition is met.
-	/// </summary>
-	private bool IsDoneNoSubCmds() => m_Count >= m_Ticks;
-	/// <summary>
-	/// Checks if the command is to be done next tick without considering sub-commands.
-	/// </summary>
-	private bool IsLastTickNoSubCmds() => m_Count < m_Ticks;
 }

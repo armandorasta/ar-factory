@@ -18,9 +18,9 @@ public partial class UnUpdater : Unit
 		Debug.Assert(Enum.IsDefined(upT));
 		return upT switch
 		{
-			UpdateType.Double => new(tl, CmdUpdate.UpdateType.Mul, 2),
-			UpdateType.Negate => new(tl, CmdUpdate.UpdateType.Mul, -1),
-			UpdateType.Increment => new(tl, CmdUpdate.UpdateType.Add, 1),
+			UpdateType.Double => new(tl, UnaryOperation.Mul, 2),
+			UpdateType.Negate => new(tl, UnaryOperation.Mul, -1),
+			UpdateType.Increment => new(tl, UnaryOperation.Add, 1),
 			_ => throw new UnreachableException(),
 		};
 	}
@@ -30,21 +30,24 @@ public partial class UnUpdater : Unit
 
 	public UpdateType m_UpType { get; private set; }
 
+	public override void _Ready()
+	{
+		UpTypeLabel = GetNode<Label>("Sprite2D/CenterContainer/HBoxContainer/Label");
+	}
 
 	public void Setup(WorldPanel world, Vector2I gloc, int workRate, Direction dir,
 		UpdateType upT)
 	{
 		BaseInit(world, TickType.OnDemand, workRate, gloc, Vector2I.One, dir);
-		UpTypeLabel = GetNode<Label>("Sprite2D/CenterContainer/HBoxContainer/Label");
-		
 		Debug.Assert(Enum.IsDefined(upT));
+		
 		m_UpType = upT;
 		UpTypeLabel.Text = upT switch
 		{
 			UpdateType.Double => "2x",
 			UpdateType.Negate => "-x",
 			UpdateType.Increment => "x+1",
-			_ => throw new UnreachableException(),
+			_ => throw new NotImplementedException(),
 		};
 	}
 

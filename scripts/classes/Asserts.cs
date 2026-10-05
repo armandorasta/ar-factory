@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 using Godot;
 
 namespace ArTest;
@@ -109,17 +110,37 @@ public static class Asserts
 			throw new InvalidOperationException($"AssertThrow: Expected an exception type but got {exType}");
 		}
 
-		try 
-		{ 
-			whatToDo.Invoke(); 
-			HandleImpl(false, $"Expected to throw {Green}{exType}{Reset} but {Red}nothing was thrown{Reset}", msg);
-		}
+		try { whatToDo.Invoke(); }
 		catch (Exception ex)
 		{
 			HandleImpl(exType is null || ex.GetType() == exType,
 				$"Expected to throw {Green}{exType}{Reset} but got {Red}{ex.GetType()}{Reset}", 
 				msg);
+			return;
 		}
+		
+		HandleImpl(false, $"Expected to throw {Green}{exType}{Reset} but {Red}nothing was thrown{Reset}", msg);
+	}
+
+	[StackTraceHidden]
+	[DebuggerStepThrough]
+	public static async Task AssertThrow(Func<Task> whatToDo, Type exType = null, string msg = null)
+	{
+		if (exType != null && !exType.IsAssignableTo( typeof(Exception) ))
+		{
+			throw new InvalidOperationException($"AssertThrow: Expected an exception type but got {exType}");
+		}
+
+		try { await whatToDo.Invoke(); }
+		catch (Exception ex)
+		{
+			HandleImpl(exType is null || ex.GetType() == exType,
+				$"Expected to throw {Green}{exType}{Reset} but got {Red}{ex.GetType()}{Reset}", 
+				msg);
+			return;
+		}
+		
+		HandleImpl(false, $"Expected to throw {Green}{exType}{Reset} but {Red}nothing was thrown{Reset}", msg);
 	}
 
 	[StackTraceHidden] 

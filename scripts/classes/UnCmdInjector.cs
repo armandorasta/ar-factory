@@ -41,6 +41,7 @@ public partial class UnCmdInjector : Unit
 		m_CmdsNextTick = [];
 	}
 
+	// Breaks everything if called after OnTick and before OnEdge...
 	public void PendParallel(IEnumerable<Command> cmds)
 	{
 		PendCmdSeq(cmds);

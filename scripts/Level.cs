@@ -87,6 +87,7 @@ public partial class Level : Godot.Node2D
 	private void InitTimer()
 	{
 		m_TickTimer.OneShot = true;
+		m_TickTimer.Paused = true;
 		AddChild(m_TickTimer);
 		m_TickTimer.Timeout += OnTickTimer_TimeOut;
 	}
@@ -189,19 +190,17 @@ public partial class Level : Godot.Node2D
 		case PlayMode.Off:
 			// When it's off, both values for bPauseOnEntry work because of the tests...
 			SetPlayMode(bPauseOnEntry ? PlayMode.Debug : PlayMode.Play);
-			break;
+			OnSimulationStart();
+			m_TickTimer.Paused = false;
+			m_TickTimer.Stop();
+			BeginTick();
+			return new(this);
 		
 		case PlayMode.Play:
 		case PlayMode.Debug:
+		default:
 			throw new InvalidProgramException();
 		}
-		
-		OnSimulationStart();
-		m_TickTimer.Paused = false;
-		m_TickTimer.Stop();
-		OnTickTimer_TimeOut();
-
-		return new(this);
 	}
 
 	/// <summary>
@@ -232,15 +231,9 @@ public partial class Level : Godot.Node2D
 	/// </summary>
 	public void HaltSimulation()
 	{
-		Debug.Assert(m_CurrPlayMode != PlayMode.Off);
-		
-		// This makes it possible to call this function multiple times.
-		if (m_TickCount > 0)
-		{
-			// This has to be called before switching the PlayMode for fast tick rates.
-			OnSimulationEnd();
-		}		
-
+		Debug.Assert(m_CurrPlayMode != PlayMode.Off);		
+		// This has to be called before switching the PlayMode for fast tick rates.
+		OnSimulationEnd();
 		SetPlayMode(PlayMode.Off);
 	}
 
@@ -283,6 +276,7 @@ public partial class Level : Godot.Node2D
 	/// </summary>
 	public async Task TickOnceAsync()
 	{
+		Debug.Assert(m_CurrPlayMode != PlayMode.Off);
 		await EndTickAsync();
 		TickOnce();
 	}
@@ -320,21 +314,30 @@ public partial class Level : Godot.Node2D
 	private void OnTickTimer_TimeOut()
 	{
 		Debug.Assert(m_CurrPlayMode != PlayMode.Off);
-		
 		World.OnEdge(this);
+		BeginTick();
+	}
 
+	/// <summary>
+	/// Called at the very start of the tick JUST before <see cref="TickOnce"/>.
+	/// </summary>
+	/// <exception cref="InvalidProgramException"></exception>
+	private void BeginTick()
+	{
 		switch (m_CurrPlayMode) {
-		case PlayMode.Off:
-			throw new InvalidProgramException();
-		
 		case PlayMode.Play:
 			TickOnce();
 			break;
-		
+
 		case PlayMode.Debug:
 			break;
+
+		case PlayMode.Off:
+		default:
+			throw new InvalidProgramException();
 		}
 	}
+
 
 	private void OnPlayButt_Pressed()
 	{

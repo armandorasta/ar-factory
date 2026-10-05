@@ -8,56 +8,42 @@ namespace ArFactory;
 /// </summary>
 public class CmdUpdate : Command
 {
-	public enum UpdateType
-	{
-		Add,
-		Mul,
-		Override,
-	}
-
-	public static int Apply(UpdateType upT, int itVal, int updateVal)
-	{
-		Debug.Assert(Enum.IsDefined(upT));
-		return upT switch
-		{
-			UpdateType.Add => itVal + updateVal,
-			UpdateType.Mul => itVal * updateVal,
-			UpdateType.Override => updateVal,
-			_ => throw new NotImplementedException(),
-		};
-	}
-
-	public Vector2I GridLoc { get; private set; }
-	public UpdateType UpType { get; private set; }
+	public Vector2I GLocation { get; private set; }
+	public UnaryOperation Op { get; private set; }
 	public int Value { get; private set; }
 
-	public CmdUpdate(Vector2I gloc, UpdateType upT, int val) : base(1)
+	public CmdUpdate(Vector2I gloc, UnaryOperation op, int val) : base(1)
 	{
-		GridLoc = gloc;
-		UpType = upT;
+		Debug.Assert(Enum.IsDefined(op));
+		GLocation = gloc;
+		Op = op;
 		Value = val;
-		AddSubParallelCmds([ new CmdAwait([gloc]) ]);
 	}
 
-	public CmdUpdate(Tile tl, UpdateType upT, int val) : this(tl.GridLoc, upT, val) { }
+	public CmdUpdate(Tile tl, UnaryOperation op, int val) : this(tl.GridLoc, op, val) { }
 
 
 	protected override void OnTick(Level lv)
 	{
-		var it = lv.World.GetTile(GridLoc).Item;
-		it.SetValue(Apply(UpType, it.Value, Value));
+		Debug.Assert(HasTileWithItem(lv.World, GLocation));
+		var it = lv.World.GetTile(GLocation).Item;
+		if (it.IsMidAnimation())
+		{
+			throw new InvalidProgramException();
+		}
+		it.SetValue(Op.Apply(it.Value, Value));
 	}
 
 	public override string ToString()
 	{
-		var upStr = UpType switch
+		var upStr = Op switch
 		{
-			UpdateType.Add => $"add {Value}",
-			UpdateType.Mul => $"mul by {Value}",
-			UpdateType.Override => $"change to {Value}",
+			UnaryOperation.Add => $"add {Value}",
+			UnaryOperation.Mul => $"mul by {Value}",
+			UnaryOperation.Override => $"change to {Value}",
 			_ => throw new NotImplementedException(),
 		};
-		return Utilz.AppendToBaseToString(base.ToString(), $"Update[at {GridLoc} {upStr}]");
+		return Utilz.AppendToBaseToString(base.ToString(), $"Update[at {GLocation} {upStr}]");
 	}
 
 }

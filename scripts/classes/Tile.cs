@@ -213,7 +213,11 @@ public class Tile
 	/// <summary>
 	/// Sends the item into oblivion.
 	/// </summary>
-	public void DestroyItem(bool bMaybeNull = false)
+	/// <returns>
+	/// <see langword="true"/> if there was an item and it was destroyed, 
+	/// <see langword="false"/> if the tile was empty in the first place.
+	/// </returns>
+	public bool DestroyItem(bool bMaybeNull = false)
 	{
 		Debug.Assert(bMaybeNull || HasItem());
 		Debug.Assert(bMaybeNull || m_bReserved);
@@ -222,7 +226,9 @@ public class Tile
 			m_Item.QueueFree();
 			m_Item.GetParent().RemoveChild(m_Item);
 			m_Item = null;
+			return true;
 		}
+		else return false;
 	}
 
 	/// <summary>

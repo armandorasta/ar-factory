@@ -19,11 +19,6 @@ public class CmdSlide : Command
 		GridFrom = gfrom;
 		Dir = dir;
 		m_StateFunc = HandleDefault;
-
-		// No AwaitVacate because we have multiple passes, AwaitVacate will block the command until
-		// no item is present in the destination tile, but we need to proceed then because we have
-		// an overlap algorithm that might clear the item away.
-		AddSubParallelCmds([ new CmdAwait([gfrom]) ]);
 	}
 	
 	public CmdSlide(Tile tlFrom, Direction dir) : this(tlFrom.GridLoc, dir) { }
@@ -38,21 +33,17 @@ public class CmdSlide : Command
 	/// </summary>
 	public bool TryMovingByOverlap(WorldPanel world)
 	{
-		Debug.Assert(m_StateFunc == HandleDefault);
+		Debug.AssertEq(m_StateFunc, HandleDefault);
 		Debug.AssertNotNull(TrackedItemRef);
 		Debug.Assert(TrackedItemRef.TryGetTarget(out var it) && it.IsAllowedToMove());
 
-		// Can't really use vacate here, because this function is called in the same tick, and is
-		// called potentially multiple times.
-
-		if (world.GetTile(GetGridTo()).IsReserved())
+		if (!world.GetTile(GetGridTo()).IsReserved())
 		{
-			return false;
+			PrepTrackedItemForSlidingAnim(world);
+			CountThisTick(); // Undo the pausing because the command has advanced.
+			return true;
 		}
-
-		PrepTrackedItemForSlidingAnim(world);
-		CountThisTick(); // Undo the pausing because the command has advanced.
-		return true;
+		else return false;
 	}
 
 	protected override void OnTick(Level lv)
@@ -62,53 +53,42 @@ public class CmdSlide : Command
 
 	protected override void DoPerFrame(double dt, Level lv)
 	{
-		if (!IsAwaitingAnim())
+		if (IsAwaitingAnim())
 		{
-			return;
-		}
-
-		Debug.Assert(TrackedItemRef != null);
-		if (TrackedItemRef.TryGetTarget(out var trackedIt))
-		{
-			var srcLoc = lv.World.GridToPos(GridFrom);
-			var destLoc = lv.World.GridToPos(GetGridTo());
-			var weight = 0.001f*lv.GetTickElapsedMillis() * lv.GetTickRate();
-			trackedIt.Position = srcLoc.Lerp(destLoc, weight);
+			Debug.Assert(TrackedItemRef != null);
+			if (TrackedItemRef.TryGetTarget(out var trackedIt))
+			{
+				var srcLoc = lv.World.GridToPos(GridFrom);
+				var destLoc = lv.World.GridToPos(GetGridTo());
+				var weight = 0.001f * lv.GetTickElapsedMillis() * lv.GetTickRate();
+				trackedIt.Position = srcLoc.Lerp(destLoc, weight);
+			}
 		}
 	}
 
 	protected override void OnEdge(Level lv)
 	{
-		if (!IsAwaitingAnim())
+		if (IsAwaitingAnim())
 		{
-			return;
-		}
-
-		Debug.Assert(TrackedItemRef != null);
-		if (TrackedItemRef.TryGetTarget(out var trackedIt))
-		{
-			trackedIt.SyncPosWithGrid(lv.World);
-			trackedIt.SetMidAnimationFlag(false);
-			m_StateFunc = HandleDefault; // We have to do this because of IsAwaitingAnim
+			Debug.Assert(TrackedItemRef != null);
+			if (TrackedItemRef.TryGetTarget(out var trackedIt))
+			{
+				trackedIt.SyncPosWithGrid(lv.World);
+				trackedIt.SetMidAnimationFlag(false);
+				m_StateFunc = HandleDefault; // We have to do this because of IsAwaitingAnim
+			}
 		}
 	}
 
 	private void HandleDefault(Level lv)
 	{
 		Debug.Assert(TrackedItemRef is null);
-		if (!lv.World.HasTile(GetGridTo()))
-		{ 
-			// Only hits when the command is made non-blocking and it is directly at a null tile or
-			// the world border...
-			PauseThisTick();
-			return;
-		}
+		Debug.Assert(HasTileWithItem(lv.World, GridFrom));
 
+		// Assume the destination tile exists.
 		var destTile = lv.World.GetTile(GetGridTo());
 		if (!destTile.CanItemEnter(Dir.Invert()))
 		{
-			// Probably will be blocked forever tho...
-			AddSubParallelCmds([ new CmdAwait([GridFrom]) ]);
 			PauseThisTick();
 			return; // Forever and ever probably...
 		}
@@ -116,7 +96,6 @@ public class CmdSlide : Command
 		if (destTile.IsReserved())
 		{
 			// This here is why CanItemEnter must be called before...
-			// The await command will be queued when we make sure we can't move in TryMovingByOverlap later.
 			lv.World.QueueBlockedSlideCmdByAnotherItem(this);
 			PauseThisTick();
 			return;

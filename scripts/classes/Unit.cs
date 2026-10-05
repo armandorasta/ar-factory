@@ -88,8 +88,8 @@ public abstract partial class Unit : Node2D
 	}
 
 	// This function is called on the `_Ready` function of sub-classes.
-	protected void BaseInit(WorldPanel world, TickType tickType, int workRate, Vector2I gloc, Vector2I dims, 
-		Direction dir)
+	protected void BaseInit(
+		WorldPanel world, TickType tickType, int workRate, Vector2I gloc, Vector2I dims, Direction dir)
 	{
 		Debug.Assert(Unit.CanFitIn(world, gloc, dims, dir));
 		Debug.Assert(CanFaceDir(dir));
@@ -105,7 +105,7 @@ public abstract partial class Unit : Node2D
 		Position = world.GridToPos(gloc);
 
 		// TODO: Add back sprite code
-		Sprite.Hide();
+		Sprite?.Hide();
 		// Sprite.ApplyScale(World.CellWidth/128.0f * (Vector2)Dims);
 		// Sprite.Translate(0.5f*World.CellWidth * Vector2.One);
 
@@ -476,12 +476,7 @@ public abstract partial class Unit : Node2D
 	public void HandleCmdOnEdge(Level lv)
 	{
         Debug.AssertRefEq(lv.World, this.World);
-#if DEBUG
-		var res = m_Runner.OnEdge(lv);
-        Debug.Assert(res != CommandRunner.Result.DoneWithFailure);
-#else
 		m_Runner.OnEdge(lv);
-#endif
 	}
 
 	/// <summary>

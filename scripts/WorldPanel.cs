@@ -406,7 +406,7 @@ public partial class WorldPanel : Godot.Panel
 	/// Same as <see cref="TeleportItem"/> but does not update the live position of the item in the world.
 	/// Calling <see cref="Item.SyncPosWithGrid"/> right after this is equivalent to 
 	/// <see cref="TeleportItem"/>.
-	/// This function is much faster than <see cref="TeleportItem"/> because it does no marsheling.
+	/// This function is much faster than <see cref="TeleportItem"/> because it does no marshaling.
 	/// </summary>
 	/// <param name="bMaybeNull">Only matters in debug mode</param>
 	/// <param name="bOverride">Only matters in debug mode</param>
@@ -446,6 +446,38 @@ public partial class WorldPanel : Godot.Panel
 		Debug.Assert(IsInstalled(tlSrc));
 		Debug.Assert(IsInstalled(tlDest));
 		return TeleportItemNoSync(tlSrc.GridLoc, tlDest.GridLoc, bMaybeNull, bOverride);
+	}
+
+	public Item TeleportItemUnchecked(Vector2I gSrc, Vector2I gDest)
+	{
+		var it = TeleportItemUncheckedNoSync(gSrc, gDest);
+		it.SyncPosWithGrid(this);
+		return it;
+	}
+
+	/// <summary>
+	/// This assumes everything is perfect and will crash the program otherwise.
+	/// </summary>
+	public Item TeleportItemUncheckedNoSync(Vector2I gSrc, Vector2I gDest)
+	{
+		Debug.Assert(IsWithin(gSrc));
+		Debug.Assert(IsWithin(gDest));
+		Debug.Assert(HasTile(gSrc));
+		Debug.Assert(HasTile(gDest));
+		Debug.Assert(GetTile(gSrc).HasItem());
+		Debug.Assert(gSrc == gDest || !GetTile(gDest).HasItem());
+
+		if (gSrc == gDest)
+		{
+			return GetTile(gSrc).Item;
+		}
+
+		var srcTl = GetTileUnchecked(gSrc);
+		var destTl = GetTileUnchecked(gDest);
+		var extractedIt = srcTl.ExtractItem();
+		destTl.SetItemUnsafe(extractedIt); // Must be before adding to tree.
+		AddChild(extractedIt);
+		return destTl.Item;
 	}
 
 
@@ -553,17 +585,17 @@ public partial class WorldPanel : Godot.Panel
 	private void PlaceSomeUnits()
 	{
 		PlaceSupplier(new(0, 6), Direction.East, 3, [1, 2, 3, 4, 5, 6]);
-		PlaceSlider(new(2, 7), Direction.East);
-		PlaceSlider(new(3, 7), Direction.North);
-		PlaceSlider(new(3, 6), Direction.East);
-		PlaceUpdater(new(4, 6), Direction.East, 3, UnUpdater.UpdateType.Double);
-		PlaceSlider(new(5, 6), Direction.East);
-		PlaceSlider(new(6, 6), Direction.South);
-		PlaceSlider(new(6, 7), Direction.South);
-		PlaceSlider(new(6, 8), Direction.West);
-		PlaceUpdater(new(5, 8), Direction.West, 3, UnUpdater.UpdateType.Double);
-		PlaceSlider(new(4, 8), Direction.West);
-		PlaceSlider(new(3, 8), Direction.North);
+		// PlaceSlider(new(2, 7), Direction.East);
+		// PlaceSlider(new(3, 7), Direction.North);
+		// PlaceSlider(new(3, 6), Direction.East);
+		// PlaceUpdater(new(4, 6), Direction.East, 3, UnUpdater.UpdateType.Double);
+		// PlaceSlider(new(5, 6), Direction.East);
+		// PlaceSlider(new(6, 6), Direction.South);
+		// PlaceSlider(new(6, 7), Direction.South);
+		// PlaceSlider(new(6, 8), Direction.West);
+		// PlaceUpdater(new(5, 8), Direction.West, 3, UnUpdater.UpdateType.Double);
+		// PlaceSlider(new(4, 8), Direction.West);
+		// PlaceSlider(new(3, 8), Direction.North);
 	}
 
 	public UnCmdInjector PlaceInjector(IEnumerable<IEnumerable<Command>> cmdsToInject)
@@ -674,6 +706,8 @@ public partial class WorldPanel : Godot.Panel
 				m_Tiles[y * newDims.X + x] = oldTiles[y * oldDims.X + x];
 			}
 		}
+
+		QueueRedraw();
 	}
 
 	public void Reset()
