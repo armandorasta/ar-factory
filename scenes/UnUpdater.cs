@@ -4,7 +4,7 @@ using Godot;
 
 namespace ArFactory;
 
-public partial class UnUpdater : Unit
+public partial class UNUpdater : Unit
 {
 	public enum UpdateType
 	{
@@ -35,8 +35,7 @@ public partial class UnUpdater : Unit
 		UpTypeLabel = GetNode<Label>("Sprite2D/CenterContainer/HBoxContainer/Label");
 	}
 
-	public void Setup(WorldPanel world, Vector2I gloc, int workRate, Direction dir,
-		UpdateType upT)
+	public void Setup(WorldPanel world, Vector2I gloc, int workRate, Direction dir, UpdateType upT)
 	{
 		BaseInit(world, TickType.OnDemand, workRate, gloc, Vector2I.One, dir);
 		Debug.Assert(Enum.IsDefined(upT));
@@ -51,27 +50,16 @@ public partial class UnUpdater : Unit
 		};
 	}
 
-	protected override void BuildTiles()
+	protected override void BuildTilesAsIfFacingEast()
 	{
 		AddInput(Vector2I.Zero, Direction.West, true);
 		AddOutput(Vector2I.Zero, Direction.East);
 	}
 
-	public override void PendNewCommands()
+	public override void PendNewCommands(WorldPanel.PendProxy pender)
 	{
-		if (!IsWorkTick())
-		{
-			return;
-		}
-		if (HasPendingCmds() && !m_Runner.IsJustAwaitingOutSlideAnim())
-		{
-			PauseThisTick();
-			return;
-		}
-
 		var tl = GetTile(Vector2I.Zero);
-		PendCmd(Apply(m_UpType, tl));
-		PendCmd(new CmdSlide(tl, Dir));
+		pender.PendParallel([ Apply(m_UpType, tl), new CmdSlide(tl, Dir) ], 0);
 	}
 
 	public override string ToString()

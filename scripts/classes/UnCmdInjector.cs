@@ -1,57 +1,36 @@
-using Godot;
 using System.Collections.Generic;
-using System.Data;
-using System.Linq;
 
 namespace ArFactory;
 
-public partial class UnCmdInjector : Unit
+public partial class UNCmdInjector : Unit
 {
-	private List<List<Command>> m_CmdsNextTick = [];
+	private List<List<Command>> m_CmdSequenceNextTick = [];
 
-	// This is used in the reset function to re-enqueue the commands again for next run, otherwise
-	// the injector will only work for a single run.
-	private List<List<Command>> m_DefaultCmds;
-
-	public void Setup(WorldPanel world, IEnumerable<IEnumerable<Command>> cmdsToInject)
+	public void Setup(WorldPanel world)
 	{
 		InjectorBaseInit(world);
-		foreach (var group in cmdsToInject)
-		{
-			m_CmdsNextTick.Add([.. group]);
-		}
-		m_DefaultCmds = [.. m_CmdsNextTick];
 	}
 
-	protected override void BuildTiles() { }
+	protected override void BuildTilesAsIfFacingEast() { }
 	
-	public override void PendNewCommands()
+	public override void PendNewCommands(WorldPanel.PendProxy pender)
 	{
-		if (!IsSafeToPendCmds())
-		{
-			return;
-		}
-
-		foreach (var group in m_CmdsNextTick)
-		{
-			PendCmdSeq(group);
-		}
-
-		m_DefaultCmds ??= m_CmdsNextTick;
-		m_CmdsNextTick = [];
+		pender.PendFullSequence(m_CmdSequenceNextTick);
+		m_CmdSequenceNextTick = [];
 	}
 
 	// Breaks everything if called after OnTick and before OnEdge...
-	public void PendParallel(IEnumerable<Command> cmds)
+	public void PendParallel(IEnumerable<Command> cmds, int index = 0)
 	{
-		PendCmdSeq(cmds);
-	}
-
-	public override void Reset()
-	{
-		base.Reset();
-		m_CmdsNextTick = m_DefaultCmds;
-		m_DefaultCmds = null;
+		Debug.Assert(0 <= index && index <= m_CmdSequenceNextTick.Count);
+		if (index < m_CmdSequenceNextTick.Count)
+		{
+			m_CmdSequenceNextTick[index].AddRange(cmds);
+		}
+		else
+		{
+			m_CmdSequenceNextTick.Add([.. cmds]);
+		}
 	}
 
 	public override string ToString() 

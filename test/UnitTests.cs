@@ -120,7 +120,7 @@ public class UnitTests : ArTest.TestSuit
 		var world = m_Lv.World;
 		var supp = world.PlaceSupplier(Vector2I.Zero, Direction.East, 3, [237, 68, 236]);
 		var tl1 = world.InstallEmptyTile(new Vector2I(1, 0));
-		AssertTrue(world.HasTile(supp.GridLoc));
+		AssertTrue(world.HasTile(supp.GLocation));
 		using (m_Lv.PlaySimulationInDebug())
 		{
 			await m_Lv.TickOnceAsync(); // Tick 0 processed
@@ -169,8 +169,8 @@ public class UnitTests : ArTest.TestSuit
 		var world = m_Lv.World;
 		world.Reset();
 		var supp = world.PlaceSupplier(Vector2I.One, Direction.South, 1, [261, 296]);
-		var tl1 = world.InstallEmptyTile(supp.GridLoc + new Vector2I(0, 1));
-		AssertTrue(world.HasTile(supp.GridLoc));
+		var tl1 = world.InstallEmptyTile(supp.GLocation + new Vector2I(0, 1));
+		AssertTrue(world.HasTile(supp.GLocation));
 		using (m_Lv.PlaySimulationInDebug())
 		{
 			await m_Lv.TickOnceAsync();
@@ -180,14 +180,13 @@ public class UnitTests : ArTest.TestSuit
 		}
 	}
 
-	[ArTest.RunThisOnly]
 	[ArTest.Test] public async Task TestSupplier_clogged()
 	{
 		var world = m_Lv.World;
 		world.Reset();
 		var supp = world.PlaceSupplier(Vector2I.One, Direction.South, 2, [261, 296]);
-		var sTl = world.GetTile(supp.GridLoc);
-		var tl1 = world.InstallEmptyTile(supp.GridLoc + new Vector2I(0, 1));
+		var sTl = world.GetTile(supp.GLocation);
+		var tl1 = world.InstallEmptyTile(supp.GLocation + new Vector2I(0, 1));
 
 		using (m_Lv.PlaySimulationInDebug())
 		{

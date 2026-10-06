@@ -20,31 +20,20 @@ public abstract partial class Unit : Node2D
 
 
 	// Public Interface
-	public Vector2I GridLoc => m_GridLoc;
+	public Vector2I GLocation => m_GL;
 	public Direction Dir => m_Dir;
-	public Vector2I Dims => m_Dims;
+	public Vector2I Dimensions => m_Dims;
 	public int Rate => m_Rate;
 	public WorldPanel World { get; private set; }
 
 
 	// Privates
 	private TickType m_TickType;
-	private Vector2I m_GridLoc;
+	private Vector2I m_GL;
 	private Direction m_Dir = Direction.East;
 	private Vector2I m_Dims;
 	private int m_Rate;
-
-
-	//  Commands that need to finish for the unit to keep operating again
-	protected CommandRunner m_Runner = new([]);
-
-#if DEBUG
-	/// <summary>
-	/// Used to ensure <see cref="PendCmd"/> and <see cref="PendCmdSeq"/> are only called within
-	/// <see cref="PendNewCommands"/> in debug.
-	/// </summary>
-	private bool m_bPendingAllowed = false;
-#endif
+	private List<Command> m_PendingCmds = [];
 
 	/// <summary>
 	/// Keeps track of <see cref="Rate"/> every tick.
@@ -81,10 +70,7 @@ public abstract partial class Unit : Node2D
 
 	public override void _Ready()
 	{
-		if (HasNode("Sprite2D"))
-		{
-			this.Sprite = GetNode<Sprite2D>("Sprite2D");
-		}
+		this.Sprite = GetNodeOrNull<Sprite2D>("Sprite2D");
 	}
 
 	// This function is called on the `_Ready` function of sub-classes.
@@ -98,7 +84,7 @@ public abstract partial class Unit : Node2D
 
 		this.World = world;
 		this.m_Rate = workRate;
-		this.m_GridLoc = gloc;
+		this.m_GL = gloc;
 		this.m_Dims = dims;
 		this.m_TickType = tickType;
 
@@ -118,7 +104,7 @@ public abstract partial class Unit : Node2D
 			}
 		}
 
-		BuildTiles();
+		BuildTilesAsIfFacingEast();
 		Debug.Assert(tickType != TickType.OnDemand || m_TickTiles.Count > 0);
 
 		SetDir(dir);
@@ -128,6 +114,7 @@ public abstract partial class Unit : Node2D
 	{
 		World = world;
 		m_TickType = TickType.Steady;
+		m_Rate = 1;
 		// Position = world.GridToPos(m_Dims);
 	}
 
@@ -139,14 +126,14 @@ public abstract partial class Unit : Node2D
 	/// where the inputs and outputs are and their directions.
 	/// <b>The tiles should be built as if the unit is facing east.</b>
 	/// </summary>
-	protected abstract void BuildTiles();
+	protected abstract void BuildTilesAsIfFacingEast();
 
 	/// <summary>
  	/// Used to add commands to the queue using `pend_cmd`.
-	/// Checks like <see cref="IsWorkTick"/>, <see cref="HasPendingCmds"/> and 
-	/// <see cref="IsJustAwaitingOutSlideAnim"/> are used quite often here.
+	/// Checks like <see cref="IsWorkTick"/>, <see cref="HasPendingCmds"/> and <see cref="IsJustAwaitingOutSlideAnim"/> 
+	/// are used quite often here.
 	/// </summary>
-	public abstract void PendNewCommands();
+	public abstract void PendNewCommands(WorldPanel.PendProxy pender);
 
 
 	#endregion // Abstract Interface
@@ -156,7 +143,7 @@ public abstract partial class Unit : Node2D
 	{
 		var bui = new StringBuilder("Unit[");
 		bui.Append(string.Join(", ", [
-			GridLoc, 
+			GLocation, 
 			$"{m_Dims.X}x{m_Dims.Y}",
 			m_Dir,
 			$"{m_Rate}t/s",
@@ -167,51 +154,44 @@ public abstract partial class Unit : Node2D
 	/// <summary>
 	/// Returns enclosing Rect2I in grid-space.
 	/// </summary>
-	public Rect2I GetRect2I() => new(m_GridLoc, m_Dims);
+	public Rect2I GetRect2I() => new(m_GL, m_Dims);
 	
 	/// <summary>
 	/// Returns enclosing Rect2 in world-space.
 	/// </summary>
-	public Rect2 GetRect2() 
-		=> new(World.CellWidth * (Vector2)m_GridLoc, World.CellWidth * (Vector2)m_Dims);
+	public Rect2 GetRect2() => new(World.CellWidth * (Vector2)m_GL, World.CellWidth * (Vector2)m_Dims);
 	
 	/// <summary>
 	/// Checks if <paramref name="gloc"/> is within the world in grid-space.
 	/// </summary>
 	public bool IsWithin(Vector2I gloc) => GetRect2I().HasPoint(gloc);
-	public Tile GetTile(Vector2I gloc) => World.GetTile(m_GridLoc + gloc);
+	public Tile GetTile(Vector2I gloc) => World.GetTile(m_GL + gloc);
 
 	/// <summary>
-	/// Returns true if the machine is expected to operate during this tick, <see cref="m_Rate"/> 
-	/// determines how 
-	/// often this function returns true, ex. when <see cref="m_Rate"/> is 1, it returns true every single tick.
+	/// Returns true if the machine is expected to operate during this tick, <see cref="m_Rate"/> determines how often 
+	/// this function returns true, ex. when <see cref="m_Rate"/> is 1, it returns true every single tick.
 	/// </summary>
-	public bool IsWorkTick() => m_Count > 0 && m_Count % m_Rate == 0;
+	private bool IsWorkTick() => m_Count % m_Rate == 0;
 
 	/// <summary>
-	/// Returns true if the command queue still has commands to be executed. You usually pend all the 
-	/// commands you want executed at once when the queue is empty, then wait until the whole sequence
+	/// Returns true if the command queue still has commands to be executed. You usually pend all the commands you want 
+	/// executed at once when the queue is empty, then wait until the whole sequence
 	/// is executed.
 	/// </summary>
-	public bool HasPendingCmds() => !m_Runner.IsDone();
+	public bool HasPendingCmds() => !m_PendingCmds.All(c => c.IsDone());
 
 	/// <summary>
-	/// Checks if there's either no commands left, or there are only slide commands that are just
-	/// animating the slide for the user.
+	/// Checks if there's either no commands left, or there are only slide commands that are just animating the slide 
+	/// for the user.
 	/// </summary>
-	protected bool IsSafeToPendCmds() => m_Runner.IsDone() || m_Runner.IsJustAwaitingOutSlideAnim();
-
-	/// <summary>
-	/// Called everytime on the tick pending commands queue size goes to zero.
-	/// </summary>
-	protected virtual void OnFinishingAllPendingCmds() { }
+	protected bool IsSafeToPendCmds() 
+		=> !HasPendingCmds() || m_PendingCmds.All(c => c is CmdSlide sc && sc.IsAwaitingAnim());
 
 	
 	#region Direction Related Methods
 
 	/// <summary>
-	/// Returns true if the unit has enough space for version of itself rotated 90 degrees clockwise or 
-	/// counter-clockwise.
+	/// Returns true if the unit has enough space for version of itself rotated 90 degrees clockwise or counter-clockwise.
 	/// Rotating 180 degrees needs no check as it takes the same space as not rotating.
 	/// </summary>
 	public bool HasSpaceForRotate90()
@@ -226,7 +206,7 @@ public abstract partial class Unit : Node2D
 		{
 			for (; vec.X < m_Dims.Y; ++vec.X)
 			{
-				if (World.HasTile(m_GridLoc + vec))
+				if (World.HasTile(m_GL + vec))
 				{
 					return false;
 				}
@@ -236,8 +216,8 @@ public abstract partial class Unit : Node2D
 	}
 
 	/// <summary>
-	/// Returns true if the unit can face that direction, by default units can only face east and west,
-	/// but this behaviour can be changed by overriding this function.
+	/// Returns true if the unit can face that direction, by default units can only face east and west, but this 
+	/// behaviour can be changed by overriding this function.
 	/// </summary>
 	/// TODO: See this `static` business...
 	public virtual bool CanFaceDir(Direction dir) => dir == Direction.East || dir == Direction.West;
@@ -285,15 +265,15 @@ public abstract partial class Unit : Node2D
 				var vec = new Vector2I(x, y);
 				GetTile(vec).Rotate180();
 				GetTile(maxGLoc - vec).Rotate180();
-				World.SwapTiles(m_GridLoc + vec, m_GridLoc + (maxGLoc - vec));
+				World.SwapTiles(m_GL + vec, m_GL + (maxGLoc - vec));
 			}
 		}
 		m_Dir = m_Dir.Invert();
 	}
 
 	/// <summary>
-	/// Rotates the unit by 90 degrees clockwise, by default this operation is not supported, but this 
-	/// can be changed by overriding <see cref="CanFaceDir"/>.
+	/// Rotates the unit by 90 degrees clockwise, by default this operation is not supported, but this can be changed 
+	/// by overriding <see cref="CanFaceDir"/>.
 	/// </summary>
 	public void Rotate90()
 	{
@@ -314,7 +294,7 @@ public abstract partial class Unit : Node2D
 		{
 			for (var x = 0; x < m_Dims.X; ++x)
 			{
-				floatyTiles[y * m_Dims.X + x] = World.ExtractTile(m_GridLoc + new Vector2I(x, y));
+				floatyTiles[y * m_Dims.X + x] = World.ExtractTile(m_GL + new Vector2I(x, y));
 			}
 		}
 
@@ -326,7 +306,7 @@ public abstract partial class Unit : Node2D
 			tl.Rotate90();
 			var x = i % m_Dims.X;
 			var y = i / m_Dims.X;
-			World.InstallTile(tl, m_GridLoc + new Vector2I(maxY - y, x));
+			World.InstallTile(tl, m_GL + new Vector2I(maxY - y, x));
 		}
 
 		m_Dims = new(m_Dims.Y, m_Dims.X);
@@ -334,8 +314,8 @@ public abstract partial class Unit : Node2D
 	}
 
 	/// <summary>
-	/// Rotates the unit by 270 degrees clockwise (90 degress counter-clockwise), by default this 
-	/// operation is not supported, but this can be changed by overriding <see cref="CanFaceDir"/>.
+	/// Rotates the unit by 270 degrees clockwise (90 degress counter-clockwise), by default this operation is not 
+	/// supported, but this can be changed by overriding <see cref="CanFaceDir"/>.
 	/// </summary>
 	public void Rotate270()
 	{
@@ -360,19 +340,18 @@ public abstract partial class Unit : Node2D
 	/// Input tiles let items slide in from a specified direction.
 	/// </summary>
 	/// <param name="bKeepTrack">
-	/// All tiles kept track of must be filled before the tick counter starts counting for on-demand 
-	/// units.
+	/// All tiles kept track of must be filled before the tick counter starts counting for on-demand units.
 	/// </param>
 	public Tile AddInput(Vector2I gloc, Direction dir, bool bKeepTrack = false)
 	{
-		Debug.Assert(IsWithin(m_GridLoc + gloc));
+		Debug.Assert(IsWithin(m_GL + gloc));
 		Debug.Assert(GetTile(gloc).IsSolid(dir));
 		Debug.Assert(dir != Direction.East);
 
 		// Must be facing out of the unit.
-		Debug.Assert(!IsWithin(m_GridLoc + gloc + dir.ToGrid()));
+		Debug.Assert(!IsWithin(m_GL + gloc + dir.ToGrid()));
 
-		Tile tl = World.GetTile(m_GridLoc + gloc);
+		Tile tl = World.GetTile(m_GL + gloc);
 		tl.MakeInput(dir, true);
 		if (bKeepTrack)
 		{
@@ -388,19 +367,18 @@ public abstract partial class Unit : Node2D
 	/// Output tiles are meant to generate tiles and slide them out in a specified direction.
 	/// </summary>
 	/// <param name="bKeepTrack">
-	/// All tiles kept track of must be filled before the tick counter starts counting for on-demand 
-	/// units.
+	/// All tiles kept track of must be filled before the tick counter starts counting for on-demand units.
 	/// </param>
 	public Tile AddOutput(Vector2I gloc, Direction dir, bool bKeepTrack = false)
 	{
-		Debug.Assert(IsWithin(m_GridLoc + gloc));
+		Debug.Assert(IsWithin(m_GL + gloc));
 		Debug.Assert(GetTile(gloc).IsSolid(dir));
 		Debug.Assert(dir != Direction.West);
 
 		// Must be facing out of the unit.
-		Debug.Assert(!IsWithin(m_GridLoc + gloc + dir.ToGrid()));
+		Debug.Assert(!IsWithin(m_GL + gloc + dir.ToGrid()));
 
-		Tile tl = World.GetTile(m_GridLoc + gloc);
+		Tile tl = World.GetTile(m_GL + gloc);
 		tl.MakeOutput(dir, true);
 		if (bKeepTrack)
 		{
@@ -418,65 +396,30 @@ public abstract partial class Unit : Node2D
 	/// </summary>
 	public void PreprocessTick()
 	{
-		switch (m_TickType)
+		m_Count = m_TickType switch 
 		{
-			case TickType.Steady:
-				m_Count += 1;
-				break;
-			
-			case TickType.OnDemand:
-				if (m_TickTiles.All((tl) => tl.HasItem()))
-				{
-					m_Count += 1;
-				}
-				else
-				{
-					m_Count = 0;
-				}
-				break;
-			
-			default:
-				Debug.AssertUnreachable();
-				break;
+			TickType.Steady => m_Count + 1,
+			TickType.OnDemand => m_TickTiles.Any(tl => !tl.HasItem()) ? 0 : m_Count + 1,
+			_ => throw new NotImplementedException(),
+		};
+
+		m_PendingCmds = m_PendingCmds.FindAll(c => !c.IsDone());
+	}
+
+	public void HandlePendingNewCommands(WorldPanel.PendProxy pender)
+	{
+		if (IsWorkTick())
+		{
+			if (!IsSafeToPendCmds())
+			{
+				PauseThisTick(); // So next tick is also work tick.
+				return;
+			}
+
+			pender.AssignWaitList(m_PendingCmds);
+			PendNewCommands(pender);
+			pender.AssignWaitList(null);
 		}
-	}
-
-	/// <summary>
-	/// Calls <see cref="Command.DoPerFrame"/> on all pending commands for now.
-	/// </summary>
-	public void DoPerFrame(double dt, Level lv)
-	{
-		Debug.AssertRefEq(lv.World, this.World);
-		m_Runner.DoPerFrame(dt, lv);
-	}
-
-	public void HandlePendingNewCommands()
-	{
-#if DEBUG
-		m_bPendingAllowed = true;
-		PendNewCommands();
-		m_bPendingAllowed = false;
-#else
-		PendNewCommands();
-#endif
-	}
-
-	/// <summary>
-	/// Handles <see cref="Command.OnTick"/> for pending commands.
-	/// </summary>
-	public void HandleCmdOnTick(Level lv)
-	{
-        Debug.AssertRefEq(lv.World, this.World);
-        m_Runner.OnTick(lv);
-	}
-
-	/// <summary>
-	/// Handles <see cref="Command.OnEdge"/> for pending commands.
-	/// </summary>
-	public void HandleCmdOnEdge(Level lv)
-	{
-        Debug.AssertRefEq(lv.World, this.World);
-		m_Runner.OnEdge(lv);
 	}
 
 	/// <summary>
@@ -494,34 +437,8 @@ public abstract partial class Unit : Node2D
 	/// </summary>
 	public virtual void Reset()
 	{
-		m_Count = 0;
-		m_Runner.Clear();
-	}
-
-	/// <summary>
-	/// Adds a command to the queue, when this function is called outside of <see cref="PendNewCommands"/>
-	///  the behaviour is undefined. Now I made it crash on debug.
-	/// </summary>
-	protected void PendCmd(Command newCmd)
-	{
-#if DEBUG
-		// m_bPendingAllowed only exists on debug, idk if the compiler crashes on non-existing fields
-		// on conditioned functions so...
-		Debug.Assert(m_bPendingAllowed);
-#endif
-		m_Runner.PendParallel([newCmd]);
-	}
-
-	/// <summary>
-	/// Adds a sequence of commands to the queue, when this function is called outside of 
-	/// <see cref="PendNewCommands"/> the behaviour is undefined.
-	/// </summary>
-	protected void PendCmdSeq(IEnumerable<Command> cmdSeq)
-	{
-#if DEBUG
-		Debug.Assert(m_bPendingAllowed);
-#endif
-		m_Runner.PendParallel(cmdSeq);
+		m_Count = 1;
+		m_PendingCmds.Clear();
 	}
 
 

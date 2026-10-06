@@ -2,14 +2,14 @@ using Godot;
 
 namespace ArFactory;
 
-public partial class UnSlider : Unit
+public partial class UNSlider : Unit
 {
 	public void Setup(WorldPanel world, Vector2I gloc, int workRate, Direction dir)
 	{
 		BaseInit(world, TickType.Steady, workRate, gloc, Vector2I.One, dir);
 	}
 
-	protected override void BuildTiles()
+	protected override void BuildTilesAsIfFacingEast()
 	{
 		AddOutput(Vector2I.Zero, Direction.East);
 		AddInput(Vector2I.Zero, Direction.North);
@@ -17,20 +17,17 @@ public partial class UnSlider : Unit
 		AddInput(Vector2I.Zero, Direction.South);
 	}
 
-	public override void PendNewCommands()
+	public override void PendNewCommands(WorldPanel.PendProxy pender)
 	{
-		if (!IsWorkTick())
+		if (World.HasTile(GLocation + Dir.ToGrid()))
 		{
-			return;
-		}
-		if (!IsSafeToPendCmds())
-		{
-			PauseThisTick();
-			return;
-		}
-		if (World.HasTile(GridLoc + Dir.ToGrid()))
-		{
-			PendCmd(new CmdSlide(GetTile(Vector2I.Zero), Dir));
+			var tl = GetTile(Vector2I.Zero);
+			// We have to do it manually like this, this way the slider is synced with the clock at all times.
+			// I could also just add a third type, but I learned the hard way that simple is always the way to go.
+			if (tl.HasItem())
+			{
+				pender.PendParallel([new CmdSlide(tl, Dir)], 0);
+			}
 		}
 	}
 

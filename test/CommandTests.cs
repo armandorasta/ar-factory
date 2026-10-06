@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 namespace ArFactory.Tests;
 using static ArTest.Asserts;
 
+[ArTest.RunThisOnly]
 public class CommandTests : ArTest.TestSuit
 {
 	private Level m_Lv;
@@ -37,7 +38,7 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var injy0 = world.PlaceInjector([]);
+		var injy0 = world.PlaceInjector();
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
@@ -46,6 +47,8 @@ public class CommandTests : ArTest.TestSuit
 			await m_Lv.TickOnceAsync();
 			AssertTrue(tl0.HasItem());
 			AssertEq(tl0.Item.Value, 41);
+			AssertFalse(injy0.HasPendingCmds());
+			
 			await m_Lv.EndTickAsync();
 			AssertTrue(tl0.HasItem());
 			AssertEq(tl0.Item.Value, 41);
@@ -57,7 +60,7 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var injy0 = world.PlaceInjector([]);
+		var injy0 = world.PlaceInjector();
 
 		// Spawn on non-existing tile
 		using (m_Lv.PlaySimulationInDebug())
@@ -89,9 +92,10 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var injy0 = world.PlaceInjector([[new CmdKill(tl0)]]);
+		var injy0 = world.PlaceInjector();
 		using (m_Lv.PlaySimulationInDebug())
 		{
+			injy0.PendParallel([new CmdKill(tl0)]);
 			world.SpawnItem(tl0, 497);
 			await m_Lv.TickOnceAsync();
 			AssertFalse(tl0.HasItem());
@@ -104,7 +108,7 @@ public class CommandTests : ArTest.TestSuit
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
-		var injy0 = world.PlaceInjector([]);
+		var injy0 = world.PlaceInjector();
 	
 		// Kill on non-existing tile
 		using (m_Lv.PlaySimulationInDebug())
@@ -147,21 +151,14 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = m_Lv.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
-		var injy = world.PlaceInjector([
-			[
-				new CmdSleep(3)
-			],
-			[
-				new CmdSpawn(tl, 3),
-				new CmdSleep(1),
-			],
-			[
-				new CmdKill(tl)
-			],
-		]);
+		var injy = world.PlaceInjector();
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
+			injy.PendParallel([new CmdSleep(3)], 0);
+			injy.PendParallel([new CmdSpawn(tl, 3), new CmdSleep(1)], 1);
+			injy.PendParallel([new CmdKill(tl)], 2);
+
 			await m_Lv.TickOnceAsync();
 			AssertEq(m_Lv.GetTicksSinceStart(), 1);
 			AssertFalse(tl.HasItem());
@@ -202,7 +199,7 @@ public class CommandTests : ArTest.TestSuit
 		var tlWest0 = world.InstallEmptyTile(new(5, 0));
 		var tlWest1 = world.InstallEmptyTile(new(4, 0));
 
-		var injy0 = world.PlaceInjector([]);
+		var injy0 = world.PlaceInjector();
 
 		using var _ = m_Lv.PlaySimulationInDebug();
 		injy0.PendParallel([
@@ -279,8 +276,8 @@ public class CommandTests : ArTest.TestSuit
 		var tl0 = world.InstallEmptyTile(new(0, 0));
 		var tl1 = world.InstallEmptyTile(new(1, 0));
 
-		var injy0 = world.PlaceInjector([]);
-		var injy1 = world.PlaceInjector([]);
+		var injy0 = world.PlaceInjector();
+		var injy1 = world.PlaceInjector();
 
 		// For now on I will only test east and assume the rest will work similarly because
 		// otherwise the code size will explode for a very stupid reason...
@@ -347,7 +344,7 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdSlide_INVALID_CASES()
 	{
 		var world = m_Lv.World;
-		var injy0 = world.PlaceInjector([]);
+		var injy0 = world.PlaceInjector();
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
 
@@ -410,7 +407,7 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var injy0 = world.PlaceInjector([]);
+		var injy0 = world.PlaceInjector();
 		
 		using (m_Lv.PlaySimulationInDebug())
 		{
@@ -431,7 +428,7 @@ public class CommandTests : ArTest.TestSuit
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
-		var injy0 = world.PlaceInjector([]);
+		var injy0 = world.PlaceInjector();
 
 		using (m_Lv.PlaySimulationInDebug())
 		{ 
@@ -459,8 +456,8 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = m_Lv.World;
 		var tl = world.InstallEmptyTile(new(1, 0));
-		var injy0 = world.PlaceInjector([]);
-		var injy1 = world.PlaceInjector([]);
+		var injy0 = world.PlaceInjector();
+		var injy1 = world.PlaceInjector();
 		
 		using (m_Lv.PlaySimulationInDebug())
 		{
@@ -499,10 +496,11 @@ public class CommandTests : ArTest.TestSuit
 		var world = m_Lv.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
 		var vac = new CmdVacate([tl]);
-		var injy0 = world.PlaceInjector([[ vac ]]);
+		var injy0 = world.PlaceInjector();
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
+			injy0.PendParallel([ vac ]);
 			await m_Lv.TickOnceAsync();
 			AssertFalse(tl.HasItem());
 			AssertTrue(vac.IsDone());
@@ -520,14 +518,16 @@ public class CommandTests : ArTest.TestSuit
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
 		var vac = new CmdVacate([tl0]);
-		var injy0 = world.PlaceInjector([[
-			new CmdSpawn(tl0, 7),
-			new CmdSlide(tl0, Direction.East),
-			vac, // Should be done immediately because they don't wait for items to finish sliding.
-		]]);
+		var injy0 = world.PlaceInjector();
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
+			injy0.PendParallel([
+			new CmdSpawn(tl0, 7),
+				new CmdSlide(tl0, Direction.East),
+				vac, // Should be done immediately because they don't wait for items to finish sliding.
+			]);
+
 			await m_Lv.TickOnceAsync();
 			AssertFalse(tl0.HasItem());
 			AssertTrue(tl1.HasItem());
@@ -553,14 +553,16 @@ public class CommandTests : ArTest.TestSuit
 		var vac = new CmdVacate([tl10, tl11]);
 		world.SpawnItem(tl10, 731);
 		world.SpawnItem(tl11, 125);
-		var injy = world.PlaceInjector([[
-			new CmdSlide(tl10, Direction.West), // (1, 0) => (0, 0)
-			new CmdSlide(tl11, Direction.West), // (1, 1) => (0, 1)
-			vac,
-		]]);
+		var injy = world.PlaceInjector();
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
+			injy.PendParallel([
+				new CmdSlide(tl10, Direction.West), // (1, 0) => (0, 0)
+				new CmdSlide(tl11, Direction.West), // (1, 1) => (0, 1)
+				vac,
+			]);
+
 			await m_Lv.TickOnceAsync();
 			AssertFalse(tl10.HasItem());
 			AssertFalse(tl11.HasItem());
@@ -595,20 +597,14 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = m_Lv.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
-
-		world.SpawnItem(tl, 274);
-		var injy = world.PlaceInjector([
-			[
-				new CmdUpdate(tl, UnaryOperation.Mul, 2),
-				new CmdSleep(1),
-			],
-			[
-				new CmdUpdate(tl, UnaryOperation.Add, 5),
-			],
-		]);
+		var injy = world.PlaceInjector();
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
+			world.SpawnItem(tl, 274);
+			injy.PendParallel([ new CmdUpdate(tl, UnaryOperation.Mul, 2), new CmdSleep(1) ]);
+			injy.PendParallel([ new CmdUpdate(tl, UnaryOperation.Add, 5) ], 1);
+
 			await m_Lv.TickOnceAsync();
 			AssertTrue(tl.HasItem());
 			AssertEq(tl.Item.Value, 2*274);
@@ -625,7 +621,7 @@ public class CommandTests : ArTest.TestSuit
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
-		var injy = world.PlaceInjector([]);
+		var injy = world.PlaceInjector();
 
 		// Updating nothing (existing tile)
 		using (m_Lv.PlaySimulationInDebug())
@@ -670,7 +666,7 @@ public class CommandTests : ArTest.TestSuit
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
 		var tl2 = world.InstallEmptyTile(new(1, 1));
-		var injy = world.PlaceInjector([]);
+		var injy = world.PlaceInjector();
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
@@ -694,7 +690,7 @@ public class CommandTests : ArTest.TestSuit
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
 		var tl2 = world.InstallEmptyTile(new(1, 1));
-		var injy = world.PlaceInjector([]);
+		var injy = world.PlaceInjector();
 
 		// No item to clone (existing tile)
 		using (m_Lv.PlaySimulationInDebug())
@@ -801,7 +797,7 @@ public class CommandTests : ArTest.TestSuit
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(0, 1));
 		var tl2 = world.InstallEmptyTile(new(1, 0));
-		var injy = world.PlaceInjector([]);
+		var injy = world.PlaceInjector();
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
@@ -822,7 +818,7 @@ public class CommandTests : ArTest.TestSuit
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(0, 1));
-		var injy = world.PlaceInjector([]);
+		var injy = world.PlaceInjector();
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
@@ -843,7 +839,7 @@ public class CommandTests : ArTest.TestSuit
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(0, 1));
 		var tl2 = world.InstallEmptyTile(new(1, 0));
-		var injy = world.PlaceInjector([]);
+		var injy = world.PlaceInjector();
 
 		// Missing item (existing tile)
 		using (m_Lv.PlaySimulationInDebug())
@@ -920,7 +916,7 @@ public class CommandTests : ArTest.TestSuit
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(0, 1));
-		var injy = world.PlaceInjector([]);
+		var injy = world.PlaceInjector();
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
@@ -939,7 +935,7 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var injy = world.PlaceInjector([]);
+		var injy = world.PlaceInjector();
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
@@ -958,7 +954,7 @@ public class CommandTests : ArTest.TestSuit
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(0, 1));
-		var injy = world.PlaceInjector([]);
+		var injy = world.PlaceInjector();
 
 		// Missing item (existing tile)
 		using (m_Lv.PlaySimulationInDebug())
@@ -1086,7 +1082,7 @@ public class CommandTests : ArTest.TestSuit
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
-		var injy = world.PlaceInjector([]);
+		var injy = world.PlaceInjector();
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
@@ -1122,7 +1118,7 @@ public class CommandTests : ArTest.TestSuit
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
-		var injy = world.PlaceInjector([]);
+		var injy = world.PlaceInjector();
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
@@ -1153,7 +1149,7 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var injy = world.PlaceInjector([]);
+		var injy = world.PlaceInjector();
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
@@ -1172,7 +1168,7 @@ public class CommandTests : ArTest.TestSuit
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
-		var injy = world.PlaceInjector([]);
+		var injy = world.PlaceInjector();
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
@@ -1207,7 +1203,7 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var injy = world.PlaceInjector([]);
+		var injy = world.PlaceInjector();
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
@@ -1228,7 +1224,7 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var injy = world.PlaceInjector([]);
+		var injy = world.PlaceInjector();
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
@@ -1249,7 +1245,7 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = m_Lv.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var injy = world.PlaceInjector([]);
+		var injy = world.PlaceInjector();
 
 		using (m_Lv.PlaySimulationInDebug())
 		{

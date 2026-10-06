@@ -8,6 +8,7 @@ namespace ArFactory;
 public class CommandRunner
 {
 	private readonly List<List<Command>> m_Groups;
+	private readonly List<CmdSlide> m_BlockedSlideCmdsByItems = [];
 
 	public CommandRunner(IEnumerable<IEnumerable<Command>> cmdGroups)
 	{
@@ -34,19 +35,37 @@ public class CommandRunner
 	public bool IsJustAwaitingOutSlideAnim() // TODO: Make this function only check output tiles somehow!
 		=> m_Groups.Count > 0 && m_Groups[0].All(c => c is CmdSlide sc && sc.IsAwaitingAnim());
 
-	/// <summary>
-	/// Pends commands to be executed in parallel, until this entire group finishes executing the
-	/// runner will not move to next group.
-	/// </summary>
-	public void PendParallel(IEnumerable<Command> parallelCmds)
+	public void PendFullSequence(IEnumerable<IEnumerable<Command>> groups, int startIndex = 0)
 	{
-		if (!parallelCmds.Any(_ => true)) // !Any(_ => true) returns false for empty sequences only.
-		{
-			return;
-		}
+		Debug.Assert(0 <= startIndex && startIndex <= m_Groups.Count);
 
-		m_Groups.Add([.. parallelCmds]);
+		// We pend in parallel with all other pend calls:
+		// First  call: Pend([ [g1], [g2] ])          => m_Groups = [ [g1], [g2] ]
+		// Second call: Pend([ [g3], [g4], [g5] ])    => m_Groups = [ [g1, g3], [g2, g4], [g5] ]
+		// Third  call: Pend([ [g6], [g7], [g8] ], 1) => m_Groups = [ [g1, g3], [g2, g4, g6], [g5, g7], [g8] ]
+		// etc...
+
+		var i = startIndex;
+		foreach (var g in groups)
+		{
+			PendParallel(g, i);
+			i += 1;
+		}
 	}
+
+	public void PendParallel(IEnumerable<Command> group, int index)
+	{
+		Debug.Assert(0 <= index && index <= m_Groups.Count);
+		if (index < m_Groups.Count)
+		{
+			m_Groups[index].AddRange(group);
+		}
+		else
+		{
+			m_Groups.Add([.. group]);
+		}
+	}
+
 
 	/// <summary>
 	/// Should be called on the beginning of the tick, this does nothing when no commands are left to be executed.
@@ -88,6 +107,7 @@ public class CommandRunner
 			}
 		}
 
+		HandleSlideCmdOverlapping(lv.World);
 		return IsDone();
 	}
 
@@ -145,5 +165,44 @@ public class CommandRunner
 		else return true;
 	}
 
-	public void Clear() => m_Groups.Clear();
+	public void Reset()
+	{
+		m_Groups.Clear();
+		m_BlockedSlideCmdsByItems.Clear();
+	}
+
+	public void QueueBlockedSlideCmdByAnotherItem(WorldPanel world, CmdSlide cmd)
+	{
+		Debug.Assert(world.HasTile(cmd.GridFrom));
+		Debug.Assert(world.GetTile(cmd.GridFrom).HasItem()); // Is there an actual item?
+		Debug.Assert(world.GetTile(cmd.GetGridTo()).IsReserved()); // And is it blocked?
+		Debug.Assert(!m_BlockedSlideCmdsByItems.Contains(cmd));
+		
+		m_BlockedSlideCmdsByItems.Add(cmd);
+	}
+
+	private void HandleSlideCmdOverlapping(WorldPanel world)
+	{
+		// If any update happens in a pass, end that pass and start over,
+		// repeat until a full pass happens with no updates.
+		while (1 + 1 == 2)
+		{
+			var bSomethingMoved = false;
+			for (var i = 0; i < m_BlockedSlideCmdsByItems.Count; ++i)
+			{
+				if (m_BlockedSlideCmdsByItems[i].TryMovingByOverlap(world))
+				{
+					// Something moved? can only move once per tick so bye-bye.
+					m_BlockedSlideCmdsByItems.RemoveAt(i);
+					bSomethingMoved = true;
+					break;
+				}
+			}
+			if (!bSomethingMoved) // None has updated? it's over.
+			{
+				break;
+			}
+		}
+		m_BlockedSlideCmdsByItems.Clear();
+	}
 }

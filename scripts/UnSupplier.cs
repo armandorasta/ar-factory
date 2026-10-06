@@ -1,10 +1,9 @@
 using System.Collections.Generic;
-using System.Linq;
 using Godot;
 
 namespace ArFactory;
 
-public partial class UnSupplier : Unit
+public partial class UNSupplier : Unit
 {
 	private int[] m_Sequence;
 	private int m_Index = -1;
@@ -17,28 +16,23 @@ public partial class UnSupplier : Unit
 		m_Sequence = [.. seq];
 	}
 
-	protected override void BuildTiles()
+	protected override void BuildTilesAsIfFacingEast()
 	{
 		m_Out0 = AddOutput(Vector2I.Zero, Direction.East);
 	}
 
-	public override void PendNewCommands()
+	public override void PendNewCommands(WorldPanel.PendProxy pender)
 	{
-		if (IsDoneWithInputSeq() || !IsWorkTick())
+		if (IsDoneWithInputSeq())
 		{
-			return;
-		}
-		if (!IsSafeToPendCmds())
-		{
-			PauseThisTick();
 			return;
 		}
 
-		PendCmd(new CmdVacate([m_Out0]));
-		PendCmd(new CmdSpawn(m_Out0, PopNextValue()));
+		pender.PendParallel([ new CmdVacate([m_Out0]) ], 0);
+		pender.PendParallel([ new CmdSpawn(m_Out0, PopNextValue()) ], 1);
 		if (World.HasTile(m_Out0.GridLoc + Dir.ToGrid()))
 		{
-			PendCmd(new CmdSlide(m_Out0, Dir));
+			pender.PendParallel([ new CmdSlide(m_Out0, Dir) ], 1);
 		}
 	}
 

@@ -10,5 +10,6 @@ public partial class MyTestHandler : ArTest.TestHandler
 	{
 		IsShowPassingTests = true;
 		IsPrintOrphanNodes = true;
+		IsStopOnFirstFail = true;
 	}
 }

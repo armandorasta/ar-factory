@@ -2,24 +2,45 @@ using Godot;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 
 namespace ArFactory;
 
 public partial class WorldPanel : Godot.Panel
 {
+	public class PendProxy(CommandRunner runner)
+	{
+		private readonly CommandRunner m_Runner = runner;
+		private List<Command> m_CurrUnitCmds;
+		
+		public void AssignWaitList(List<Command> listToPendTo) => m_CurrUnitCmds = listToPendTo;
+
+		public void PendParallel(IEnumerable<Command> group, int index)
+		{
+			m_CurrUnitCmds.AddRange(group);
+			m_Runner.PendParallel(group, index);
+		}
+
+		public void PendFullSequence(IEnumerable<IEnumerable<Command>> groups, int startIndex = 0)
+		{
+			m_CurrUnitCmds.AddRange(groups.SelectMany(g => g));
+			m_Runner.PendFullSequence(groups, startIndex);
+		}
+	}
+
 	public static readonly Vector2I MinDims = new(3, 3);
 	public static readonly Vector2I MaxDims = new(100, 100);
 
 	// Nodes
 	public static readonly Godot.PackedScene ItemScene = GD.Load<Godot.PackedScene>("res://scenes/item.tscn");
-	public static readonly Godot.PackedScene UnSupplierScene = GD.Load<Godot.PackedScene>("res://scenes/un_supplier.tscn");
-	public static readonly Godot.PackedScene UnSliderScene = GD.Load<Godot.PackedScene>("res://scenes/un_slider.tscn");
-	public static readonly Godot.PackedScene UnUpdaterScene = GD.Load<Godot.PackedScene>("res://scenes/un_updater.tscn");
-	public static readonly Godot.PackedScene UnBinScene = GD.Load<Godot.PackedScene>("res://scenes/un_bin.tscn");
-	public static readonly Godot.PackedScene UnDemanderScene = GD.Load<Godot.PackedScene>("res://scenes/un_demander.tscn");
-	public static readonly Godot.PackedScene UnCombinerScene = GD.Load<Godot.PackedScene>("res://scenes/un_combiner.tscn");
-	public static readonly Godot.PackedScene UnClonerScene = GD.Load<Godot.PackedScene>("res://scenes/un_cloner.tscn");
-	public static readonly Godot.PackedScene UnBranchScene = GD.Load<Godot.PackedScene>("res://scenes/un_branch.tscn");
+	public static readonly Godot.PackedScene UNSupplierScene = GD.Load<Godot.PackedScene>("res://scenes/UNSupplier.tscn");
+	public static readonly Godot.PackedScene UNSliderScene = GD.Load<Godot.PackedScene>("res://scenes/UNSlider.tscn");
+	public static readonly Godot.PackedScene UNUpdaterScene = GD.Load<Godot.PackedScene>("res://scenes/UNUpdater.tscn");
+	public static readonly Godot.PackedScene UNBinScene = GD.Load<Godot.PackedScene>("res://scenes/UNBin.tscn");
+	public static readonly Godot.PackedScene UNDemanderScene = GD.Load<Godot.PackedScene>("res://scenes/UNDemander.tscn");
+	public static readonly Godot.PackedScene UNCombinerScene = GD.Load<Godot.PackedScene>("res://scenes/UNCombiner.tscn");
+	public static readonly Godot.PackedScene UNClonerScene = GD.Load<Godot.PackedScene>("res://scenes/UNCloner.tscn");
+	public static readonly Godot.PackedScene UNBranchScene = GD.Load<Godot.PackedScene>("res://scenes/UNBranch.tscn");
 
 	// Other statics
 	public static readonly Godot.Font DebugFont = GD.Load<Godot.Font>("res://resources/fonts/AnonymousPro-Regular.ttf");
@@ -35,7 +56,13 @@ public partial class WorldPanel : Godot.Panel
 	private Vector2I m_Dims = new(15, 10);
 	private List<Unit> m_Units = [];
 	private List<Tile> m_Tiles = [];
-	private List<CmdSlide> m_BlockedSlideCmdsByItems = [];
+	private readonly CommandRunner m_Runner = new([]);
+
+#if DEBUG
+	// Used to prevent injecting commands after OnTick and before OnEdge.
+	private bool m_bCmdInjectionAllowed = false;
+#endif
+
 
 	#region .Essential Functions
 
@@ -487,10 +514,7 @@ public partial class WorldPanel : Godot.Panel
 
 	public void DoPerFrame(float dt, Level lv)
 	{
-		foreach (var u in m_Units)
-		{
-			u.DoPerFrame(dt, lv);
-		}
+		m_Runner.DoPerFrame(dt, lv);
 	}
 
 	public void OnTick(Level lv)
@@ -501,10 +525,9 @@ public partial class WorldPanel : Godot.Panel
 			tl?.GetItemMaybeNull()?.ResetMovementFlag();
 		}
 
-		// This must happen before HandleCmdTick, otherwise the first tick will handle nothing.
 		foreach (var u in m_Units)
 		{
-			u.HandlePendingNewCommands();
+			u.HandlePendingNewCommands(new(m_Runner));
 		}
 
 		foreach (var u in m_Units)
@@ -512,22 +535,12 @@ public partial class WorldPanel : Godot.Panel
 			u.PreprocessTick();
 		}
 
-		foreach (var u in m_Units)
-		{
-			u.HandleCmdOnTick(lv);
-		}
-
-		// Must happen after HandleCmdTick, otherwise it will do nothing since the queue is populated 
-		// by HandleCmdTick.
-		HandleSlideCmdOverlapping();
+		m_Runner.OnTick(lv);
 	}
 
 	public void OnEdge(Level lv)
 	{
-		foreach (var u in m_Units)
-		{
-			u.HandleCmdOnEdge(lv);
-		}
+		m_Runner.OnEdge(lv);
 	}
 
 	public void CleanUpAfterSim()
@@ -542,7 +555,7 @@ public partial class WorldPanel : Godot.Panel
 			tl?.DestroyItem(true);
 		}
 
-		m_BlockedSlideCmdsByItems.Clear();
+		m_Runner.Reset();
 	}
 
 	#endregion
@@ -572,7 +585,7 @@ public partial class WorldPanel : Godot.Panel
 		}
 		foreach (var u in m_Units)
 		{
-			DrawRect(new(GridToPos(u.GridLoc), CellWidth*(Vector2)u.Dims), Godot.Colors.Black, false, -2.0f);
+			DrawRect(new(GridToPos(u.GLocation), CellWidth*(Vector2)u.Dimensions), Godot.Colors.Black, false, -2.0f);
 			DrawString(DebugFont, u.Position + new Vector2(0.0f, 15.0f), u.GetType().Name,
 				Godot.HorizontalAlignment.Left, CellWidth, 16, Godot.Colors.Black);
 		}
@@ -598,33 +611,33 @@ public partial class WorldPanel : Godot.Panel
 		// PlaceSlider(new(3, 8), Direction.North);
 	}
 
-	public UnCmdInjector PlaceInjector(IEnumerable<IEnumerable<Command>> cmdsToInject)
+	public UNCmdInjector PlaceInjector()
 	{
-		var u = new UnCmdInjector();
+		var u = new UNCmdInjector();
 		AddUnit(u);
-		u.Setup(this, cmdsToInject);
+		u.Setup(this);
 		return u;
 	}
 
-	public UnSupplier PlaceSupplier(Vector2I gloc, Direction dir, int rate, IEnumerable<int> seq)
+	public UNSupplier PlaceSupplier(Vector2I gloc, Direction dir, int rate, IEnumerable<int> seq)
 	{
-		var u = UnSupplierScene.Instantiate() as UnSupplier;
+		var u = UNSupplierScene.Instantiate() as UNSupplier;
 		AddUnit(u);
 		u.Setup(this, gloc, rate, dir, seq);
 		return u;
 	}
 
-	public UnSlider PlaceSlider(Vector2I gloc, Direction dir)
+	public UNSlider PlaceSlider(Vector2I gloc, Direction dir)
 	{
-		var u = UnSliderScene.Instantiate() as UnSlider;
+		var u = UNSliderScene.Instantiate() as UNSlider;
 		AddUnit(u);
 		u.Setup(this, gloc, 1, dir);
 		return u;
 	}
 
-	public UnUpdater PlaceUpdater(Vector2I gloc, Direction dir, int rate, UnUpdater.UpdateType UpT)
+	public UNUpdater PlaceUpdater(Vector2I gloc, Direction dir, int rate, UNUpdater.UpdateType UpT)
 	{
-		var u = UnUpdaterScene.Instantiate<UnUpdater>();
+		var u = UNUpdaterScene.Instantiate<UNUpdater>();
 		AddUnit(u);
 		u.Setup(this, gloc, rate, dir, UpT);
 		return u;
@@ -692,7 +705,7 @@ public partial class WorldPanel : Godot.Panel
 		for (var i = m_Units.Count - 1; i >= 0; --i)
 		{
 			var u = m_Units[i];
-			if (!Unit.CanFitIn(this, u.GridLoc, u.Dims, u.Dir))
+			if (!Unit.CanFitIn(this, u.GLocation, u.Dimensions, u.Dir))
 			{
 				DeleteUnit(u);
 			}
@@ -726,51 +739,15 @@ public partial class WorldPanel : Godot.Panel
 		{
 			m_Tiles.Add(null);
 		}
-
-		m_BlockedSlideCmdsByItems.Clear();
 	}
 
 
 	/// <summary>
-	/// Adds a slide command blocked by another item in the way only, all other types crash the
-	/// program in debug.
+	/// Adds a slide command blocked by another item in the way only, all other types crash the program in debug.
 	/// </summary>
 	public void QueueBlockedSlideCmdByAnotherItem(CmdSlide cmd)
 	{
-		Debug.Assert(HasTile(cmd.GridFrom));
-		Debug.Assert(GetTile(cmd.GridFrom).HasItem()); // Is there an actual item?
-		Debug.Assert(GetTile(cmd.GetGridTo()).IsReserved()); // And is it blocked?
-		Debug.Assert(!m_BlockedSlideCmdsByItems.Contains(cmd));
-		
-		m_BlockedSlideCmdsByItems.Add(cmd);
-	}
-
-	/// <summary>
-	/// Called after handling all ticks of pending commands
-	/// </summary>
-	private void HandleSlideCmdOverlapping()
-	{
-		// If any update happens in a pass, end that pass and start over,
-		// repeat until a full pass happens with no updates.
-		while (1 + 1 == 2)
-		{
-			var bSomethingMoved = false;
-			for (var i = 0; i < m_BlockedSlideCmdsByItems.Count; ++i)
-			{
-				if (m_BlockedSlideCmdsByItems[i].TryMovingByOverlap(this))
-				{
-					// Something moved? can only move once per tick so bye-bye.
-					m_BlockedSlideCmdsByItems.RemoveAt(i);
-					bSomethingMoved = true;
-					break;
-				}
-			}
-			if (!bSomethingMoved) // None has updated? it's over.
-			{
-				break;
-			}
-		}
-		m_BlockedSlideCmdsByItems.Clear();
+		m_Runner.QueueBlockedSlideCmdByAnotherItem(this, cmd);
 	}
 
 	/// <summary>
@@ -799,11 +776,11 @@ public partial class WorldPanel : Godot.Panel
 		m_Units.Remove(u);
 
 		var bLeftRight = u.Dir == Direction.East || u.Dir == Direction.West;
-		for (int y = 0, ylim = bLeftRight ? u.Dims.Y : u.Dims.X; y < ylim; ++y)
+		for (int y = 0, ylim = bLeftRight ? u.Dimensions.Y : u.Dimensions.X; y < ylim; ++y)
 		{
-			for (int x = 0, xlim = bLeftRight ? u.Dims.X : u.Dims.Y; x < xlim; ++x)
+			for (int x = 0, xlim = bLeftRight ? u.Dimensions.X : u.Dimensions.Y; x < xlim; ++x)
 			{
-				DeleteTile(u.GridLoc + new Vector2I(x, y));
+				DeleteTile(u.GLocation + new Vector2I(x, y));
 			}
 		}
 	}

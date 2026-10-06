@@ -20,22 +20,11 @@ public partial class TestHandler : Godot.Node
 	private static TestHandler s_Instance;
 
 
-	public bool IsShowPassingTests 
-	{ 
-		get => m_bShowPassingTests;
-		set => m_bShowPassingTests = value; 
-	}
+	public bool IsShowPassingTests { get; set; } = false;
+	public bool IsPrintOrphanNodes { get; set; } = false;
+	public bool IsStopOnFirstFail { get; set; } = false;
 
-	public bool IsPrintOrphanNodes
-	{ 
-		get => m_bPrintOrphanNodes;
-		set => m_bPrintOrphanNodes = value; 
-	}
-
-	private bool m_bShowPassingTests = false;
 	private Task m_WholeProgramTask;
-
-	private bool m_bPrintOrphanNodes = false;
 	private int m_OrphanCount = 0;
 
 
@@ -75,6 +64,28 @@ public partial class TestHandler : Godot.Node
 			.Where(c => c.IsSubclassOf(typeof(TestSuit)))
 			.ToArray();
 		
+		var runFirstClasses = testClasses
+			.Where(c => c.GetCustomAttribute<RunThisOnlyAttribute>() != null)
+			.ToArray();
+		if (runFirstClasses.Length > 0)
+		{
+			if (runFirstClasses.Length > 1)
+			{
+				GD.Print($"Found a {Pink}{nameof(RunThisOnlyAttribute)}{Reset} on more than 1 test suite:");
+				for (var i = 0; i < runFirstClasses.Length; ++i)
+				{
+					var clazz = runFirstClasses[i];
+					GD.Print($"[{i+1}] #{Pink}{clazz.Name}{Reset}");
+				}
+
+				return;
+			}
+
+			var onlyClass = runFirstClasses[0];
+			testClasses = [onlyClass];
+			GD.Print($"Only running test suite: {Pink}{onlyClass.Name}{Reset}.");
+		}
+
 		var runFirstMeths = testClasses
 			.SelectMany(c => c.GetMethods().Where(m => m.GetCustomAttribute<RunThisOnlyAttribute>() != null))
 			.ToArray();
@@ -95,9 +106,9 @@ public partial class TestHandler : Godot.Node
 			}
 
 			onlyTest = runFirstMeths[0];
-			GD.Print($"Only running test: {FormatTestName(onlyTest)} from {Pink}{onlyTest.DeclaringType.Name}{Reset}.");
-
 			testClasses = [onlyTest.DeclaringType];
+
+			GD.Print($"Only running test: {FormatTestName(onlyTest)} from {Pink}{onlyTest.DeclaringType.Name}{Reset}.");
 		}
 
 		foreach (var tclass in testClasses)
@@ -149,7 +160,7 @@ public partial class TestHandler : Godot.Node
 		// We don't wanna print intros for classes with no failing tests in that case.
 		bool bPrintClassIntro = true;
 
-		if (m_bShowPassingTests)
+		if (IsShowPassingTests)
 		{
 			GD.Print("========================================================");
 			GD.Print($"{Pink}{tclass.Name}:{Reset}");
@@ -157,10 +168,11 @@ public partial class TestHandler : Godot.Node
 		}
 
 		tclass.GetMethod("BeforeAll")?.Invoke(instance, []);
+		bool bSkipFromNowOn = false;
 		foreach (var tmeth in tMethods)
 		{
 			res.TestCount += 1;
-			if (tmeth.GetCustomAttribute<IgnoreAttribute>() != null)
+			if (tmeth.GetCustomAttribute<IgnoreAttribute>() != null || bSkipFromNowOn)
 			{
 				res.IgnoredTestCount += 1;
 				continue;
@@ -187,7 +199,7 @@ public partial class TestHandler : Godot.Node
 					throw new InvalidProgramException($"Sync test {Pink}{tmeth}{Reset} must return void");
 				}
 			}
-			
+
 			try
 			{
 				DoBeforeEachTest(tmeth);
@@ -208,7 +220,7 @@ public partial class TestHandler : Godot.Node
 				DoAfterEachTest(tmeth);
 
 				res.PassingTestCount += 1;
-				if (m_bShowPassingTests)
+				if (IsShowPassingTests)
 				{
 					GD.Print($"    {FormatTestName(tmeth)} {Green}passes!{Reset}");
 				}
@@ -222,8 +234,13 @@ public partial class TestHandler : Godot.Node
 					bPrintClassIntro = false;
 				}
 
-				var preMsg = (ex is TestAssertFailedException) ? "" : $"Unexpected '{ex.GetType()}': ";
-				GD.Print(ex.Message.Indent($"    {Red}{preMsg}{Reset}"));
+				if (ex is not TestAssertFailedException)
+				{
+					GD.Print($"{FormatTestName(tmeth)} {Red}failed{Reset} because of Unexpected {Red}'{ex.GetType()}'{Reset}:\n{ex.Message}".Indent("    "));
+					GD.Print(ex.StackTrace);
+				}
+
+				bSkipFromNowOn = IsStopOnFirstFail;
 			}
 		}
 		tclass.GetMethod("AfterAll")?.Invoke(instance, []);
@@ -240,7 +257,7 @@ public partial class TestHandler : Godot.Node
 		}
 		else if (res.PassingTestCount + res.IgnoredTestCount == res.TestCount)
 		{
-			if (m_bShowPassingTests)
+			if (IsShowPassingTests)
 			{
 				GD.Print($"{Green}All tests of {Pink}{tclass.Name} {Green}pass!{Reset}");
 				GD.Print("========================================================\n");
@@ -268,7 +285,7 @@ public partial class TestHandler : Godot.Node
 			GD.Print($"    {nCurrTestOrphan} {Red}orphan nodes detected{Reset}");
 		}
 
-		if (m_bPrintOrphanNodes)
+		if (IsPrintOrphanNodes)
 		{
 			PrintOrphanNodes();
 		}
