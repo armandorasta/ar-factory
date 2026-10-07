@@ -8,6 +8,8 @@ public class CmdIf : Command
 {
 	public enum CheckType
 	{
+		NoTile,
+		HasTile,
 		NoItem,
 		HasItem,
 		Equal,
@@ -21,21 +23,21 @@ public class CmdIf : Command
 	/// <summary>
 	/// Applies a check on a tile, the tile is considered to be left hand side for binary operations.
 	/// </summary>
-	public static bool Apply(CheckType check, Tile tl, int rhs)
+	public static bool Apply(CheckType check, Tile? tl, int rhs)
 	{ // Public for testing...
 		Debug.Assert(Enum.IsDefined(check));
-		Debug.AssertNotNull(tl);
-		
 		return check switch
 		{
-			CheckType.NoItem    => tl.HasItem() is false,
-			CheckType.HasItem   => tl.HasItem(),
-			CheckType.Equal     => tl.HasItem() && tl.Item.Value == rhs,
-			CheckType.NotEq     => tl.HasItem() && tl.Item.Value != rhs,
-			CheckType.Greater   => tl.HasItem() && tl.Item.Value >  rhs,
-			CheckType.GreaterEq => tl.HasItem() && tl.Item.Value >= rhs,
-			CheckType.Less      => tl.HasItem() && tl.Item.Value <  rhs,
-			CheckType.LessEq    => tl.HasItem() && tl.Item.Value <= rhs,
+			CheckType.NoTile    => tl is null,
+			CheckType.HasTile   => tl != null,
+			CheckType.NoItem    => tl is null || !tl.HasItem(),
+			CheckType.HasItem   => tl != null && tl.HasItem(),
+			CheckType.Equal     => tl != null && tl.HasItem() && tl.Item.Value == rhs,
+			CheckType.NotEq     => tl != null && tl.HasItem() && tl.Item.Value != rhs,
+			CheckType.Greater   => tl != null && tl.HasItem() && tl.Item.Value >  rhs,
+			CheckType.GreaterEq => tl != null && tl.HasItem() && tl.Item.Value >= rhs,
+			CheckType.Less      => tl != null && tl.HasItem() && tl.Item.Value <  rhs,
+			CheckType.LessEq    => tl != null && tl.HasItem() && tl.Item.Value <= rhs,
 			_ => throw new NotImplementedException()
 		};
 	}
@@ -45,16 +47,15 @@ public class CmdIf : Command
 	public CheckType Check { get; private set; }
 	public int CmpValue { get; private set; }
 	public List<Command> TrueCmdSeq { get; private set; }
-	public List<Command> FalseCmdSeq { get; private set; }
+	public List<Command>? FalseCmdSeq { get; private set; }
 
-	private CommandRunner m_BranchRunner;
-	private Action<Level> m_StateFunc;
+	private WorldPanel.PendProxy m_Pender;
 
 
-	public CmdIf(Vector2I gloc, CheckType check, int cmpVal,
+	public CmdIf(Vector2I gloc, CheckType check, int cmpVal, WorldPanel.PendProxy pender,
 		IEnumerable<Command> trueBranch, 
-		IEnumerable<Command> elseBranch = null) 
-		: base(1, true)
+		IEnumerable<Command>? elseBranch = null)
+		: base(1)
 	{
 		Debug.Assert(Item.IsValueWithinRange(cmpVal));
 		Debug.AssertNotNull(trueBranch);
@@ -64,66 +65,34 @@ public class CmdIf : Command
 		CmpValue = Item.Clamp(cmpVal);
 		TrueCmdSeq = [.. trueBranch];
 		FalseCmdSeq = elseBranch is null ? null : [.. elseBranch];
-
-		m_StateFunc = HandleDefault;
+		m_Pender = pender;
 	}
 
-	public CmdIf(Tile tl, CheckType check, int cmpVal, 
+	public CmdIf(Tile tl, CheckType check, int cmpVal,  WorldPanel.PendProxy pender,
 		IEnumerable<Command> cmdsIfTrue, 
-		IEnumerable<Command> cmdsIfFalse = null) 
-		: this(tl.GridLoc, check, cmpVal, cmdsIfTrue, cmdsIfFalse)
+		IEnumerable<Command>? cmdsIfFalse = null)
+		: this(tl.GridLoc, check, cmpVal, pender, cmdsIfTrue, cmdsIfFalse)
 	{ }
 
 
 	protected override void OnTick(Level lv)
 	{
-		m_StateFunc.Invoke(lv);
-	}
-
-	protected override void DoPerFrame(double dt, Level lv)
-	{
-		m_BranchRunner?.DoPerFrame(dt, lv);
-	}
-
-	protected override void OnEdge(Level lv)
-	{
-		if (!m_BranchRunner.OnEdge(lv))
-		{
-			PauseThisTick();
-		}
-	}
-
-
-	private void HandleDefault(Level lv)
-	{
 		Debug.Assert(lv.World.HasTile(GLocation));
 
 		var bCondMet = Apply(Check, lv.World.GetTile(GLocation), CmpValue);
 		var winnerBranch = bCondMet ? TrueCmdSeq : FalseCmdSeq;
-		if (winnerBranch is null)
+		if (winnerBranch is not null)
 		{
-			ForceFinish();
-			return;
+			m_Pender.Pend([winnerBranch]);
 		}
-		
-		// So they don't keep commands alive for no reason.
-		TrueCmdSeq = null;
-		FalseCmdSeq = null;
-
-		m_BranchRunner = new([winnerBranch]);
-		m_StateFunc = HandleBranch;
-		m_StateFunc.Invoke(lv);
-	}
-
-	private void HandleBranch(Level lv)
-	{
-		m_BranchRunner.OnTick(lv);
 	}
 
 	public override string ToString()
 	{
 		var condStr = Check switch
 		{
+			CheckType.NoTile    => $"no tile in {GLocation}",
+			CheckType.HasTile   => $"has tile in {GLocation}",
 			CheckType.NoItem    => $"no item in {GLocation}",
 			CheckType.HasItem   => $"has item in {GLocation}",
 			CheckType.Equal     => $"{GLocation} == {CmpValue}",

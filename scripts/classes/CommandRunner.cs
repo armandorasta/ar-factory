@@ -1,71 +1,84 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Xml.Serialization;
 using Godot;
 
 namespace ArFactory;
 
-public class CommandRunner
+public readonly struct CommandRunner()
 {
-	private readonly List<List<Command>> m_Groups;
-	private readonly List<CmdSlide> m_BlockedSlideCmdsByItems = [];
-
-	public CommandRunner(IEnumerable<IEnumerable<Command>> cmdGroups)
+	private class CmdWrapper(Command cmd, IEnumerable<Command> dep)
 	{
-		// !Any(_ => true) returns true for empty sequences only.
-		var nonEmptySeqs = cmdGroups.Where(g => g.Any(_ => true));
-		var lists = nonEmptySeqs.Select(g => g.ToList());
-		m_Groups = [.. lists];
+		public readonly Command Cmd = cmd;
+		public readonly List<Command> DepCmds = [.. dep];
+		public bool bRanThisTick = false;
+
+		public bool IsReady() => DepCmds.All(c => c.IsDone());
+		public void OnTick(Level lv)
+		{
+			if (!bRanThisTick)
+			{
+				Cmd.HandleOnTick(lv);
+				bRanThisTick = true;
+			}
+		}
 	}
+
+	private static readonly Type[] s_CmdPiorities =
+	[
+		typeof(CmdIf),
+		typeof(CmdVacate),
+		typeof(CmdAwait),
+		typeof(CmdAwaitVacate),
+		typeof(CmdDemand),
+		typeof(CmdSpawn),
+		typeof(CmdClone),
+		typeof(CmdUpdate),
+		typeof(CmdTeleport),
+		typeof(CmdCombine),
+		typeof(CmdKill),
+		typeof(CmdSlide),
+		typeof(CmdSleep),
+	];
+
+	private static int GetCmdPiority<T>(T cmd) where T: Command
+	{
+		var tp = cmd.GetType();
+		for (var i = 0; i < s_CmdPiorities.Length; ++i)
+		{
+			if (s_CmdPiorities[i] == tp)
+			{
+				return i;
+			}
+		}
+
+		throw new InvalidProgramException($"GetCmdPiority: Invalid command type '{tp}'");
+	}
+
+
+	private readonly List<CmdWrapper> m_Cmds = [];
+	private readonly List<CmdSlide> m_BlockedSlideCmdsByItems = [];
 
 	/// <summary>
 	/// Checks if the runner no longer needs to execute anything, either because it already executed
 	/// everything else (always the case in blocking mode), or it failed somewhere (only in non-blocking
 	/// mode).
 	/// </summary>
-	public bool IsDone() => m_Groups.Count == 0;
+	public bool IsDone() => m_Cmds.Count == 0;
 
-	/// <summary>
-	/// Returns <see langword="true"/> if we are waiting for the animation of a slide command to end, 
-	/// that slide command is on one of the outputs of the unit.
-	/// In this case, we can often just pend new commands before the end of the animation on the next
-	/// tick.
-	/// If there are no pending commands, it will return false!
-	/// </summary>
-	public bool IsJustAwaitingOutSlideAnim() // TODO: Make this function only check output tiles somehow!
-		=> m_Groups.Count > 0 && m_Groups[0].All(c => c is CmdSlide sc && sc.IsAwaitingAnim());
-
-	public void PendFullSequence(IEnumerable<IEnumerable<Command>> groups, int startIndex = 0)
+	public void PendFullSequence(IEnumerable<IEnumerable<Command>> groups)
 	{
-		Debug.Assert(0 <= startIndex && startIndex <= m_Groups.Count);
-
-		// We pend in parallel with all other pend calls:
-		// First  call: Pend([ [g1], [g2] ])          => m_Groups = [ [g1], [g2] ]
-		// Second call: Pend([ [g3], [g4], [g5] ])    => m_Groups = [ [g1, g3], [g2, g4], [g5] ]
-		// Third  call: Pend([ [g6], [g7], [g8] ], 1) => m_Groups = [ [g1, g3], [g2, g4, g6], [g5, g7], [g8] ]
-		// etc...
-
-		var i = startIndex;
+		IEnumerable<Command> lastGroup = [];
 		foreach (var g in groups)
 		{
-			PendParallel(g, i);
-			i += 1;
+			foreach (var cmd in g)
+			{
+				m_Cmds.Add(new CmdWrapper(cmd, lastGroup));
+			}
+			lastGroup = g;
 		}
 	}
-
-	public void PendParallel(IEnumerable<Command> group, int index)
-	{
-		Debug.Assert(0 <= index && index <= m_Groups.Count);
-		if (index < m_Groups.Count)
-		{
-			m_Groups[index].AddRange(group);
-		}
-		else
-		{
-			m_Groups.Add([.. group]);
-		}
-	}
-
 
 	/// <summary>
 	/// Should be called on the beginning of the tick, this does nothing when no commands are left to be executed.
@@ -77,33 +90,37 @@ public class CommandRunner
 			return true;
 		}
 
-		while (m_Groups.Count > 0)
+		var i = 0;
+		do
 		{
-			var g0 = m_Groups[0];
-			foreach (var cmd in g0)
-			{
-				cmd.HandleOnTick(lv);
-			}
+			m_Cmds.Sort((l, r) => GetCmdPiority(l.Cmd) - GetCmdPiority(r.Cmd));
 
-			for (var i = g0.Count - 1; i >= 0; --i)
+			var count = m_Cmds.Count;
+			for (i = 0; i < count; ++i)
 			{
-				var cmd = g0[i];
-				Debug.Assert(!cmd.IsSmooth() || !cmd.IsDone()); // These should have already been bombed in OnEdge.
-				if (!cmd.IsSmooth() && cmd.CountAndCheckIfDone())
+				var cmdWrap = m_Cmds[i];
+				if (cmdWrap.IsReady())
 				{
-					g0.RemoveAt(i);
+					cmdWrap.OnTick(lv);
+					if (m_Cmds.Count != count)
+					{
+						break;
+					}
 				}
 			}
+		} while (i < m_Cmds.Count);
 
-			if (g0.Count == 0)
+		for (i = m_Cmds.Count - 1; i >= 0; --i)
+		{
+			var cmd = m_Cmds[i];
+			Debug.Assert(!cmd.Cmd.IsSmooth() || !cmd.Cmd.IsDone()); // These should have already been bombed in OnEdge.
+			if (cmd.IsReady() && !cmd.Cmd.IsSmooth() && cmd.Cmd.CountAndCheckIfDone())
 			{
-				// Done with the current group, move to the next one immediately until either all
-				// commands get consumed, or you get to a group and not all of its commands.
-				m_Groups.RemoveAt(0);
+				m_Cmds.RemoveAt(i);
 			}
 			else
 			{
-				break; // Unfinished group? must be finished before we move on, so wait for next tick.
+				cmd.bRanThisTick = false;
 			}
 		}
 
@@ -121,53 +138,39 @@ public class CommandRunner
 			return true;
 		}
 
-		// No loop here like OnTick because we know that commands on next group have not called OnTick yet.
-
-		var g0 = m_Groups[0];
-		foreach (var cmd in g0)
+		foreach (var cmd in m_Cmds)
 		{
-			if (!cmd.HasBlockedThisTick() && cmd.IsSmooth())
+			if (cmd.IsReady() && !cmd.Cmd.HasBlockedThisTick() && cmd.Cmd.IsSmooth())
 			{
-				cmd.HandleOnEdge(lv);
+				cmd.Cmd.HandleOnEdge(lv);
 			}
 		}
 
-		for (var i = g0.Count - 1; i >= 0; --i)
+		for (var i = m_Cmds.Count - 1; i >= 0; --i)
 		{
-			var cmd = g0[i];
+			var cmd = m_Cmds[i];
 			// Instant commands get popped in OnTick, only smooth commands are handled at the end here.
-			Debug.Assert(cmd.IsSmooth() || !cmd.IsDone());
-			if (cmd.IsSmooth() && cmd.CountAndCheckIfDone())
+			Debug.Assert(cmd.Cmd.IsSmooth() || !cmd.Cmd.IsDone());
+			if (cmd.Cmd.IsSmooth() && cmd.Cmd.CountAndCheckIfDone())
 			{
-				g0.RemoveAt(i);
+				m_Cmds.RemoveAt(i);
 			}
-		}
-
-		if (g0.Count == 0)
-		{
-			m_Groups.RemoveAt(0);
 		}
 		
 		return IsDone();
 	}
 
-	public bool DoPerFrame(double dt, Level lv)
+	public void DoPerFrame(double dt, Level lv)
 	{
-		if (m_Groups.Count != 0)
+		foreach (var cmd in m_Cmds)
 		{
-			foreach (var cmd in m_Groups[0])
-			{
-				cmd.HandleFrame(dt, lv);
-			}
-
-			return false;
+			cmd.Cmd.HandleFrame(dt, lv);
 		}
-		else return true;
 	}
 
 	public void Reset()
 	{
-		m_Groups.Clear();
+		m_Cmds.Clear();
 		m_BlockedSlideCmdsByItems.Clear();
 	}
 

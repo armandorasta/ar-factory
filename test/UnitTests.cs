@@ -180,44 +180,46 @@ public class UnitTests : ArTest.TestSuit
 		}
 	}
 
+	[ArTest.RunThisOnly]
 	[ArTest.Test] public async Task TestSupplier_clogged()
 	{
 		var world = m_Lv.World;
 		world.Reset();
 		var supp = world.PlaceSupplier(Vector2I.One, Direction.South, 2, [261, 296]);
-		var sTl = world.GetTile(supp.GLocation);
-		var tl1 = world.InstallEmptyTile(supp.GLocation + new Vector2I(0, 1));
+		var tlSupp = world.GetTile(supp.GLocation);
+		var tlNearby = world.InstallEmptyTile(supp.GLocation + new Vector2I(0, 1));
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
-			world.SpawnItem(tl1, -217); // In the way
+			world.SpawnItem(tlNearby, -217); // In the way
+
 			await m_Lv.TickOnceAsync(); // Nothing happens
-			AssertFalse(sTl.HasItem());
+			AssertFalse(tlSupp.HasItem());
 			
 			await m_Lv.TickOnceAsync(); // First item spawns
-			AssertTrue(sTl.HasItem());
-			AssertFalse(sTl.Item.IsMidAnimation());
-			AssertEq(sTl.Item.Value, 261);
+			AssertTrue(tlSupp.HasItem());
+			AssertFalse(tlSupp.Item.IsMidAnimation());
+			AssertEq(tlSupp.Item.Value, 261);
 
 			await m_Lv.TickOnceAsync(); // Nothing happens
 
 			await m_Lv.TickOnceAsync(); // Blocked, and differred to next tick not the next time around.
-			AssertTrue(sTl.HasItem());
-			AssertFalse(sTl.Item.IsMidAnimation());
-			AssertEq(sTl.Item.Value, 261);
+			AssertTrue(tlSupp.HasItem());
+			AssertFalse(tlSupp.Item.IsMidAnimation());
+			AssertEq(tlSupp.Item.Value, 261);
 
-			tl1.DestroyItem(); // Remove the obsticle
+			tlNearby.DestroyItem(); // Remove the obsticle
 			await m_Lv.TickOnceAsync();
 			// Clogged item should spawn as soon as it can regardless of the tick rate, 
 			// clogged this tick? try next tick again and again.
 
-			AssertTrue(sTl.HasItem());
-			AssertFalse(sTl.Item.IsMidAnimation());
-			AssertEq(sTl.Item.Value, 296);
-			
-			AssertTrue(tl1.HasItem());
-			AssertTrue(tl1.Item.IsMidAnimation());
-			AssertEq(tl1.Item.Value, 261);
+			AssertTrue(tlSupp.HasItem());
+			AssertFalse(tlSupp.Item.IsMidAnimation());
+			AssertEq(tlSupp.Item.Value, 296);
+
+			AssertTrue(tlNearby.HasItem());
+			AssertTrue(tlNearby.Item.IsMidAnimation());
+			AssertEq(tlNearby.Item.Value, 261);
 
 			AssertTrue(supp.IsDoneWithInputSeq());
 		}

@@ -1,5 +1,7 @@
 namespace ArTest;
 
+#if TEST
+
 public abstract class TestSuit
 {
 	public virtual void BeforeAll()  { }
@@ -19,3 +21,5 @@ public abstract class TestSuit
 		return node;
 	}
 }
+
+#endif // Test

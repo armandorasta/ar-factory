@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Linq;
 
@@ -8,28 +9,24 @@ namespace ArFactory;
 
 public partial class WorldPanel : Godot.Panel
 {
-	public class PendProxy(CommandRunner runner)
+	public struct PendProxy(CommandRunner runner)
 	{
 		private readonly CommandRunner m_Runner = runner;
-		private List<Command> m_CurrUnitCmds;
+		private List<Command>? m_CurrUnitCmds;
 		
 		public void AssignWaitList(List<Command> listToPendTo) => m_CurrUnitCmds = listToPendTo;
 
-		public void PendParallel(IEnumerable<Command> group, int index)
+		public readonly void Pend(IEnumerable<IEnumerable<Command>> groups)
 		{
-			m_CurrUnitCmds.AddRange(group);
-			m_Runner.PendParallel(group, index);
-		}
-
-		public void PendFullSequence(IEnumerable<IEnumerable<Command>> groups, int startIndex = 0)
-		{
-			m_CurrUnitCmds.AddRange(groups.SelectMany(g => g));
-			m_Runner.PendFullSequence(groups, startIndex);
+			// Null when testing only!
+			m_CurrUnitCmds?.AddRange(groups.SelectMany(g => g));
+			m_Runner.PendFullSequence(groups);
 		}
 	}
 
 	public static readonly Vector2I MinDims = new(3, 3);
 	public static readonly Vector2I MaxDims = new(100, 100);
+
 
 	// Nodes
 	public static readonly Godot.PackedScene ItemScene = GD.Load<Godot.PackedScene>("res://scenes/item.tscn");
@@ -56,7 +53,7 @@ public partial class WorldPanel : Godot.Panel
 	private Vector2I m_Dims = new(15, 10);
 	private List<Unit> m_Units = [];
 	private List<Tile> m_Tiles = [];
-	private readonly CommandRunner m_Runner = new([]);
+	private readonly CommandRunner m_Runner = new();
 
 #if DEBUG
 	// Used to prevent injecting commands after OnTick and before OnEdge.
@@ -527,7 +524,8 @@ public partial class WorldPanel : Godot.Panel
 
 		foreach (var u in m_Units)
 		{
-			u.HandlePendingNewCommands(new(m_Runner));
+			var pender = new PendProxy(m_Runner);
+			u.HandlePendingNewCommands(pender); // So when I press F11 it doesn't dive into the ctor.
 		}
 
 		foreach (var u in m_Units)
@@ -786,4 +784,13 @@ public partial class WorldPanel : Godot.Panel
 	}
 
 	#endregion
+	#region .Test Specific
+#if TEST
+
+	public PendProxy MakePenderForTesting() => new(m_Runner);
+
+#endif // TEST
+	#endregion .Test Specific
+
+
 }

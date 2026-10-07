@@ -26,16 +26,26 @@ public class CmdSlide : Command
 
 	public bool IsAwaitingAnim() => m_StateFunc is null;
 	public Vector2I GetGridTo() => GridFrom + Dir.ToGrid();
+	/// <summary>
+	/// Assumes the tile exists.
+	/// </summary>
+	public bool CanSlideNextTick(WorldPanel world)
+	{
+		var destTl = world.GetTile(GetGridTo());
+		return destTl.CanItemEnter(Dir.Invert()) // No wall in the way
+			&& !destTl.IsReserved();             // No item already there/about to be there
+	}
+
 
 	/// <summary>
-	/// If <see cref="TrackedItemRef"/> can move, it will move it and return true, otherwise it will 
-	/// return false.
+	/// If <see cref="TrackedItemRef"/> can move, it will move it and return true, otherwise it will return false.
 	/// </summary>
 	public bool TryMovingByOverlap(WorldPanel world)
 	{
 		Debug.AssertEq(m_StateFunc, HandleDefault);
 		Debug.AssertNotNull(TrackedItemRef);
 		Debug.Assert(TrackedItemRef.TryGetTarget(out var it) && it.IsAllowedToMove());
+		Debug.Assert(world.HasTile(GetGridTo()));
 
 		if (!world.GetTile(GetGridTo()).IsReserved())
 		{

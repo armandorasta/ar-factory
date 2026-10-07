@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 using Godot;
 
 namespace ArTest;
+
+#if TEST
+
 using static AnsiColors;
 
 public partial class TestHandler : Godot.Node
@@ -16,6 +19,8 @@ public partial class TestHandler : Godot.Node
 		public int PassingTestCount;
 		public int IgnoredTestCount;
 	}
+
+	private const string sc_IndentationStr = "    ";
 
 	private static TestHandler s_Instance;
 
@@ -234,9 +239,15 @@ public partial class TestHandler : Godot.Node
 					bPrintClassIntro = false;
 				}
 
-				if (ex is not TestAssertFailedException)
+				if (ex is TestAssertFailedException)
 				{
-					GD.Print($"{FormatTestName(tmeth)} {Red}failed{Reset} because of Unexpected {Red}'{ex.GetType()}'{Reset}:\n{ex.Message}".Indent("    "));
+					GD.Print(ex.Message.Indent(sc_IndentationStr));
+				}
+				else
+				{
+					var errMsg = $"{FormatTestName(tmeth)} {Red}failed{Reset}" + 
+						$" because of Unexpected {Red}'{ex.GetType()}'{Reset}:\n{ex.Message}";
+					GD.Print(errMsg.Indent(sc_IndentationStr));
 					GD.Print(ex.StackTrace);
 				}
 
@@ -316,3 +327,5 @@ public partial class TestHandler : Godot.Node
 		return $"{Cyan}test {mainPart} ({rest}){Reset}";
 	}
 }
+
+#endif // TEST

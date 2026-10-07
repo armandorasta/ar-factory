@@ -31,7 +31,7 @@ public class CmdAwaitVacate : Command
 		var vacateTls = VacateGridLocs.Select(lv.World.GetTile);
 		if (!waitTls.All(tl => tl is not null) || !vacateTls.All(tl => tl is not null))
 		{
-			PauseThisTick();
+			// PauseThisTick();
 			return; // Forever and ever...
 		}
 

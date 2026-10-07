@@ -15,7 +15,7 @@ public partial class UNCmdInjector : Unit
 	
 	public override void PendNewCommands(WorldPanel.PendProxy pender)
 	{
-		pender.PendFullSequence(m_CmdSequenceNextTick);
+		pender.Pend(m_CmdSequenceNextTick);
 		m_CmdSequenceNextTick = [];
 	}
 
@@ -35,5 +35,4 @@ public partial class UNCmdInjector : Unit
 
 	public override string ToString() 
 		=> Utilz.ReplaceBaseNameInToString(base.ToString(), "CmdInjector");
-
 }

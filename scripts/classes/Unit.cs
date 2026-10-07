@@ -115,7 +115,6 @@ public abstract partial class Unit : Node2D
 		World = world;
 		m_TickType = TickType.Steady;
 		m_Rate = 1;
-		// Position = world.GridToPos(m_Dims);
 	}
 
 	#region Abstract Interface
@@ -184,9 +183,14 @@ public abstract partial class Unit : Node2D
 	/// Checks if there's either no commands left, or there are only slide commands that are just animating the slide 
 	/// for the user.
 	/// </summary>
-	protected bool IsSafeToPendCmds() 
-		=> !HasPendingCmds() || m_PendingCmds.All(c => c is CmdSlide sc && sc.IsAwaitingAnim());
+	protected bool IsSafeToPendCmds() => !HasPendingCmds() || AllCmdsAreEndingSlidingCmds();
 
+	/// <summary>
+	/// All the rest of the pending commands are sliding commands that will complete next tick, this means you can go
+	/// ahead and overlap a spawn where the item is about to slide away from.
+	/// </summary>
+	protected bool AllCmdsAreEndingSlidingCmds()
+		=> m_PendingCmds.All(c => c is CmdSlide sc && sc.CanSlideNextTick(World));
 	
 	#region Direction Related Methods
 

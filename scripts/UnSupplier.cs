@@ -28,12 +28,20 @@ public partial class UNSupplier : Unit
 			return;
 		}
 
-		pender.PendParallel([ new CmdVacate([m_Out0]) ], 0);
-		pender.PendParallel([ new CmdSpawn(m_Out0, PopNextValue()) ], 1);
-		if (World.HasTile(m_Out0.GridLoc + Dir.ToGrid()))
-		{
-			pender.PendParallel([ new CmdSlide(m_Out0, Dir) ], 1);
-		}
+		pender.Pend([
+			[ 
+				new CmdVacate([m_Out0]) 
+			],
+			[ 
+				new CmdSpawn(m_Out0, PopNextValue())
+			],
+			[ 
+				new CmdIf(m_Out0.GridLoc + Dir.ToGrid(), CmdIf.CheckType.HasTile, -1, pender,
+				[
+					new CmdSlide(m_Out0, Dir)	
+				]
+			)]
+		]);
 	}
 
 	public bool IsDoneWithInputSeq() => m_Index >= m_Sequence.Length - 1;

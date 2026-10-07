@@ -26,7 +26,7 @@ public partial class UNSlider : Unit
 			// I could also just add a third type, but I learned the hard way that simple is always the way to go.
 			if (tl.HasItem())
 			{
-				pender.PendParallel([new CmdSlide(tl, Dir)], 0);
+				pender.Pend([ [new CmdSlide(tl, Dir)] ]);
 			}
 		}
 	}
