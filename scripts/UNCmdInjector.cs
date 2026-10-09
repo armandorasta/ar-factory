@@ -33,6 +33,17 @@ public partial class UNCmdInjector : Unit
 		}
 	}
 
+	public void PendFullSequence(IEnumerable<IEnumerable<Command>> seq, int startIndex = 0)
+	{
+		Debug.Assert(0 <= startIndex && startIndex <= m_CmdSequenceNextTick.Count);
+		var i = 0;
+		foreach (var group in seq)
+		{
+			PendParallel(group, i);
+			++i;
+		}
+	}
+
 	public override string ToString() 
 		=> Utilz.ReplaceBaseNameInToString(base.ToString(), "CmdInjector");
 }

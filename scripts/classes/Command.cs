@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 
 namespace ArFactory;
@@ -67,7 +68,7 @@ public abstract class Command
 	/// <summary>
 	/// Executed at the very beginning of every tick.
 	/// </summary>
-	protected abstract void OnTick(Level lv);
+	protected abstract void OnTick(Level lv, CommandRunner.OnTickPender pender);
 	/// <summary>
 	/// Executed every frame. So far only used by slide...
 	/// </summary>
@@ -135,9 +136,9 @@ public abstract class Command
 	/// Should be called inside a <see cref="OnTick"/> function of some sort when handling commands manually. 
 	/// Generally speaking tho, you should be using <see cref="CommandRunner"/> for that.
 	/// </summary>
-	public void HandleOnTick(Level lv)
+	public void HandleOnTick(Level lv, CommandRunner.OnTickPender pender)
 	{
-		OnTick(lv);
+		OnTick(lv, pender);
 	}
 
 	/// <summary>

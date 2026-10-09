@@ -26,12 +26,12 @@ public class CmdClone : Command
 	{ }
 
 
-	protected override void OnTick(Level lv)
+	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{
 		Debug.Assert(HasTileWithItem(lv.World, SourceGL));
 		Debug.Assert(!DestinationGLs.All( l => HasTileUnreserved(lv.World, l) ));
 
-		Item it = lv.World.GetTile(SourceGL).Item;
+		Item it = lv.World.GetTileOrNull(SourceGL).Item;
 		if (it.IsMidAnimation())
 		{
 			throw new InvalidProgramException();

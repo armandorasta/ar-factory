@@ -20,9 +20,9 @@ public class CmdVacate : Command
 
 	public CmdVacate(IEnumerable<Tile> tls) : this(tls.Select(tl => tl.GridLoc)) { }
 
-	protected override void OnTick(Level lv)
+	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{
-		var myTiles = GridLocs.Select(lv.World.GetTile);
+		var myTiles = GridLocs.Select(lv.World.GetTileOrNull);
 		if (!myTiles.All(tl => tl is not null))
 		{
 			PauseThisTick();

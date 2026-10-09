@@ -12,13 +12,13 @@ using static AnsiColors;
 
 public static class Asserts
 {
-	public static SceneTree TreePtr;
-	public static string CurrTestClass;
-	public static string CurrTestMethod;
+	public static SceneTree? TreePtr;
+	public static string? CurrTestClass;
+	public static string? CurrTestMethod;
 
 	[StackTraceHidden] 
 	[DebuggerStepThrough]
-	public static void AssertTrue(bool cond, string msg = null)
+	public static void AssertTrue(bool cond, string? msg = null)
 	{
 		HandleImpl(cond, $"Expected {Green}'true'{Reset} but got {Red}'false'{Reset}", msg);
 	}
@@ -26,7 +26,7 @@ public static class Asserts
 	
 	[StackTraceHidden] 
 	[DebuggerStepThrough]
-	public static void AssertFalse(bool cond, string msg = null)
+	public static void AssertFalse(bool cond, string? msg = null)
 	{
 		HandleImpl(!cond, $"Expected {Green}'false'{Reset} but got {Red}'true'{Reset}", msg);
 	}
@@ -36,10 +36,11 @@ public static class Asserts
 	/// </summary>
 	[StackTraceHidden] 
 	[DebuggerStepThrough]
-	public static void AssertIs(object subject, Type expectedType, string msg = null)
+	public static void AssertIs(object? subject, Type expectedType, string? msg = null)
 	{
+		var typeStr = subject is null ? "null" : subject.GetType().ToString();
 		HandleImpl(expectedType.IsInstanceOfType(subject), 
-			$"Expected {Green}'{subject.GetType()}'{Reset} but got {Red}'{expectedType}'{Reset}", 
+			$"Expected {Green}'{typeStr}'{Reset} but got {Red}'{expectedType}'{Reset}", 
 			msg);
 	}
 
@@ -49,7 +50,7 @@ public static class Asserts
 	/// </summary>
 	[StackTraceHidden] 
 	[DebuggerStepThrough]
-	public static void AssertEq<T>(T testValue, T target, string msg = null)
+	public static void AssertEq<T>(T testValue, T target, string? msg = null)
 	{
 		HandleImpl(EqualityComparer<T>.Default.Equals(testValue, target),
 			$"Expected {Red}'{testValue}'{Reset} to equal {Green}'{target}'{Reset}", 
@@ -58,7 +59,7 @@ public static class Asserts
 
 	[StackTraceHidden] 
 	[DebuggerStepThrough]
-	public static void AssertNotEq<T>(T testValue, T target, string msg = null)
+	public static void AssertNotEq<T>(T? testValue, T? target, string? msg = null)
 	{
 		HandleImpl(!EqualityComparer<T>.Default.Equals(testValue, target),
 			$"Expected {Red}'{testValue}'{Reset} to not equal {Green}'{target}'{Reset}", 
@@ -67,7 +68,7 @@ public static class Asserts
 
 	[StackTraceHidden] 
 	[DebuggerStepThrough]
-	public static void AssertRefEq<T>(T testValue, T target, string msg = null) where T : class
+	public static void AssertRefEq<T>(T? testValue, T? target, string? msg = null) where T : class
 	{
 		HandleImpl(object.ReferenceEquals(testValue, target),
 			$"Expected {Red}'{testValue}'{Reset} to equal {Green}'{target}'{Reset}", 
@@ -76,7 +77,7 @@ public static class Asserts
 
 	[StackTraceHidden] 
 	[DebuggerStepThrough]
-	public static void AssertRefNotEq<T>(T testValue, T target, string msg = null)
+	public static void AssertRefNotEq<T>(T? testValue, T? target, string? msg = null)
 	{
 		HandleImpl(!object.ReferenceEquals(testValue, target),
 			$"Expected {Red}'{testValue}'{Reset} to not equal {Green}'{target}'{Reset}", 
@@ -85,7 +86,7 @@ public static class Asserts
 
 	[StackTraceHidden] 
 	[DebuggerStepThrough]
-	public static void AssertNull(object testValue, string msg = null)
+	public static void AssertNull(object? testValue, string? msg = null)
 	{
 		HandleImpl(testValue is null, 
 			$"Expected {Red}{testValue}{Reset} to be {Green}null{Reset}", 
@@ -94,7 +95,7 @@ public static class Asserts
 
 	[StackTraceHidden] 
 	[DebuggerStepThrough]
-	public static void AssertNotNull(object testValue, string msg = null)
+	public static void AssertNotNull(object? testValue, string? msg = null)
 	{
 		HandleImpl(testValue is not null, 
 			$"Expected {Green}non-null{Reset} but got {Red}null{Reset}", 
@@ -103,7 +104,7 @@ public static class Asserts
 
 	[StackTraceHidden] 
 	[DebuggerStepThrough]
-	public static void AssertThrow(Action whatToDo, Type exType = null, string msg = null)
+	public static void AssertThrow(Action whatToDo, Type? exType = null, string? msg = null)
 	{
 		if (exType != null && !exType.IsAssignableTo( typeof(Exception) ))
 		{
@@ -124,7 +125,7 @@ public static class Asserts
 
 	[StackTraceHidden]
 	[DebuggerStepThrough]
-	public static async Task AssertThrow(Func<Task> whatToDo, Type exType = null, string msg = null)
+	public static async Task AssertThrow(Func<Task> whatToDo, Type? exType = null, string? msg = null)
 	{
 		if (exType != null && !exType.IsAssignableTo( typeof(Exception) ))
 		{
@@ -145,7 +146,7 @@ public static class Asserts
 
 	[StackTraceHidden] 
 	[DebuggerHidden]
-	private static void HandleImpl(bool bMustBe, string specialMsg, string userMsg)
+	private static void HandleImpl(bool bMustBe, string specialMsg, string? userMsg)
 	{
 		if (bMustBe)
 		{
@@ -160,11 +161,18 @@ public static class Asserts
 
 		var trace = new StackTrace(2, fNeedFileInfo: true);
 		var frame = trace.GetFrame(0);
-		var file = Path.GetRelativePath(Directory.GetCurrentDirectory(), frame.GetFileName());
-		var line = frame.GetFileLineNumber();
-		var col = frame.GetFileColumnNumber();
-
-		bui.Append($"On ({Cyan}.\\{file}:{line}:{col}{Reset})\n");
+		if (frame is not null)
+		{
+			var fileName = frame.GetFileName();
+			var file = fileName is null ? "UNKNOWN" : Path.GetRelativePath(Directory.GetCurrentDirectory(), fileName);
+			var line = frame.GetFileLineNumber();
+			var col = frame.GetFileColumnNumber();
+			bui.Append($"On ({Cyan}.\\{file}:{line}:{col}{Reset})\n");
+		}
+		else
+		{
+			bui.Append("[LOCATION UNKNOWN]\n");
+		}
 
 		throw new TestAssertFailedException(bui.ToString());
 	}

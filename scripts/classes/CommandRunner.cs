@@ -1,26 +1,51 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Xml.Serialization;
-using Godot;
 
 namespace ArFactory;
 
 public readonly struct CommandRunner()
 {
-	private class CmdWrapper(Command cmd, IEnumerable<Command> dep)
+	public class CmdWrapper(Command cmd, IEnumerable<Command> dep)
 	{
 		public readonly Command Cmd = cmd;
 		public readonly List<Command> DepCmds = [.. dep];
+		public bool bHasNextCmd = false;
 		public bool bRanThisTick = false;
 
-		public bool IsReady() => DepCmds.All(c => c.IsDone());
-		public void OnTick(Level lv)
+		public bool AllDepsDone() => DepCmds.All(c => c.IsDone());
+		public override string ToString() => Cmd.ToString();
+	}
+
+	
+	public readonly struct OnTickPender()
+	{
+		public readonly List<List<CmdWrapper>> Groups = [];
+
+		public void Pend(IEnumerable<IEnumerable<Command>> newSequence, int startIndex = 0)
 		{
-			if (!bRanThisTick)
+			Debug.Assert(0 <= startIndex && startIndex <= Groups.Count);
+			IEnumerable<Command> lastNewCmdGroup = [];
+			var i = startIndex;
+			foreach (var ng in newSequence)
 			{
-				Cmd.HandleOnTick(lv);
-				bRanThisTick = true;
+				if (i < Groups.Count)
+				{
+					Groups[i].AddRange(ng.Select(c => new CmdWrapper(c, lastNewCmdGroup)));
+				}
+				else
+				{
+					Groups.Add([.. ng.Select(c => new CmdWrapper(c, lastNewCmdGroup))]);
+				}
+				if (i > startIndex)
+				{
+					foreach (var cmdWrapper in Groups[i - 1])
+					{
+						cmdWrapper.bHasNextCmd = true;
+					}
+				}
+				lastNewCmdGroup = ng;
+				++i;
 			}
 		}
 	}
@@ -42,7 +67,7 @@ public readonly struct CommandRunner()
 		typeof(CmdSleep),
 	];
 
-	private static int GetCmdPiority<T>(T cmd) where T: Command
+	private static int GetCmdPiority<T>(T cmd) where T : Command
 	{
 		var tp = cmd.GetType();
 		for (var i = 0; i < s_CmdPiorities.Length; ++i)
@@ -57,26 +82,41 @@ public readonly struct CommandRunner()
 	}
 
 
-	private readonly List<CmdWrapper> m_Cmds = [];
+	private readonly List<List<CmdWrapper>> m_Groups = [];
 	private readonly List<CmdSlide> m_BlockedSlideCmdsByItems = [];
+	private readonly List<CmdWrapper> m_OnEdgeQueue = [];
 
 	/// <summary>
 	/// Checks if the runner no longer needs to execute anything, either because it already executed
 	/// everything else (always the case in blocking mode), or it failed somewhere (only in non-blocking
 	/// mode).
 	/// </summary>
-	public bool IsDone() => m_Cmds.Count == 0;
+	public bool IsDone() => m_Groups.Count == 0;
 
-	public void PendFullSequence(IEnumerable<IEnumerable<Command>> groups)
+	public void PendFullSequence(IEnumerable<IEnumerable<Command>> newSequence, int startIndex = 0)
 	{
+		Debug.Assert(0 <= startIndex && startIndex <= m_Groups.Count);
 		IEnumerable<Command> lastGroup = [];
-		foreach (var g in groups)
+		var i = startIndex;
+		foreach (var ng in newSequence)
 		{
-			foreach (var cmd in g)
+			if (i < m_Groups.Count)
 			{
-				m_Cmds.Add(new CmdWrapper(cmd, lastGroup));
+				m_Groups[i].AddRange(ng.Select(c => new CmdWrapper(c, lastGroup)));
 			}
-			lastGroup = g;
+			else
+			{
+				m_Groups.Add([.. ng.Select(c => new CmdWrapper(c, lastGroup))]);
+			}
+			if (i > startIndex)
+			{
+				foreach (var cmdWrapper in m_Groups[i - 1])
+				{
+					cmdWrapper.bHasNextCmd = true;
+				}
+			}
+			lastGroup = ng;
+			++i;
 		}
 	}
 
@@ -85,47 +125,72 @@ public readonly struct CommandRunner()
 	/// </summary>
 	public bool OnTick(Level lv)
 	{
-		if (IsDone())
+		if (IsDone()) return true;
+		for (var gIndex = 0;;)
 		{
-			return true;
-		}
-
-		var i = 0;
-		do
-		{
-			m_Cmds.Sort((l, r) => GetCmdPiority(l.Cmd) - GetCmdPiority(r.Cmd));
-
-			var count = m_Cmds.Count;
-			for (i = 0; i < count; ++i)
+			var currGroup = m_Groups[gIndex];
+			var bGoingNextGroup = false;
+			for (var otPender = new OnTickPender();;)
 			{
-				var cmdWrap = m_Cmds[i];
-				if (cmdWrap.IsReady())
+				currGroup.Sort((l, r) => GetCmdPiority(l.Cmd) - GetCmdPiority(r.Cmd));
+				foreach (var cw in currGroup)
 				{
-					cmdWrap.OnTick(lv);
-					if (m_Cmds.Count != count)
+					if (cw.AllDepsDone() && !cw.bRanThisTick)
 					{
-						break;
+						cw.Cmd.HandleOnTick(lv, otPender);
+						cw.bRanThisTick = true;
+						if (!cw.Cmd.IsSmooth()) 
+						{
+							cw.Cmd.CountThisTick();
+						}
 					}
 				}
+				bGoingNextGroup = currGroup.Any(c => c.Cmd.IsDone() && c.bHasNextCmd);
+				currGroup.RemoveAll(c => c.Cmd.IsDone());
+				if (otPender.Groups.Count > 0)
+				{
+					var i = 0;
+					foreach (var ng in otPender.Groups)
+					{
+						if (i < m_Groups.Count)
+						{
+							m_Groups[i].AddRange(ng);
+						}
+						else
+						{
+							m_Groups.Add([.. ng]);
+						}
+						++i;
+					}
+					otPender.Groups.Clear();
+				}
+				else break;
 			}
-		} while (i < m_Cmds.Count);
-
-		for (i = m_Cmds.Count - 1; i >= 0; --i)
-		{
-			var cmd = m_Cmds[i];
-			Debug.Assert(!cmd.Cmd.IsSmooth() || !cmd.Cmd.IsDone()); // These should have already been bombed in OnEdge.
-			if (cmd.IsReady() && !cmd.Cmd.IsSmooth() && cmd.Cmd.CountAndCheckIfDone())
+			
+			if (bGoingNextGroup)
 			{
-				m_Cmds.RemoveAt(i);
+				++gIndex;
 			}
-			else
-			{
-				cmd.bRanThisTick = false;
-			}
+			else break;
 		}
+
+		m_Groups.RemoveAll(g => g.Count == 0);
 
 		HandleSlideCmdOverlapping(lv.World);
 		return IsDone();
+	}
+
+	public bool DoPerFrame(double dt, Level lv)
+	{
+		if (!IsDone())
+		{
+			foreach (var cmd in m_Groups[0])
+			{
+				cmd.Cmd.HandleFrame(dt, lv);
+			}
+			return false;
+		}
+		return true;
 	}
 
 	/// <summary>
@@ -133,44 +198,34 @@ public readonly struct CommandRunner()
 	/// </summary>
 	public bool OnEdge(Level lv)
 	{
-		if (IsDone())
+		foreach (var group in m_Groups)
 		{
-			return true;
-		}
-
-		foreach (var cmd in m_Cmds)
-		{
-			if (cmd.IsReady() && !cmd.Cmd.HasBlockedThisTick() && cmd.Cmd.IsSmooth())
+			var bSomethingRan = false;
+			foreach (var cw in group)
 			{
-				cmd.Cmd.HandleOnEdge(lv);
+				if (cw.bRanThisTick && cw.Cmd.IsSmooth())
+				{
+					cw.Cmd.HandleOnEdge(lv);
+					cw.Cmd.CountThisTick();
+					bSomethingRan = true;
+				}
+				cw.bRanThisTick = false;
+			}
+			group.RemoveAll(c => c.Cmd.IsDone());
+			if (!bSomethingRan)
+			{
+				break;
 			}
 		}
 
-		for (var i = m_Cmds.Count - 1; i >= 0; --i)
-		{
-			var cmd = m_Cmds[i];
-			// Instant commands get popped in OnTick, only smooth commands are handled at the end here.
-			Debug.Assert(cmd.Cmd.IsSmooth() || !cmd.Cmd.IsDone());
-			if (cmd.Cmd.IsSmooth() && cmd.Cmd.CountAndCheckIfDone())
-			{
-				m_Cmds.RemoveAt(i);
-			}
-		}
-		
+		m_Groups.RemoveAll(g => g.Count == 0);
+
 		return IsDone();
-	}
-
-	public void DoPerFrame(double dt, Level lv)
-	{
-		foreach (var cmd in m_Cmds)
-		{
-			cmd.Cmd.HandleFrame(dt, lv);
-		}
 	}
 
 	public void Reset()
 	{
-		m_Cmds.Clear();
+		m_Groups.Clear();
 		m_BlockedSlideCmdsByItems.Clear();
 	}
 
@@ -180,7 +235,7 @@ public readonly struct CommandRunner()
 		Debug.Assert(world.GetTile(cmd.GridFrom).HasItem()); // Is there an actual item?
 		Debug.Assert(world.GetTile(cmd.GetGridTo()).IsReserved()); // And is it blocked?
 		Debug.Assert(!m_BlockedSlideCmdsByItems.Contains(cmd));
-		
+
 		m_BlockedSlideCmdsByItems.Add(cmd);
 	}
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace ArFactory;
@@ -46,15 +47,13 @@ public class CmdIf : Command
 	public Vector2I GLocation { get; private set; }
 	public CheckType Check { get; private set; }
 	public int CmpValue { get; private set; }
-	public List<Command> TrueCmdSeq { get; private set; }
-	public List<Command>? FalseCmdSeq { get; private set; }
-
-	private WorldPanel.PendProxy m_Pender;
+	public List<List<Command>> TrueBranch { get; private set; }
+	public List<List<Command>>? ElseBranch { get; private set; }
 
 
-	public CmdIf(Vector2I gloc, CheckType check, int cmpVal, WorldPanel.PendProxy pender,
-		IEnumerable<Command> trueBranch, 
-		IEnumerable<Command>? elseBranch = null)
+	public CmdIf(Vector2I gloc, CheckType check, int cmpVal,
+		IEnumerable<IEnumerable<Command>> trueBranch, 
+		IEnumerable<IEnumerable<Command>>? elseBranch = null)
 		: base(1)
 	{
 		Debug.Assert(Item.IsValueWithinRange(cmpVal));
@@ -63,27 +62,26 @@ public class CmdIf : Command
 		GLocation = gloc;
 		Check = check;
 		CmpValue = Item.Clamp(cmpVal);
-		TrueCmdSeq = [.. trueBranch];
-		FalseCmdSeq = elseBranch is null ? null : [.. elseBranch];
-		m_Pender = pender;
+		TrueBranch = [.. trueBranch.Select(g => g.ToList())];
+		ElseBranch = elseBranch is null ? null : [.. elseBranch.Select(g => g.ToList())];
 	}
 
-	public CmdIf(Tile tl, CheckType check, int cmpVal,  WorldPanel.PendProxy pender,
-		IEnumerable<Command> cmdsIfTrue, 
-		IEnumerable<Command>? cmdsIfFalse = null)
-		: this(tl.GridLoc, check, cmpVal, pender, cmdsIfTrue, cmdsIfFalse)
+	public CmdIf(Tile tl, CheckType check, int cmpVal, 
+		IEnumerable<IEnumerable<Command>> cmdsIfTrue, 
+		IEnumerable<IEnumerable<Command>>? cmdsIfFalse = null)
+		: this(tl.GridLoc, check, cmpVal, cmdsIfTrue, cmdsIfFalse)
 	{ }
 
 
-	protected override void OnTick(Level lv)
+	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{
 		Debug.Assert(lv.World.HasTile(GLocation));
 
-		var bCondMet = Apply(Check, lv.World.GetTile(GLocation), CmpValue);
-		var winnerBranch = bCondMet ? TrueCmdSeq : FalseCmdSeq;
+		var bCondMet = Apply(Check, lv.World.GetTileOrNull(GLocation), CmpValue);
+		var winnerBranch = bCondMet ? TrueBranch : ElseBranch;
 		if (winnerBranch is not null)
 		{
-			m_Pender.Pend([winnerBranch]);
+			pender.Pend(winnerBranch);
 		}
 	}
 

@@ -16,7 +16,7 @@ public abstract partial class Unit : Node2D
 
 
 	// Nodes
-	public Sprite2D Sprite;
+	public Sprite2D? Sprite;
 
 
 	// Public Interface
@@ -24,10 +24,11 @@ public abstract partial class Unit : Node2D
 	public Direction Dir => m_Dir;
 	public Vector2I Dimensions => m_Dims;
 	public int Rate => m_Rate;
-	public WorldPanel World { get; private set; }
+	public WorldPanel World => m_World!;
 
 
 	// Privates
+
 	private TickType m_TickType;
 	private Vector2I m_GL;
 	private Direction m_Dir = Direction.East;
@@ -44,8 +45,9 @@ public abstract partial class Unit : Node2D
 	/// These are checked by the on-demand units
 	/// </summary>
 	private List<Tile> m_TickTiles = [];
+	private WorldPanel? m_World;
 
-	
+
 	public static bool CanFitIn(WorldPanel world, Vector2I gloc, Vector2I dims, Direction dir)
 	{
 		var bLeftRight = dir == Direction.East || dir == Direction.West;
@@ -82,7 +84,7 @@ public abstract partial class Unit : Node2D
 		Debug.Assert(workRate > 0);
 		Debug.Assert(Enum.IsDefined(tickType));
 
-		this.World = world;
+		this.m_World = world;
 		this.m_Rate = workRate;
 		this.m_GL = gloc;
 		this.m_Dims = dims;
@@ -112,7 +114,7 @@ public abstract partial class Unit : Node2D
 
 	protected void InjectorBaseInit(WorldPanel world)
 	{
-		World = world;
+		m_World = world;
 		m_TickType = TickType.Steady;
 		m_Rate = 1;
 	}
@@ -164,6 +166,7 @@ public abstract partial class Unit : Node2D
 	/// Checks if <paramref name="gloc"/> is within the world in grid-space.
 	/// </summary>
 	public bool IsWithin(Vector2I gloc) => GetRect2I().HasPoint(gloc);
+	public Tile? GetTileOrNull(Vector2I gloc) => World.GetTileOrNull(m_GL + gloc);
 	public Tile GetTile(Vector2I gloc) => World.GetTile(m_GL + gloc);
 
 	/// <summary>
@@ -261,15 +264,15 @@ public abstract partial class Unit : Node2D
 		}
 
 		// (new.x, new.y) = (max_x - old.x, max_y - old.y)
-		var maxGLoc = m_Dims - Vector2I.One;
+		var maxGL = m_Dims - Vector2I.One;
 		for (var y = 0; y < m_Dims.Y / 2; ++y) // Only go up to the center.
 		{
 			for (var x = 0; x < m_Dims.X; ++x)
 			{
 				var vec = new Vector2I(x, y);
 				GetTile(vec).Rotate180();
-				GetTile(maxGLoc - vec).Rotate180();
-				World.SwapTiles(m_GL + vec, m_GL + (maxGLoc - vec));
+				GetTile(maxGL - vec).Rotate180();
+				World.SwapTiles(m_GL + vec, m_GL + (maxGL - vec));
 			}
 		}
 		m_Dir = m_Dir.Invert();
@@ -298,7 +301,7 @@ public abstract partial class Unit : Node2D
 		{
 			for (var x = 0; x < m_Dims.X; ++x)
 			{
-				floatyTiles[y * m_Dims.X + x] = World.ExtractTile(m_GL + new Vector2I(x, y));
+				floatyTiles[y * m_Dims.X + x] = World.ExtractTile(m_GL + new Vector2I(x, y))!;
 			}
 		}
 
@@ -355,11 +358,11 @@ public abstract partial class Unit : Node2D
 		// Must be facing out of the unit.
 		Debug.Assert(!IsWithin(m_GL + gloc + dir.ToGrid()));
 
-		Tile tl = World.GetTile(m_GL + gloc);
+		Tile tl = GetTile(gloc);
 		tl.MakeInput(dir, true);
 		if (bKeepTrack)
 		{
-			// For now I dubs are not allowed.
+			// For now dubs are not allowed.
 			Debug.Assert(!m_TickTiles.Contains(tl));
 			m_TickTiles.Add(tl);
 		}
@@ -382,10 +385,11 @@ public abstract partial class Unit : Node2D
 		// Must be facing out of the unit.
 		Debug.Assert(!IsWithin(m_GL + gloc + dir.ToGrid()));
 
-		Tile tl = World.GetTile(m_GL + gloc);
+		Tile tl = GetTile(gloc);
 		tl.MakeOutput(dir, true);
 		if (bKeepTrack)
 		{
+			Debug.Assert(!m_TickTiles.Contains(tl));
 			m_TickTiles.Add(tl);
 		}
 		return tl;
@@ -407,7 +411,7 @@ public abstract partial class Unit : Node2D
 			_ => throw new NotImplementedException(),
 		};
 
-		m_PendingCmds = m_PendingCmds.FindAll(c => !c.IsDone());
+		m_PendingCmds.RemoveAll(c => c.IsDone());
 	}
 
 	public void HandlePendingNewCommands(WorldPanel.PendProxy pender)
@@ -422,7 +426,6 @@ public abstract partial class Unit : Node2D
 
 			pender.AssignWaitList(m_PendingCmds);
 			PendNewCommands(pender);
-			pender.AssignWaitList(null);
 		}
 	}
 

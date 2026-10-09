@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Godot;
 
@@ -7,7 +6,7 @@ using static ArTest.Asserts;
 
 public class UnitTests : ArTest.TestSuit
 {
-	private Level m_Lv;
+	private Level? m_Lv;
 
 	public override void BeforeAll()
 	{
@@ -19,24 +18,24 @@ public class UnitTests : ArTest.TestSuit
 
 	public override void BeforeEach()
 	{
-		m_Lv.World.Reset();
+		m_Lv!.World.Reset();
 		m_Lv.World.SetDims(new(15, 10));
 	}
 
 	public override void AfterEach()
 	{
-		AssertFalse(m_Lv.IsSimRunning());
+		AssertFalse(m_Lv!.IsSimRunning());
 	}
 
 	public override void AfterAll()
 	{
-		m_Lv.QueueFree();
+		m_Lv!.QueueFree();
 		RemoveNode(m_Lv);
 	}
 
 	[ArTest.Test] public void TestCanFitIn()
 	{
-		var world = m_Lv.World;
+		var world = m_Lv!.World;
 		
 		// 1. Empty world.
 		// One block.
@@ -117,7 +116,7 @@ public class UnitTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestSupplier_tick_rate()
 	{
-		var world = m_Lv.World;
+		var world = m_Lv!.World;
 		var supp = world.PlaceSupplier(Vector2I.Zero, Direction.East, 3, [237, 68, 236]);
 		var tl1 = world.InstallEmptyTile(new Vector2I(1, 0));
 		AssertTrue(world.HasTile(supp.GLocation));
@@ -166,7 +165,7 @@ public class UnitTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestSupplier_different_direction()
 	{
-		var world = m_Lv.World;
+		var world = m_Lv!.World;
 		world.Reset();
 		var supp = world.PlaceSupplier(Vector2I.One, Direction.South, 1, [261, 296]);
 		var tl1 = world.InstallEmptyTile(supp.GLocation + new Vector2I(0, 1));
@@ -183,11 +182,13 @@ public class UnitTests : ArTest.TestSuit
 	[ArTest.RunThisOnly]
 	[ArTest.Test] public async Task TestSupplier_clogged()
 	{
-		var world = m_Lv.World;
+		var world = m_Lv!.World;
 		world.Reset();
 		var supp = world.PlaceSupplier(Vector2I.One, Direction.South, 2, [261, 296]);
+		var injy = world.PlaceInjector();
 		var tlSupp = world.GetTile(supp.GLocation);
 		var tlNearby = world.InstallEmptyTile(supp.GLocation + new Vector2I(0, 1));
+		var tlFar = world.InstallEmptyTile(tlNearby.GridLoc + new Vector2I(0, 1));
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
@@ -210,16 +211,33 @@ public class UnitTests : ArTest.TestSuit
 
 			tlNearby.DestroyItem(); // Remove the obsticle
 			await m_Lv.TickOnceAsync();
-			// Clogged item should spawn as soon as it can regardless of the tick rate, 
-			// clogged this tick? try next tick again and again.
+			
+			// For now I will let clogged items only spawn after the old item has finished sliding out,
+			// it's exactly the same speed, just screws up testing for the item in the first tick...
 
-			AssertTrue(tlSupp.HasItem());
-			AssertFalse(tlSupp.Item.IsMidAnimation());
-			AssertEq(tlSupp.Item.Value, 296);
+			AssertFalse(tlSupp.HasItem());
 
 			AssertTrue(tlNearby.HasItem());
 			AssertTrue(tlNearby.Item.IsMidAnimation());
 			AssertEq(tlNearby.Item.Value, 261);
+
+			await m_Lv.EndTickAsync();
+			AssertTrue(tlNearby.HasItem());
+			AssertFalse(tlNearby.Item.IsMidAnimation());
+			AssertEq(tlNearby.Item.Value, 261);
+
+			injy.PendParallel([new CmdSlide(tlNearby, Direction.South)]);
+
+			// First item finished sliding out, second item spawns and slides out right after it.
+			await m_Lv.TickOnceAsync();
+			AssertFalse(tlSupp.HasItem());
+			AssertTrue(tlNearby.HasItem());
+			AssertTrue(tlNearby.Item.IsMidAnimation());
+			AssertEq(tlNearby.Item.Value, 296);
+
+			AssertTrue(tlFar.HasItem());
+			AssertTrue(tlFar.Item.IsMidAnimation());			
+			AssertEq(tlFar.Item.Value, 216);
 
 			AssertTrue(supp.IsDoneWithInputSeq());
 		}
@@ -228,7 +246,7 @@ public class UnitTests : ArTest.TestSuit
 	[ArTest.Ignore]
 	[ArTest.Test] public async Task TestSlider()
 	{
-		var world = m_Lv.World;
+		var world = m_Lv!.World;
 		var slid = world.PlaceSlider(new Vector2I(3, 4), Direction.North);
 	}
 }

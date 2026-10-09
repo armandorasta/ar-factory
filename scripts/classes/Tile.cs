@@ -29,7 +29,7 @@ public class Tile
 		get
 		{
 			Debug.AssertNotNull(m_Item);
-			return m_Item;
+			return m_Item!;
 		}	
 	}
 
@@ -38,7 +38,7 @@ public class Tile
 	private Vector2I m_GridLoc = Vector2I.Zero;
 	// High to low: west -> south -> east -> north.
 	private Int32 m_WallFlags;
-	private Item m_Item;
+	private Item? m_Item;
 	// This flag is only set from outside, function IsReserved checks this and the item directly.
 	private bool m_bReserved = false;
 
@@ -193,7 +193,7 @@ public class Tile
 	/// <summary>
 	/// Does the same thing as the property in release, mandatory in debug if the item might be null.
 	/// </summary>
-	public Item GetItemMaybeNull() => m_Item;
+	public Item? GetItemMaybeNull() => m_Item;
 
 	/// <summary>
 	/// Only works with extracted tiles in debug, use <see cref="WorldPanel.SpawnItem"/> or
@@ -234,14 +234,14 @@ public class Tile
 	/// <summary>
 	/// Removes the item from the block and returns it, the caller has full ownership of the item.
 	/// </summary>
-	public Item ExtractItem(bool bMaybeNull = false)
+	public Item? ExtractItem(bool bMaybeNull = false)
 	{
 		Debug.Assert(bMaybeNull || HasItem());
 		var extractedIt = m_Item;
 		m_Item = null;
 		m_bReserved = false;
 		// Parents might be null if the user carelessly uses SetItemUnsafe directly.
-		extractedIt.GetParent().RemoveChild(extractedIt);
+		extractedIt?.GetParent().RemoveChild(extractedIt);
 		return extractedIt;
 	}
 

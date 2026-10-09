@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace ArFactory;
 
@@ -14,13 +15,17 @@ public partial class WorldPanel : Godot.Panel
 		private readonly CommandRunner m_Runner = runner;
 		private List<Command>? m_CurrUnitCmds;
 		
-		public void AssignWaitList(List<Command> listToPendTo) => m_CurrUnitCmds = listToPendTo;
+		// Do not call this outside the unit class!
+		public void AssignWaitList(List<Command>? listToPendTo) => m_CurrUnitCmds = listToPendTo;
 
-		public readonly void Pend(IEnumerable<IEnumerable<Command>> groups)
+		public readonly void Pend(IEnumerable<IEnumerable<Command>> groups, int startIndex = 0)
 		{
-			// Null when testing only!
+#if TEST // Can be null when testing only! something to do with Commands that take penders.
 			m_CurrUnitCmds?.AddRange(groups.SelectMany(g => g));
-			m_Runner.PendFullSequence(groups);
+#else
+			m_CurrUnitCmds!.AddRange(groups.SelectMany(g => g));
+#endif
+			m_Runner.PendFullSequence(groups, startIndex);
 		}
 	}
 
@@ -46,13 +51,13 @@ public partial class WorldPanel : Godot.Panel
 	// Public interface
 	public Vector2I Dims => m_Dims;
 	public readonly float CellWidth = 100.0f;
-	public Tile this[int x, int y] => GetTile(new(x, y));
+	public Tile? this[int x, int y] => GetTileOrNull(new(x, y));
 
 
 	// Privates
 	private Vector2I m_Dims = new(15, 10);
 	private List<Unit> m_Units = [];
-	private List<Tile> m_Tiles = [];
+	private List<Tile?> m_Tiles = [];
 	private readonly CommandRunner m_Runner = new();
 
 #if DEBUG
@@ -109,22 +114,22 @@ public partial class WorldPanel : Godot.Panel
 	/// <summary>
 	/// Gets the tile in the location specified, but also returns null for out of bounds locations.
 	/// </summary>
-	public Tile GetTile(Vector2I gloc) => IsWithin(gloc) ? m_Tiles[GridToIndex(gloc)] : null;
+	public Tile? GetTileOrNull(Vector2I gloc) => IsWithin(gloc) ? m_Tiles[GridToIndex(gloc)] : null;
 	/// <summary>
 	/// Gets the tile in the location specified, and does no bounds checking whatsoever, meaning getting
 	/// tiles out of bounds is undefined behaviour.
 	/// </summary>
-	public Tile GetTileUnchecked(Vector2I gloc) => m_Tiles[GridToIndex(gloc)];
+	public Tile GetTile(Vector2I gloc) => m_Tiles[GridToIndex(gloc)]!;
 	/// <summary>
 	/// Returns true if the tile is installed within this world, returns false if it's floating or
 	/// installed in another world somehow.
 	/// </summary>
-	public bool IsInstalled(Tile tl) => IsWithin(tl.GridLoc) && object.ReferenceEquals(tl, GetTile(tl.GridLoc));
+	public bool IsInstalled(Tile tl) => IsWithin(tl.GridLoc) && object.ReferenceEquals(tl, GetTileOrNull(tl.GridLoc));
 
 	/// <summary>
 	/// Returns the whichever unit that <paramref name="gloc"/> lands on.
 	/// </summary>
-	public Unit GetUnit(Vector2I gloc)
+	public Unit? GetUnit(Vector2I gloc)
 	{
 		foreach (var u in m_Units)
 		{
@@ -160,14 +165,11 @@ public partial class WorldPanel : Godot.Panel
 		Debug.AssertNotNull(tl);
 		Debug.Assert(IsWithin(gloc));
 		Debug.Assert(bOverride || !HasTile(gloc));
-		if (tl is not null)
-		{
-			DeleteTile(gloc, true);
-			m_Tiles[GridToIndex(gloc)] = tl;
-			tl.SetGridLocUnsafe(gloc);
-			// TODO: Replace this with something...
-			// tl.Connect(Tile.SignalName.NeedsRedraw, Callable.From(OnTile_NeedsRedraw));
-		}
+		DeleteTile(gloc, true);
+		m_Tiles[GridToIndex(gloc)] = tl;
+		tl.SetGridLocUnsafe(gloc);
+		// TODO: Replace this with something...
+		// tl.Connect(Tile.SignalName.NeedsRedraw, Callable.From(OnTile_NeedsRedraw));
 		return tl;
 	}
 
@@ -203,7 +205,7 @@ public partial class WorldPanel : Godot.Panel
 	/// </summary>
 	/// <param name="bMaybeNull">Only matters in debug mode</param>
 	/// <param name="bOverride">Only matters in debug mode</param>
-	public Tile MoveTile(Vector2I gFrom, Vector2I gTo, bool bMaybeNull = false, bool bOverride = false)
+	public Tile? MoveTile(Vector2I gFrom, Vector2I gTo, bool bMaybeNull = false, bool bOverride = false)
 	{
 		Debug.Assert(IsWithin(gFrom));
 		Debug.Assert(IsWithin(gTo));
@@ -211,7 +213,7 @@ public partial class WorldPanel : Godot.Panel
 		Debug.Assert(bOverride || gFrom == gTo || !HasTile(gTo));
 		if (gFrom == gTo)
 		{
-			return GetTileUnchecked(gFrom);
+			return GetTile(gFrom);
 		}
 		var myTile = ExtractTile(gFrom, true);
 		if (myTile is not null)
@@ -228,14 +230,14 @@ public partial class WorldPanel : Godot.Panel
 	public Tile MoveTile(Tile tl, Vector2I gTo, bool bOverride = false)
 	{
 		Debug.Assert(IsInstalled(tl));
-		return MoveTile(tl.GridLoc, gTo, false, bOverride);
+		return MoveTile(tl.GridLoc, gTo, false, bOverride)!;
 	}
 
 	/// <summary>
 	/// Removes the tile from the world, and returns it.
 	/// </summary>
 	/// <param name="bMaybeNull">Only matters in debug mode</param>
-	public Tile ExtractTile(Vector2I gloc, bool bMaybeNull = false)
+	public Tile? ExtractTile(Vector2I gloc, bool bMaybeNull = false)
 	{
 		Debug.Assert(IsWithin(gloc));
 		Debug.Assert(bMaybeNull || HasTile(gloc));
@@ -283,8 +285,8 @@ public partial class WorldPanel : Godot.Panel
 	/// </summary>
 	public void SwapTiles(Tile tl0, Tile tl1)
 	{
-		Debug.AssertRefEq(GetTile(tl0.GridLoc), tl0);
-		Debug.AssertRefEq(GetTile(tl1.GridLoc), tl1);
+		Debug.Assert(IsInstalled(tl0));
+		Debug.Assert(IsInstalled(tl1));
 		SwapTiles(tl0.GridLoc, tl1.GridLoc, false);
 	}
 
@@ -293,15 +295,15 @@ public partial class WorldPanel : Godot.Panel
 	#region .Item Methods
 
 	/// <summary>
-	/// Returns the item just added or null when spawn fails. Null returns are considered errors
-	/// in debug and crash the program.
+	/// Returns the item just added or null when spawn fails. Null returns are considered errors in debug and crash 
+	/// the program.
 	/// </summary>
-	public Item SpawnItem(Vector2I gloc, int value)
+	public Item? SpawnItem(Vector2I gloc, int value)
 	{
-		Debug.AssertNotNull(GetTile(gloc));
+		Debug.AssertNotNull(GetTileOrNull(gloc));
 		Debug.Assert(!GetTile(gloc).IsReserved());
 		
-		var tl = GetTileUnchecked(gloc);
+		var tl = GetTile(gloc);
 		if (tl is null || tl.IsReserved())
 		{
 			return null;
@@ -318,7 +320,7 @@ public partial class WorldPanel : Godot.Panel
 	/// <b>Tile must be in this world, otherwise the behaviour is undefined.</b>
 	/// See <see cref="SpawnItem(Vector2I, int)"/>
 	/// </summary>
-	public Item SpawnItem(Tile tl, int value)
+	public Item? SpawnItem(Tile tl, int value)
 	{
 		Debug.Assert(IsInstalled(tl));
 		return SpawnItem(tl.GridLoc, value);
@@ -329,15 +331,15 @@ public partial class WorldPanel : Godot.Panel
 	/// in debug and crash the program.
 	/// This very same passed item is gauranteed to be installed, no new items are made.
 	/// </summary>
-	public Item InstallItem(Item it, Vector2I gloc)
+	public Item? InstallItem(Item it, Vector2I gloc)
 	{
 		Debug.AssertNotNull(it); // No installing nulls!
 		Debug.Assert(it.GetParent() is null); // No associated world.
 		Debug.Assert(it.ParentTile is null);
-		Debug.AssertNotNull(GetTile(it.GridLoc));
+		Debug.AssertNotNull(GetTileOrNull(it.GridLoc));
 		Debug.Assert(!GetTile(it.GridLoc).IsReserved());
 
-		var tl = GetTileUnchecked(gloc);
+		var tl = GetTile(gloc);
 		if (tl is null || tl.IsReserved())
 		{
 			return null;
@@ -354,7 +356,7 @@ public partial class WorldPanel : Godot.Panel
 	/// <b>Tile must be in this world, otherwise the behaviour is undefined.</b>
 	/// See <see cref="InstallItem(Item, Vector2I)"/>
 	/// </summary>
-	public Item InstallItem(Item it, Tile tl)
+	public Item? InstallItem(Item it, Tile tl)
 	{
 		Debug.Assert(IsInstalled(tl));
 		return InstallItem(it, tl.GridLoc);
@@ -368,7 +370,7 @@ public partial class WorldPanel : Godot.Panel
 	/// </summary>
 	/// <param name="bMaybeNull">Only matters in debug mode</param>
 	/// <param name="bOverride">Only matters in debug mode</param>
-	public Item CloneItem(Vector2I gSrc, Vector2I gDest, bool bMaybeNull = false, bool bOverride = false)
+	public Item? CloneItem(Vector2I gSrc, Vector2I gDest, bool bMaybeNull = false, bool bOverride = false)
 	{
 		Debug.Assert(IsWithin(gSrc));
 		Debug.Assert(HasTile(gSrc));
@@ -377,22 +379,22 @@ public partial class WorldPanel : Godot.Panel
 		Debug.Assert(HasTile(gDest));
 		Debug.Assert(bOverride || gSrc == gDest || !GetTile(gDest).HasItem());
 		
-		var srcTl = GetTileUnchecked(gSrc);
-		var destTl = GetTileUnchecked(gDest);
+		var srcTl = GetTile(gSrc);
+		var destTl = GetTile(gDest);
 		if (srcTl is null || !srcTl.HasItem() || destTl is null)
 		{
 			return null;
 		}
 		
 		destTl.DestroyItem(true);
-		return SpawnItem(gDest, srcTl.Item.Value);
+		return SpawnItem(gDest, srcTl.Item.Value)!;
 	}
 
 	/// <summary>
 	/// <b>Tiles must be in this world, otherwise the behaviour is undefined.</b>
 	/// See <see cref="CloneItem(Vector2I, Vector2I, bool, bool)"/>
 	/// </summary>
-	public Item CloneItem(Tile tlSrc, Tile tlDest, bool bMaybeNull = false, bool bOverride = false)
+	public Item? CloneItem(Tile tlSrc, Tile tlDest, bool bMaybeNull = false, bool bOverride = false)
 	{
 		Debug.Assert(IsInstalled(tlSrc));
 		Debug.Assert(IsInstalled(tlDest));
@@ -408,7 +410,7 @@ public partial class WorldPanel : Godot.Panel
 	/// </summary>
 	/// <param name="bMaybeNull">Only matters in debug mode</param>
 	/// <param name="bOverride">Only matters in debug mode</param>
-	public Item TeleportItem(Vector2I gSrc, Vector2I gDest, bool bMaybeNull = false, bool bOverride = false)
+	public Item? TeleportItem(Vector2I gSrc, Vector2I gDest, bool bMaybeNull = false, bool bOverride = false)
 	{
 		var it = TeleportItemNoSync(gSrc, gDest, bMaybeNull, bOverride);
 		it?.SyncPosWithGrid(this);
@@ -419,7 +421,7 @@ public partial class WorldPanel : Godot.Panel
 	/// <b>Tiles must be in this world, otherwise the behaviour is undefined.</b>
 	/// See <see cref="TeleportItem(Vector2I, Vector2I, bool, bool)"/>
 	/// </summary>
-	public Item TeleportItem(Tile tlSrc, Tile tlDest, bool bMaybeNull = false, bool bOverride = false)
+	public Item? TeleportItem(Tile tlSrc, Tile tlDest, bool bMaybeNull = false, bool bOverride = false)
 	{
 		Debug.Assert(IsInstalled(tlSrc));
 		Debug.Assert(IsInstalled(tlDest));
@@ -434,7 +436,7 @@ public partial class WorldPanel : Godot.Panel
 	/// </summary>
 	/// <param name="bMaybeNull">Only matters in debug mode</param>
 	/// <param name="bOverride">Only matters in debug mode</param>
-	public Item TeleportItemNoSync(Vector2I gSrc, Vector2I gDest, bool bMaybeNull = false, bool bOverride = false)
+	public Item? TeleportItemNoSync(Vector2I gSrc, Vector2I gDest, bool bMaybeNull = false, bool bOverride = false)
 	{
 		Debug.Assert(IsWithin(gSrc));
 		Debug.Assert(IsWithin(gDest));
@@ -448,60 +450,31 @@ public partial class WorldPanel : Godot.Panel
 			return GetTile(gSrc)?.GetItemMaybeNull();
 		}
 
-		var srcTl = GetTileUnchecked(gSrc);
-		var destTl = GetTileUnchecked(gDest);
+		var srcTl = GetTile(gSrc);
+		var destTl = GetTile(gDest);
 		if (srcTl is null || !srcTl.HasItem() || destTl is null)
 		{
 			return null;
 		}
 
 		var extractedIt = srcTl.ExtractItem();
-		destTl.SetItemUnsafe(extractedIt); // Must be before adding to tree.
-		AddChild(extractedIt);
-		return destTl.Item;
+		if (extractedIt is not null)
+		{
+			destTl.SetItemUnsafe(extractedIt); // Must be before adding to tree.
+			AddChild(extractedIt);
+		}
+		return extractedIt;
 	}
 
 	/// <summary>
 	/// <b>Tiles must be in this world, otherwise the behaviour is undefined.</b>
 	/// See <see cref="TeleportItemNoSync(Vector2I, Vector2I, bool, bool)"/>
 	/// </summary>
-	public Item TeleportItemNoSync(Tile tlSrc, Tile tlDest, bool bMaybeNull = false, bool bOverride = false)
+	public Item? TeleportItemNoSync(Tile tlSrc, Tile tlDest, bool bMaybeNull = false, bool bOverride = false)
 	{
 		Debug.Assert(IsInstalled(tlSrc));
 		Debug.Assert(IsInstalled(tlDest));
 		return TeleportItemNoSync(tlSrc.GridLoc, tlDest.GridLoc, bMaybeNull, bOverride);
-	}
-
-	public Item TeleportItemUnchecked(Vector2I gSrc, Vector2I gDest)
-	{
-		var it = TeleportItemUncheckedNoSync(gSrc, gDest);
-		it.SyncPosWithGrid(this);
-		return it;
-	}
-
-	/// <summary>
-	/// This assumes everything is perfect and will crash the program otherwise.
-	/// </summary>
-	public Item TeleportItemUncheckedNoSync(Vector2I gSrc, Vector2I gDest)
-	{
-		Debug.Assert(IsWithin(gSrc));
-		Debug.Assert(IsWithin(gDest));
-		Debug.Assert(HasTile(gSrc));
-		Debug.Assert(HasTile(gDest));
-		Debug.Assert(GetTile(gSrc).HasItem());
-		Debug.Assert(gSrc == gDest || !GetTile(gDest).HasItem());
-
-		if (gSrc == gDest)
-		{
-			return GetTile(gSrc).Item;
-		}
-
-		var srcTl = GetTileUnchecked(gSrc);
-		var destTl = GetTileUnchecked(gDest);
-		var extractedIt = srcTl.ExtractItem();
-		destTl.SetItemUnsafe(extractedIt); // Must be before adding to tree.
-		AddChild(extractedIt);
-		return destTl.Item;
 	}
 
 
@@ -619,7 +592,7 @@ public partial class WorldPanel : Godot.Panel
 
 	public UNSupplier PlaceSupplier(Vector2I gloc, Direction dir, int rate, IEnumerable<int> seq)
 	{
-		var u = UNSupplierScene.Instantiate() as UNSupplier;
+		var u = UNSupplierScene.Instantiate<UNSupplier>();
 		AddUnit(u);
 		u.Setup(this, gloc, rate, dir, seq);
 		return u;
@@ -627,7 +600,7 @@ public partial class WorldPanel : Godot.Panel
 
 	public UNSlider PlaceSlider(Vector2I gloc, Direction dir)
 	{
-		var u = UNSliderScene.Instantiate() as UNSlider;
+		var u = UNSliderScene.Instantiate<UNSlider>();
 		AddUnit(u);
 		u.Setup(this, gloc, 1, dir);
 		return u;
@@ -786,9 +759,6 @@ public partial class WorldPanel : Godot.Panel
 	#endregion
 	#region .Test Specific
 #if TEST
-
-	public PendProxy MakePenderForTesting() => new(m_Runner);
-
 #endif // TEST
 	#endregion .Test Specific
 

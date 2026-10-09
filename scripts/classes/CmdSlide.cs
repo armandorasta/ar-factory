@@ -31,7 +31,7 @@ public class CmdSlide : Command
 	/// </summary>
 	public bool CanSlideNextTick(WorldPanel world)
 	{
-		var destTl = world.GetTile(GetGridTo());
+		var destTl = world.GetTileOrNull(GetGridTo());
 		return destTl.CanItemEnter(Dir.Invert()) // No wall in the way
 			&& !destTl.IsReserved();             // No item already there/about to be there
 	}
@@ -47,7 +47,7 @@ public class CmdSlide : Command
 		Debug.Assert(TrackedItemRef.TryGetTarget(out var it) && it.IsAllowedToMove());
 		Debug.Assert(world.HasTile(GetGridTo()));
 
-		if (!world.GetTile(GetGridTo()).IsReserved())
+		if (!world.GetTileOrNull(GetGridTo()).IsReserved())
 		{
 			PrepTrackedItemForSlidingAnim(world);
 			CountThisTick(); // Undo the pausing because the command has advanced.
@@ -56,7 +56,7 @@ public class CmdSlide : Command
 		else return false;
 	}
 
-	protected override void OnTick(Level lv)
+	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{
 		m_StateFunc.Invoke(lv);
 	}
@@ -96,7 +96,7 @@ public class CmdSlide : Command
 		Debug.Assert(HasTileWithItem(lv.World, GridFrom));
 
 		// Assume the destination tile exists.
-		var destTile = lv.World.GetTile(GetGridTo());
+		var destTile = lv.World.GetTileOrNull(GetGridTo());
 		if (!destTile.CanItemEnter(Dir.Invert()))
 		{
 			PauseThisTick();

@@ -24,14 +24,14 @@ public class CmdCombine(Vector2I glLeft, Vector2I glRight, Vector2I glDest, Bina
 	{ }
 
 
-	protected override void OnTick(Level lv)
+	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{
 		Debug.Assert(HasTileWithItem(lv.World, LeftGL));
 		Debug.Assert(HasTileWithItem(lv.World, RightGL));
 		Debug.Assert(HasTileUnreserved(lv.World, ResultGL));
 
-		Tile tlLeft = lv.World.GetTile(LeftGL);
-		Tile tlRight = lv.World.GetTile(RightGL);
+		Tile tlLeft = lv.World.GetTileOrNull(LeftGL);
+		Tile tlRight = lv.World.GetTileOrNull(RightGL);
 
 		if (tlLeft.Item.IsMidAnimation() || tlRight.Item.IsMidAnimation())
 		{

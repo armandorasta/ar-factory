@@ -155,9 +155,18 @@ public class CommandTests : ArTest.TestSuit
 
 		using (m_Lv.PlaySimulationInDebug())
 		{
-			injy.PendParallel([new CmdSleep(3)], 0);
-			injy.PendParallel([new CmdSpawn(tl, 3), new CmdSleep(1)], 1);
-			injy.PendParallel([new CmdKill(tl)], 2);
+			injy.PendFullSequence([
+				[
+					new CmdSleep(3)
+				],
+				[
+					new CmdSpawn(tl, 3), 
+					new CmdSleep(1),
+				],
+				[
+					new CmdKill(tl),
+				],
+			]);
 
 			await m_Lv.TickOnceAsync();
 			AssertEq(m_Lv.GetTicksSinceStart(), 1);
@@ -412,8 +421,14 @@ public class CommandTests : ArTest.TestSuit
 		using (m_Lv.PlaySimulationInDebug())
 		{
 			var wait0 = new CmdAwait([tl0]);
-			injy0.PendParallel([new CmdSpawn(tl0, 7)], 0);
-			injy0.PendParallel([wait0], 1); // Here it does nothing.
+			injy0.PendFullSequence([
+				[
+					new CmdSpawn(tl0, 7)
+				],
+				[
+					wait0 // Here it does nothing.
+				],
+			]);
 
 			await m_Lv.TickOnceAsync();
 			AssertTrue(tl0.HasItem());
@@ -1092,14 +1107,14 @@ public class CommandTests : ArTest.TestSuit
 		using (m_Lv.PlaySimulationInDebug())
 		{
 			injy.PendParallel([
-				new CmdIf(tl0, CmdIf.CheckType.NoItem, -1, world.MakePenderForTesting(),
+				new CmdIf(tl0, CmdIf.CheckType.NoItem, -1,
 				[
-					new CmdSpawn(tl0, 6),
-					new CmdSlide(tl0, Direction.East),
+					[ new CmdSpawn(tl0, 6) ],
+					[ new CmdSlide(tl0, Direction.East) ],
 				],
 				[
-					new CmdSpawn(tl1, 948),
-					new CmdSlide(tl1, Direction.West),
+					[ new CmdSpawn(tl1, 948) ],
+					[ new CmdSlide(tl1, Direction.West) ],
 				]),
 			]);
 
@@ -1128,10 +1143,10 @@ public class CommandTests : ArTest.TestSuit
 		using (m_Lv.PlaySimulationInDebug())
 		{
 			injy.PendParallel([
-				new CmdIf(tl0, CmdIf.CheckType.NoItem, -1, world.MakePenderForTesting(),
+				new CmdIf(tl0, CmdIf.CheckType.NoItem, -1,
 				[
-					new CmdSpawn(tl0, 6),
-					new CmdSlide(tl0, Direction.East),
+					[ new CmdSpawn(tl0, 6) ],
+					[ new CmdSlide(tl0, Direction.East) ],
 				]),
 			]);
 
@@ -1159,7 +1174,7 @@ public class CommandTests : ArTest.TestSuit
 		using (m_Lv.PlaySimulationInDebug())
 		{
 			injy.PendParallel([
-				new CmdIf(tl0, CmdIf.CheckType.NoItem, -1, world.MakePenderForTesting(), [ ], [ ]),
+				new CmdIf(tl0, CmdIf.CheckType.NoItem, -1, [ ], [ ]),
 			]);
 
 			await m_Lv.TickOnceAsync();
@@ -1178,14 +1193,14 @@ public class CommandTests : ArTest.TestSuit
 		using (m_Lv.PlaySimulationInDebug())
 		{
 			injy.PendParallel([
-				new CmdIf(tl0, CmdIf.CheckType.Greater, Item.MaxValue, world.MakePenderForTesting(),
+				new CmdIf(tl0, CmdIf.CheckType.Greater, Item.MaxValue,
 				[
-					new CmdSpawn(tl1, 948),
-					new CmdSlide(tl1, Direction.West),
+					[ new CmdSpawn(tl1, 948) ],
+					[ new CmdSlide(tl1, Direction.West) ],
 				],
 				[
-					new CmdSpawn(tl0, 6),
-					new CmdSlide(tl0, Direction.East),
+					[ new CmdSpawn(tl0, 6) ],
+					[ new CmdSlide(tl0, Direction.East) ],
 				]),
 			]);
 
@@ -1214,10 +1229,10 @@ public class CommandTests : ArTest.TestSuit
 		using (m_Lv.PlaySimulationInDebug())
 		{
 			injy.PendParallel([
-				new CmdIf(new Vector2I(2, 3), CmdIf.CheckType.NoItem, -1, world.MakePenderForTesting(),
+				new CmdIf(new Vector2I(2, 3), CmdIf.CheckType.NoItem, -1,
 				[
-					new CmdSpawn(tl0, 6),
-					new CmdSlide(tl0, Direction.East),
+					[ new CmdSpawn(tl0, 6) ],
+					[ new CmdSlide(tl0, Direction.East) ],
 				]),
 			]);
 
@@ -1246,10 +1261,10 @@ public class CommandTests : ArTest.TestSuit
 		using (m_Lv.PlaySimulationInDebug())
 		{
 			injy.PendParallel([
-				new CmdIf(new Vector2I(-2, 3), CmdIf.CheckType.NoItem, -1, world.MakePenderForTesting(),
+				new CmdIf(new Vector2I(-2, 3), CmdIf.CheckType.NoItem, -1,
 				[
-					new CmdSpawn(tl0, 6),
-					new CmdSlide(tl0, Direction.East),
+					[ new CmdSpawn(tl0, 6) ],
+					[ new CmdSlide(tl0, Direction.East) ],
 				]),
 			]);
 

@@ -12,10 +12,10 @@ public class CmdKill(Vector2I gloc) : Command(1)
 
 	public CmdKill (Tile tl) : this(tl.GridLoc) { }
 
-	protected override void OnTick(Level lv)
+	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{
 		Debug.Assert(HasTileWithItem(lv.World, GLocation));
-		Tile tl = lv.World.GetTile(GLocation);
+		Tile tl = lv.World.GetTileOrNull(GLocation);
 		if (tl.Item.IsMidAnimation() || !tl.DestroyItem())
 		{
 			throw new InvalidProgramException();	

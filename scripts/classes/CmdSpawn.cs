@@ -14,7 +14,7 @@ public class CmdSpawn(Vector2I gloc, int val) : Command(1)
 	public CmdSpawn(Tile tl, int val) : this(tl.GridLoc, val) { }
 
 
-	protected override void OnTick(Level lv)
+	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{
 		Debug.Assert(HasTileUnreserved(lv.World, GLocation));
 		if (lv.World.SpawnItem(GLocation, Value) is null)

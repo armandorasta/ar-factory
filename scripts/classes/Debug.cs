@@ -20,13 +20,6 @@ using DebugAssertionDebuggerVisibiltyAttribute = DebuggerHiddenAttribute;
 internal static class Debug
 {
 	public static SceneTree? TreePtr;
-	
-	private static bool s_bEnabled = true;
-
-
-	public static void DisableAsserts() { s_bEnabled = false; }
-	public static void EnableAsserts()  { s_bEnabled = true;  }
-
 
 	[Conditional("ASSERTIONS")]
 	[DebugAssertionDebuggerVisibilty]
@@ -42,7 +35,7 @@ internal static class Debug
 	[Conditional("ASSERTIONS")]
 	[DebugAssertionDebuggerVisibilty] 
 	[StackTraceHidden] 
-	public static void AssertIs(object subject, Type expectedType, string? msg = null)
+	public static void AssertIs(object? subject, Type expectedType, string? msg = null)
 	{
 		HandleImpl(expectedType.IsInstanceOfType(subject), 
 			$"AssertIs: expected '{subject.GetType()}' but got '{expectedType}'.", 
@@ -56,7 +49,7 @@ internal static class Debug
 	[Conditional("ASSERTIONS")]
 	[DebugAssertionDebuggerVisibilty] 
 	[StackTraceHidden] 
-	public static void AssertEq<T>(T testValue, T target, string? msg = null)
+	public static void AssertEq<T>(T? testValue, T? target, string? msg = null)
 	{
 		HandleImpl(EqualityComparer<T>.Default.Equals(testValue, target),
 			$"AssertEq: expected '{target}' but got '{testValue}'.", 
@@ -66,7 +59,7 @@ internal static class Debug
 	[Conditional("ASSERTIONS")]
 	[DebugAssertionDebuggerVisibilty] 
 	[StackTraceHidden] 
-	public static void AssertRefEq<T>(T testValue, T target, string? msg = null)
+	public static void AssertRefEq<T>(T? testValue, T? target, string? msg = null)
 	{
 		HandleImpl(object.ReferenceEquals(testValue, target),
 			$"AssertEq: expected '{target}' but got '{testValue}'.", 
@@ -76,11 +69,9 @@ internal static class Debug
 	[Conditional("ASSERTIONS")]
 	[DebugAssertionDebuggerVisibilty] 
 	[StackTraceHidden] 
-	public static void AssertNotNull(object testValue, string? msg = null)
+	public static void AssertNotNull(object? testValue, string? msg = null)
 	{
-		HandleImpl(testValue is not null, 
-			$"AssertNotNull: Expected non-null.", 
-			msg);
+		HandleImpl(testValue is not null, "AssertNotNull: Expected non-null.", msg);
 	}
 
 	/// <summary>
@@ -101,29 +92,22 @@ internal static class Debug
 	[StackTraceHidden] 
 	private static void HandleImpl([DoesNotReturnIf(false)] bool bMustBe, string specialMsg, string? userMsg)
 	{
-		if (!s_bEnabled)
+		if (!bMustBe)
 		{
-			return;
-		}
+			GD.PrintErr($"\n{specialMsg}");
+			if (!string.IsNullOrEmpty(userMsg))
+			{
+				GD.PrintErr($"Message: {userMsg}");
+			}
 
-		if (bMustBe)
-		{
-			return;
+			PrintStackTrace(3);
+			// GD.PushError($"Assertion Failed! {msg}");
+			TreePtr?.Quit();
 		}
-
-		GD.PrintErr($"\n{specialMsg}");
-		if (!string.IsNullOrEmpty(userMsg))
-		{
-			GD.PrintErr($"Message: {userMsg}");
-		}
-		
-		PrintStackTrace(3);
-		// GD.PushError($"Assertion Failed! {msg}");
-		TreePtr?.Quit();
 	}
 
-	[StackTraceHidden]
 	[Conditional("ASSERTIONS")]
+	[StackTraceHidden]
 	private static void PrintStackTrace(int nSkippedFrames = 1, bool includeGodotShit = false)
 	{
 		GD.PrintErr("Stack:");

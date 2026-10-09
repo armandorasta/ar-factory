@@ -58,7 +58,7 @@ public partial class UNUpdater : Unit
 
 	public override void PendNewCommands(WorldPanel.PendProxy pender)
 	{
-		var tl = GetTile(Vector2I.Zero);
+		var tl = GetTileOrNull(Vector2I.Zero);
 		pender.Pend([ [new CmdSlide(tl, Dir)], [Apply(m_UpType, tl)] ]);
 	}
 

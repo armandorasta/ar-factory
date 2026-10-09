@@ -11,13 +11,13 @@ public partial class Item : Node2D
 	public const int MinValue = -MaxValue;
 
 	// Nodes
-	public Sprite2D Sprite { get; private set; }
-	public Label CenterLabel { get; private set; }
+	public Sprite2D? Sprite { get; private set; }
+	public Label? CenterLabel { get; private set; }
 
 
 	// Publics
 	public int Value => m_Value;
-	public Tile ParentTile => m_ParentTile;
+	public Tile? ParentTile => m_ParentTile;
 	/// <summary>
 	/// Crashes the program when the tile is floating!
 	/// </summary>
@@ -26,13 +26,13 @@ public partial class Item : Node2D
 		get
 		{
 			Debug.AssertNotNull(m_ParentTile);
-			return m_ParentTile.GridLoc;
+			return m_ParentTile!.GridLoc;
 		}
 	}
 
 
 	// Privates
-	private Tile m_ParentTile;
+	private Tile? m_ParentTile;
 	private bool m_bDisallowMoveThisTick = false;
 	private bool m_bMidAnimation = false;
 	private int m_Value;
@@ -53,7 +53,7 @@ public partial class Item : Node2D
 		m_ParentTile = world.GetTile(gloc);
 		SetValue(val);
 		SyncPosWithGrid(world);
-		Sprite.ApplyScale(world.CellWidth / 200.0f * Vector2.One);
+		Sprite!.ApplyScale(world.CellWidth / 200.0f * Vector2.One);
 		Sprite.Translate(0.5f * world.CellWidth * Vector2.One);
 	}
 
@@ -75,7 +75,7 @@ public partial class Item : Node2D
 	{
 		// Debug.Assert(IsValueWithinRange(newValue));
 		m_Value = Clamp(newVal);
-		CenterLabel.Text = m_Value.ToString();
+		CenterLabel!.Text = m_Value.ToString();
 	}
 
 	/// <summary>
@@ -96,7 +96,7 @@ public partial class Item : Node2D
 	public void SyncPosWithGrid(WorldPanel world)
 	{
 		Debug.AssertNotNull(m_ParentTile);
-		Position = world.GridToPos(m_ParentTile.GridLoc);
+		Position = world.GridToPos(m_ParentTile!.GridLoc);
 	}
 
 	/// <summary>

@@ -21,7 +21,7 @@ public partial class UNSlider : Unit
 	{
 		if (World.HasTile(GLocation + Dir.ToGrid()))
 		{
-			var tl = GetTile(Vector2I.Zero);
+			var tl = GetTileOrNull(Vector2I.Zero);
 			// We have to do it manually like this, this way the slider is synced with the clock at all times.
 			// I could also just add a third type, but I learned the hard way that simple is always the way to go.
 			if (tl.HasItem())

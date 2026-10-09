@@ -25,10 +25,10 @@ public class CmdAwaitVacate : Command
 		: this(waitTiles.Select(tl => tl.GridLoc), vacateTiles.Select(tl => tl.GridLoc)) 
 	{ }
 
-	protected override void OnTick(Level lv)
+	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{
-		var waitTls = WaitGridLocs.Select(lv.World.GetTile);
-		var vacateTls = VacateGridLocs.Select(lv.World.GetTile);
+		var waitTls = WaitGridLocs.Select(lv.World.GetTileOrNull);
+		var vacateTls = VacateGridLocs.Select(lv.World.GetTileOrNull);
 		if (!waitTls.All(tl => tl is not null) || !vacateTls.All(tl => tl is not null))
 		{
 			// PauseThisTick();
