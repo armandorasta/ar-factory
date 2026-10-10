@@ -26,13 +26,14 @@ public partial class UNUpdater : Unit
 	}
 
 
-	public Label UpTypeLabel { get; private set; }
+	public Label UpTypeLabel => m_UpTypeLabel!;
+	public Label? m_UpTypeLabel;
 
 	public UpdateType m_UpType { get; private set; }
 
 	public override void _Ready()
 	{
-		UpTypeLabel = GetNode<Label>("Sprite2D/CenterContainer/HBoxContainer/Label");
+		m_UpTypeLabel = GetNode<Label>("Sprite2D/CenterContainer/HBoxContainer/Label");
 	}
 
 	public void Setup(WorldPanel world, Vector2I gloc, int workRate, Direction dir, UpdateType upT)
@@ -58,8 +59,12 @@ public partial class UNUpdater : Unit
 
 	public override void PendNewCommands(WorldPanel.PendProxy pender)
 	{
-		var tl = GetTileOrNull(Vector2I.Zero);
-		pender.Pend([ [new CmdSlide(tl, Dir)], [Apply(m_UpType, tl)] ]);
+		var tl = GetTileNonNull(Vector2I.Zero);
+		var destLoc = tl.GridLoc + Dir.ToGrid();
+		pender.Pend([
+			[ Apply(m_UpType, tl) ],
+			World.HasTile(destLoc) ? [ new CmdSlide(tl, Dir) ] : [],
+		]);
 	}
 
 	public override string ToString()

@@ -49,12 +49,14 @@ public abstract class Command
 
 	protected static bool HasTileWithItem(WorldPanel world, Vector2I gloc)
 	{
-		return world.HasTile(gloc) && world.GetTile(gloc).HasItem() && !world.GetTile(gloc).Item.IsMidAnimation();
+		return world.HasTile(gloc) 
+			&& world.GetTileNonNull(gloc).HasItem() 
+			&& !world.GetTileNonNull(gloc).Item.IsMidAnimation();
 	}
 
 	protected static bool HasTileUnreserved(WorldPanel world, Vector2I gloc)
 	{
-		return world.HasTile(gloc) && !world.GetTile(gloc).IsReserved();
+		return world.HasTile(gloc) && !world.GetTileNonNull(gloc).IsReserved();
 	}
 
 

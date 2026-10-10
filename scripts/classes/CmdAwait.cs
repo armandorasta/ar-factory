@@ -30,13 +30,13 @@ public class CmdAwait : Command
 			return; // Forever and ever...
 		}
 
-		if (!myTiles.All(tl => tl.HasItem() && !tl.Item.IsMidAnimation()))
+		if (!myTiles.All(tl => tl!.HasItem() && !tl.Item.IsMidAnimation()))
 		{
 			PauseThisTick();
 			return;
 		}
 
-		Debug.Assert(myTiles.All(tl => tl.Item.IsAllowedToMove()));
+		Debug.Assert(myTiles.All(tl => tl!.Item.IsAllowedToMove()));
 	}
 
 	public override string ToString()

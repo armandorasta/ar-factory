@@ -10,22 +10,14 @@ namespace ArFactory;
 
 public partial class WorldPanel : Godot.Panel
 {
-	public struct PendProxy(CommandRunner runner)
+	public readonly struct PendProxy(Unit penderUnit, CommandRunner runner)
 	{
 		private readonly CommandRunner m_Runner = runner;
-		private List<Command>? m_CurrUnitCmds;
-		
-		// Do not call this outside the unit class!
-		public void AssignWaitList(List<Command>? listToPendTo) => m_CurrUnitCmds = listToPendTo;
+		private readonly Unit m_PenderUnit = penderUnit;
 
 		public readonly void Pend(IEnumerable<IEnumerable<Command>> groups, int startIndex = 0)
 		{
-#if TEST // Can be null when testing only! something to do with Commands that take penders.
-			m_CurrUnitCmds?.AddRange(groups.SelectMany(g => g));
-#else
-			m_CurrUnitCmds!.AddRange(groups.SelectMany(g => g));
-#endif
-			m_Runner.PendFullSequence(groups, startIndex);
+			m_Runner.PendFullSequence(m_PenderUnit, groups.Where(g => g.Any(_ => true)), startIndex);
 		}
 	}
 
@@ -119,7 +111,18 @@ public partial class WorldPanel : Godot.Panel
 	/// Gets the tile in the location specified, and does no bounds checking whatsoever, meaning getting
 	/// tiles out of bounds is undefined behaviour.
 	/// </summary>
-	public Tile GetTile(Vector2I gloc) => m_Tiles[GridToIndex(gloc)]!;
+	public Tile? GetTile(Vector2I gloc) => m_Tiles[GridToIndex(gloc)];
+	/// <summary>
+	/// Throws if the tile is null in debug, equivalent to <see cref="GetTile"/> in release.
+	/// </summary>
+	public Tile GetTileNonNull(Vector2I gloc)
+	{
+#if DEBUG
+		return GetTile(gloc) ?? throw new InvalidProgramException();
+#else
+		return m_Tiles[GridToIndex(gloc)];
+#endif
+	}
 	/// <summary>
 	/// Returns true if the tile is installed within this world, returns false if it's floating or
 	/// installed in another world somehow.
@@ -301,7 +304,7 @@ public partial class WorldPanel : Godot.Panel
 	public Item? SpawnItem(Vector2I gloc, int value)
 	{
 		Debug.AssertNotNull(GetTileOrNull(gloc));
-		Debug.Assert(!GetTile(gloc).IsReserved());
+		Debug.Assert(!GetTile(gloc)!.IsReserved());
 		
 		var tl = GetTile(gloc);
 		if (tl is null || tl.IsReserved())
@@ -337,7 +340,7 @@ public partial class WorldPanel : Godot.Panel
 		Debug.Assert(it.GetParent() is null); // No associated world.
 		Debug.Assert(it.ParentTile is null);
 		Debug.AssertNotNull(GetTileOrNull(it.GridLoc));
-		Debug.Assert(!GetTile(it.GridLoc).IsReserved());
+		Debug.Assert(!GetTileNonNull(it.GridLoc).IsReserved());
 
 		var tl = GetTile(gloc);
 		if (tl is null || tl.IsReserved())
@@ -374,10 +377,10 @@ public partial class WorldPanel : Godot.Panel
 	{
 		Debug.Assert(IsWithin(gSrc));
 		Debug.Assert(HasTile(gSrc));
-		Debug.Assert(bMaybeNull || GetTile(gSrc).HasItem());
+		Debug.Assert(bMaybeNull || GetTileNonNull(gSrc).HasItem());
 		Debug.Assert(IsWithin(gDest));
 		Debug.Assert(HasTile(gDest));
-		Debug.Assert(bOverride || gSrc == gDest || !GetTile(gDest).HasItem());
+		Debug.Assert(bOverride || gSrc == gDest || !GetTileNonNull(gDest).HasItem());
 		
 		var srcTl = GetTile(gSrc);
 		var destTl = GetTile(gDest);
@@ -442,8 +445,8 @@ public partial class WorldPanel : Godot.Panel
 		Debug.Assert(IsWithin(gDest));
 		Debug.Assert(HasTile(gSrc));
 		Debug.Assert(HasTile(gDest));
-		Debug.Assert(bMaybeNull || GetTile(gSrc).HasItem());
-		Debug.Assert(bOverride || gSrc == gDest || !GetTile(gDest).HasItem());
+		Debug.Assert(bMaybeNull || GetTileNonNull(gSrc).HasItem());
+		Debug.Assert(bOverride || gSrc == gDest || !GetTileNonNull(gDest).HasItem());
 		
 		if (gSrc == gDest)
 		{
@@ -497,7 +500,7 @@ public partial class WorldPanel : Godot.Panel
 
 		foreach (var u in m_Units)
 		{
-			var pender = new PendProxy(m_Runner);
+			var pender = new PendProxy(u, m_Runner);
 			u.HandlePendingNewCommands(pender); // So when I press F11 it doesn't dive into the ctor.
 		}
 
@@ -598,11 +601,11 @@ public partial class WorldPanel : Godot.Panel
 		return u;
 	}
 
-	public UNSlider PlaceSlider(Vector2I gloc, Direction dir)
+	public UNSlider PlaceSlider(Vector2I gloc, Direction dir, int rate = 1)
 	{
 		var u = UNSliderScene.Instantiate<UNSlider>();
 		AddUnit(u);
-		u.Setup(this, gloc, 1, dir);
+		u.Setup(this, gloc, rate, dir);
 		return u;
 	}
 

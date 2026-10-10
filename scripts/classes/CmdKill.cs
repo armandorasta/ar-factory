@@ -15,7 +15,7 @@ public class CmdKill(Vector2I gloc) : Command(1)
 	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{
 		Debug.Assert(HasTileWithItem(lv.World, GLocation));
-		Tile tl = lv.World.GetTileOrNull(GLocation);
+		Tile tl = lv.World.GetTileNonNull(GLocation);
 		if (tl.Item.IsMidAnimation() || !tl.DestroyItem())
 		{
 			throw new InvalidProgramException();	

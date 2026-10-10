@@ -30,8 +30,8 @@ public class CmdCombine(Vector2I glLeft, Vector2I glRight, Vector2I glDest, Bina
 		Debug.Assert(HasTileWithItem(lv.World, RightGL));
 		Debug.Assert(HasTileUnreserved(lv.World, ResultGL));
 
-		Tile tlLeft = lv.World.GetTileOrNull(LeftGL);
-		Tile tlRight = lv.World.GetTileOrNull(RightGL);
+		Tile tlLeft = lv.World.GetTileNonNull(LeftGL);
+		Tile tlRight = lv.World.GetTileNonNull(RightGL);
 
 		if (tlLeft.Item.IsMidAnimation() || tlRight.Item.IsMidAnimation())
 		{

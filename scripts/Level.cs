@@ -35,16 +35,27 @@ public partial class Level : Godot.Node2D
 	public delegate void TickProcessedEventHandler(int tickCount);
 
 	// Nodes
-	public Godot.Camera2D Cam;
-	public WorldPanel World;
-	public Godot.Button PlayButt;
-	public Godot.Button HaltButt;
-	public Godot.Button DebugButt;
-	public Godot.HBoxContainer ToolsHBox;
-	public Godot.HBoxContainer PlayHBox;
-	public Godot.Label TicksLabel;
-	public Godot.HSlider SpeedSlider;
-	public Godot.Label TickSpeedLabel;
+	public Godot.Camera2D Cam => m_Cam!;
+	public WorldPanel World => m_World!;
+	public Godot.Button PlayButt => m_PlayButt!;
+	public Godot.Button HaltButt => m_HaltButt!;
+	public Godot.Button DebugButt => m_DebugButt!;
+	public Godot.HBoxContainer ToolsHBox => m_ToolsHBox!;
+	public Godot.HBoxContainer PlayHBox => m_PlayHBox!;
+	public Godot.Label TicksLabel => m_TicksLabel!;
+	public Godot.HSlider SpeedSlider => m_SpeedSlider!;
+	public Godot.Label TickSpeedLabel => m_TickSpeedLabel!;
+
+	public Godot.Camera2D? m_Cam;
+	public WorldPanel? m_World;
+	public Godot.Button? m_PlayButt;
+	public Godot.Button? m_HaltButt;
+	public Godot.Button? m_DebugButt;
+	public Godot.HBoxContainer? m_ToolsHBox;
+	public Godot.HBoxContainer? m_PlayHBox;
+	public Godot.Label? m_TicksLabel;
+	public Godot.HSlider? m_SpeedSlider;
+	public Godot.Label? m_TickSpeedLabel;
 
 
 	// Publics
@@ -62,7 +73,7 @@ public partial class Level : Godot.Node2D
 	{
 		GetAllNodes();
 		
-		Cam.Position = World.Size * 0.5f;
+		Cam!.Position = World!.Size * 0.5f;
 		
 		InitTimer();
 		InitSimButts();
@@ -72,16 +83,16 @@ public partial class Level : Godot.Node2D
 
 	private void GetAllNodes()
 	{
-		Cam = GetNode<Godot.Camera2D>("WorldPanel/Cam");
-		World = GetNode<WorldPanel>("WorldPanel");
-		PlayButt = GetNode<Godot.Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PlayButt");
-		HaltButt = GetNode<Godot.Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PauseButt");
-		DebugButt = GetNode<Godot.Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/DebugButt");
-		ToolsHBox = GetNode<Godot.HBoxContainer>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/ToolsHBox");
-		PlayHBox = GetNode<Godot.HBoxContainer>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox");
-		TicksLabel = GetNode<Godot.Label>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TicksLabel");
-		SpeedSlider = GetNode<Godot.HSlider>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/SpeedHSlider");
-		TickSpeedLabel = GetNode<Godot.Label>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TickSpeedLabel");
+		m_Cam = GetNode<Godot.Camera2D>("WorldPanel/Cam");
+		m_World = GetNode<WorldPanel>("WorldPanel");
+		m_PlayButt = GetNode<Godot.Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PlayButt");
+		m_HaltButt = GetNode<Godot.Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PauseButt");
+		m_DebugButt = GetNode<Godot.Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/DebugButt");
+		m_ToolsHBox = GetNode<Godot.HBoxContainer>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/ToolsHBox");
+		m_PlayHBox = GetNode<Godot.HBoxContainer>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox");
+		m_TicksLabel = GetNode<Godot.Label>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TicksLabel");
+		m_SpeedSlider = GetNode<Godot.HSlider>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/SpeedHSlider");
+		m_TickSpeedLabel = GetNode<Godot.Label>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TickSpeedLabel");
 	}
 
 	private void InitTimer()

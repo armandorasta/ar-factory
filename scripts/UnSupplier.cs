@@ -29,12 +29,14 @@ public partial class UNSupplier : Unit
 		}
 
 		var startIndex = HasPendingCmds() ? 1 : 0;
+		Vector2I destLoc = m_Out0!.GridLoc + Dir.ToGrid();
 		pender.Pend([
 			[ new CmdVacate([m_Out0!]) ],
 			[ new CmdSpawn(m_Out0!, PopNextValue()) ],
-			[ new CmdIf(m_Out0!.GridLoc + Dir.ToGrid(), CmdIf.CheckType.HasTile, -1, [
-				[ new CmdSlide(m_Out0, Dir) ]
-			])]
+			World.HasTile(destLoc) ? [ new CmdSlide(m_Out0, Dir) ] : [],
+			// [ new CmdIf(m_Out0!.GridLoc + Dir.ToGrid(), CmdIf.CheckType.HasTile, -1, [
+			// 	[ new CmdSlide(m_Out0, Dir) ]
+			// ])]
 		], startIndex);
 	}
 

@@ -294,7 +294,7 @@ public class Tile
 
 			var myScale = 0.15f;
 			if (IsInput(d) && 
-				!(world.HasTile(GridLoc + gdir) && world.GetTile(GridLoc + gdir).IsOutput(d.Invert())))
+				!(world.HasTile(GridLoc + gdir) && world.GetTileNonNull(GridLoc + gdir).IsOutput(d.Invert())))
 			{
 				myScale *= 0.5f;
 				myCol.A = 0.3f;

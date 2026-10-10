@@ -26,7 +26,7 @@ public class CmdUpdate : Command
 	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{
 		Debug.Assert(HasTileWithItem(lv.World, GLocation));
-		var it = lv.World.GetTileOrNull(GLocation).Item;
+		var it = lv.World.GetTileNonNull(GLocation).Item;
 		if (it.IsMidAnimation())
 		{
 			throw new InvalidProgramException();

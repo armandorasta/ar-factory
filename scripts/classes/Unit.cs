@@ -167,7 +167,8 @@ public abstract partial class Unit : Node2D
 	/// </summary>
 	public bool IsWithin(Vector2I gloc) => GetRect2I().HasPoint(gloc);
 	public Tile? GetTileOrNull(Vector2I gloc) => World.GetTileOrNull(m_GL + gloc);
-	public Tile GetTile(Vector2I gloc) => World.GetTile(m_GL + gloc);
+	public Tile? GetTile(Vector2I gloc) => World.GetTile(m_GL + gloc);
+	public Tile GetTileNonNull(Vector2I gloc) => World.GetTileNonNull(m_GL + gloc);
 
 	/// <summary>
 	/// Returns true if the machine is expected to operate during this tick, <see cref="m_Rate"/> determines how often 
@@ -258,7 +259,7 @@ public abstract partial class Unit : Node2D
 
 		if (m_Dims == Vector2I.One)
 		{
-			GetTile(Vector2I.Zero).Rotate180();
+			GetTileNonNull(Vector2I.Zero).Rotate180();
 			m_Dir = m_Dir.Invert();
 			return;
 		}
@@ -270,8 +271,8 @@ public abstract partial class Unit : Node2D
 			for (var x = 0; x < m_Dims.X; ++x)
 			{
 				var vec = new Vector2I(x, y);
-				GetTile(vec).Rotate180();
-				GetTile(maxGL - vec).Rotate180();
+				GetTileNonNull(vec).Rotate180();
+				GetTileNonNull(maxGL - vec).Rotate180();
 				World.SwapTiles(m_GL + vec, m_GL + (maxGL - vec));
 			}
 		}
@@ -289,7 +290,7 @@ public abstract partial class Unit : Node2D
 
 		if (m_Dims == Vector2I.One)
 		{
-			GetTile(Vector2I.Zero).Rotate90();
+			GetTileNonNull(Vector2I.Zero).Rotate90();
 			m_Dir = m_Dir.Rotate90();
 			return;
 		}
@@ -329,7 +330,7 @@ public abstract partial class Unit : Node2D
 		if (m_Dims == Vector2I.One)
 		{
 			Debug.Assert(CanFaceDir(m_Dir.Rotate270()));
-			GetTile(Vector2I.Zero).Rotate270();
+			GetTileNonNull(Vector2I.Zero).Rotate270();
 			m_Dir = m_Dir.Rotate270();
 			return;
 		}
@@ -352,13 +353,13 @@ public abstract partial class Unit : Node2D
 	public Tile AddInput(Vector2I gloc, Direction dir, bool bKeepTrack = false)
 	{
 		Debug.Assert(IsWithin(m_GL + gloc));
-		Debug.Assert(GetTile(gloc).IsSolid(dir));
+		Debug.Assert(GetTileNonNull(gloc).IsSolid(dir));
 		Debug.Assert(dir != Direction.East);
 
 		// Must be facing out of the unit.
 		Debug.Assert(!IsWithin(m_GL + gloc + dir.ToGrid()));
 
-		Tile tl = GetTile(gloc);
+		var tl = GetTileNonNull(gloc);
 		tl.MakeInput(dir, true);
 		if (bKeepTrack)
 		{
@@ -379,13 +380,13 @@ public abstract partial class Unit : Node2D
 	public Tile AddOutput(Vector2I gloc, Direction dir, bool bKeepTrack = false)
 	{
 		Debug.Assert(IsWithin(m_GL + gloc));
-		Debug.Assert(GetTile(gloc).IsSolid(dir));
+		Debug.Assert(GetTileNonNull(gloc).IsSolid(dir));
 		Debug.Assert(dir != Direction.West);
 
 		// Must be facing out of the unit.
 		Debug.Assert(!IsWithin(m_GL + gloc + dir.ToGrid()));
 
-		Tile tl = GetTile(gloc);
+		var tl = GetTileNonNull(gloc);
 		tl.MakeOutput(dir, true);
 		if (bKeepTrack)
 		{
@@ -424,7 +425,6 @@ public abstract partial class Unit : Node2D
 				return;
 			}
 
-			pender.AssignWaitList(m_PendingCmds);
 			PendNewCommands(pender);
 		}
 	}
@@ -435,6 +435,12 @@ public abstract partial class Unit : Node2D
 	public void PauseThisTick()
 	{
 		m_Count -= 1;
+	}
+
+	public void AddCommandsToWaitList(IEnumerable<IEnumerable<Command>> sequence)
+	{
+		Debug.Assert(sequence.SelectMany(c => c).All(c => !m_PendingCmds.Contains(c)));
+		m_PendingCmds.AddRange(sequence.SelectMany(c => c));
 	}
 
 	/// <summary>

@@ -1,5 +1,4 @@
 using System;
-using Godot;
 
 namespace ArFactory;
 
@@ -12,8 +11,7 @@ public enum UnaryOperation
 
 public static class UnaryOperationExtensions
 {
-	public static int Apply(this UnaryOperation op, int itVal, int updateVal) 
-		=> op switch
+	public static int Apply(this UnaryOperation op, int itVal, int updateVal) => op switch
 	{
 		UnaryOperation.Add => itVal + updateVal,
 		UnaryOperation.Mul => itVal * updateVal,

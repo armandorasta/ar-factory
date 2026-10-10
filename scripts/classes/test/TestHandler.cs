@@ -22,18 +22,18 @@ public partial class TestHandler : Godot.Node
 
 	private const string sc_IndentationStr = "    ";
 
-	private static TestHandler s_Instance;
+	private static TestHandler? s_Instance;
 
 
 	public bool IsShowPassingTests { get; set; } = false;
 	public bool IsPrintOrphanNodes { get; set; } = false;
 	public bool IsStopOnFirstFail { get; set; } = false;
 
-	private Task m_WholeProgramTask;
+	private Task? m_WholeProgramTask;
 	private int m_OrphanCount = 0;
 
 
-	public static TestHandler GetInstance() => s_Instance;
+	public static TestHandler GetInstance() => s_Instance!;
 
 
 	/// <summary>
@@ -95,7 +95,7 @@ public partial class TestHandler : Godot.Node
 			.SelectMany(c => c.GetMethods().Where(m => m.GetCustomAttribute<RunThisOnlyAttribute>() != null))
 			.ToArray();
 		
-		MethodInfo onlyTest = null;
+		MethodInfo? onlyTest = null;
 		if (runFirstMeths.Length > 0)
 		{
 			if (runFirstMeths.Length > 1)
@@ -104,16 +104,16 @@ public partial class TestHandler : Godot.Node
 				for (var i = 0; i < runFirstMeths.Length; ++i)
 				{
 					var meth = runFirstMeths[i];
-					GD.Print($"[{i+1}] #{Cyan}{meth.Name}{Reset} from {Pink}{meth.DeclaringType.Name}{Reset}");
+					GD.Print($"[{i+1}] #{Cyan}{meth.Name}{Reset} from {Pink}{meth.DeclaringType!.Name}{Reset}");
 				}
 
 				return;
 			}
 
 			onlyTest = runFirstMeths[0];
-			testClasses = [onlyTest.DeclaringType];
+			testClasses = [onlyTest.DeclaringType!];
 
-			GD.Print($"Only running test: {FormatTestName(onlyTest)} from {Pink}{onlyTest.DeclaringType.Name}{Reset}.");
+			GD.Print($"Only running test: {FormatTestName(onlyTest)} from {Pink}{onlyTest.DeclaringType!.Name}{Reset}.");
 		}
 
 		foreach (var tclass in testClasses)
@@ -150,9 +150,9 @@ public partial class TestHandler : Godot.Node
 		}
 	}
 
-	private async Task<TestClassResult> HandleTestClass(Type tclass, MethodInfo onlyRunThis = null)
+	private async Task<TestClassResult> HandleTestClass(Type tclass, MethodInfo? onlyRunThis = null)
 	{
-		var instance = tclass.GetConstructor([]).Invoke([]);
+		var instance = tclass.GetConstructor([])!.Invoke([]);
 		var res = new TestClassResult();
 		
 		Asserts.CurrTestClass = tclass.Name;
@@ -211,7 +211,7 @@ public partial class TestHandler : Godot.Node
 				tclass.GetMethod("BeforeEach")?.Invoke(instance, []);
 				if (bAsync)
 				{
-					await (Task)tmeth.Invoke(instance, []);
+					await (Task)tmeth.Invoke(instance, [])!;
 				}
 				else
 				{

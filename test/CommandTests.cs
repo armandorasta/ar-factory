@@ -4,52 +4,52 @@ using System.Threading.Tasks;
 namespace ArFactory.Tests;
 using static ArTest.Asserts;
 
-[ArTest.RunThisOnly]
 public class CommandTests : ArTest.TestSuit
 {
+	private Level Lvl => m_Lv!;
 	private Level? m_Lv;
 
 	public override void BeforeAll()
 	{
 		var levelScene = GD.Load<PackedScene>("res://scenes/level.tscn");
 		m_Lv = levelScene.Instantiate<Level>();
-		AddNode(m_Lv);
-		m_Lv.SetTickRate(100);
+		AddNode(Lvl);
+		Lvl.SetTickRate(100);
 	}
 
 	public override void BeforeEach()
 	{
-		m_Lv!.World.Reset();
-		m_Lv.World.SetDims(new(6, 6));
+		Lvl.World.Reset();
+		Lvl.World.SetDims(new(6, 6));
 	}
 
 	public override void AfterEach()
 	{
-		AssertFalse(m_Lv!.IsSimRunning());
+		AssertFalse(Lvl.IsSimRunning());
 	}
 
 	public override void AfterAll()
 	{
-		m_Lv!.QueueFree();
-		RemoveNode(m_Lv);
+		Lvl.QueueFree();
+		RemoveNode(Lvl);
 	}
 
 	[ArTest.Test] public async Task TestCmdSpawn_Vanilla()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var injy0 = world.PlaceInjector();
 
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			AssertFalse(tl0.HasItem());
 			injy0.PendParallel([ new CmdSpawn(tl0, 41) ]);
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertTrue(tl0.HasItem());
 			AssertEq(tl0.Item.Value, 41);
 			AssertFalse(injy0.HasPendingCmds());
 			
-			await m_Lv.EndTickAsync();
+			await Lvl.EndTickAsync();
 			AssertTrue(tl0.HasItem());
 			AssertEq(tl0.Item.Value, 41);
 			AssertFalse(injy0.HasPendingCmds());
@@ -58,46 +58,46 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdSpawn_INVALID_CASES()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var injy0 = world.PlaceInjector();
 
 		// Spawn on non-existing tile
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy0.PendParallel([new CmdSpawn(new Vector2I(2, 3), -552)]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy0.HasPendingCmds());
 		}
 
 		// Double spawn.
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, -380);
 			injy0.PendParallel([new CmdSpawn(tl0, 150)]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy0.HasPendingCmds());
 		}
 
 		// Out of bounds spawn
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy0.PendParallel([new CmdSpawn(new Vector2I(-1, -1), -428)]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy0.HasPendingCmds());
 		}
 	}
 
 	[ArTest.Test] public async Task TestCmdKill_Vanilla()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var injy0 = world.PlaceInjector();
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy0.PendParallel([new CmdKill(tl0)]);
 			world.SpawnItem(tl0, 497);
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertFalse(tl0.HasItem());
 			AssertFalse(injy0.HasPendingCmds());
 		}
@@ -105,55 +105,55 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdKill_INVALID_CASES()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
 		var injy0 = world.PlaceInjector();
 	
 		// Kill on non-existing tile
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy0.PendParallel([new CmdKill(new Vector2I(2, 3))]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy0.HasPendingCmds());
 		}
 
 		// Killing nothing (existing tile tho).
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy0.PendParallel([new CmdKill(new Vector2I(0, 0))]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy0.HasPendingCmds());
 		}
 
 		// Out of bounds kill
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy0.PendParallel([new CmdKill(new Vector2I(-1, -1))]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy0.HasPendingCmds());
 		}
 
 		// Killing mid-animation
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, 112);
 			injy0.PendParallel([
 				new CmdSlide(tl0, Direction.East),
 				new CmdKill(new Vector2I(-1, -1))
 			]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy0.HasPendingCmds());
 		}
 	}
 
 	[ArTest.Test] public async Task TestCmdSleep()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
 		var injy = world.PlaceInjector();
 
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy.PendFullSequence([
 				[
@@ -168,26 +168,26 @@ public class CommandTests : ArTest.TestSuit
 				],
 			]);
 
-			await m_Lv.TickOnceAsync();
-			AssertEq(m_Lv.GetTicksSinceStart(), 1);
+			await Lvl.TickOnceAsync();
+			AssertEq(Lvl.GetTicksSinceStart(), 1);
 			AssertFalse(tl.HasItem());
 
-			await m_Lv.TickOnceAsync();
-			AssertEq(m_Lv.GetTicksSinceStart(), 2);
+			await Lvl.TickOnceAsync();
+			AssertEq(Lvl.GetTicksSinceStart(), 2);
 			AssertFalse(tl.HasItem());
 
-			await m_Lv.TickOnceAsync();
-			AssertEq(m_Lv.GetTicksSinceStart(), 3);
+			await Lvl.TickOnceAsync();
+			AssertEq(Lvl.GetTicksSinceStart(), 3);
 			AssertFalse(tl.HasItem());
 			// And now sleep is done.
 
-			await m_Lv.TickOnceAsync();
-			AssertEq(m_Lv.GetTicksSinceStart(), 4);
+			await Lvl.TickOnceAsync();
+			AssertEq(Lvl.GetTicksSinceStart(), 4);
 			AssertTrue(tl.HasItem());
 			// The second sleep should be done immediately this tick as well.
 
-			await m_Lv.TickOnceAsync();
-			AssertEq(m_Lv.GetTicksSinceStart(), 5);
+			await Lvl.TickOnceAsync();
+			AssertEq(Lvl.GetTicksSinceStart(), 5);
 			AssertFalse(tl.HasItem()); // Item should be dead now
 			AssertFalse(injy.HasPendingCmds());
 		}
@@ -195,7 +195,7 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdSlide_Vanilla()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tlEast0 = world.InstallEmptyTile(new(0, 0));
 		var tlEast1 = world.InstallEmptyTile(new(1, 0));
 
@@ -210,7 +210,7 @@ public class CommandTests : ArTest.TestSuit
 
 		var injy0 = world.PlaceInjector();
 
-		using var _ = m_Lv.PlaySimulationInDebug();
+		using var _ = Lvl.PlaySimulationInDebug();
 		injy0.PendParallel([
 			new CmdSpawn(tlEast0, 1),
 			new CmdSpawn(tlSouth0, 2),
@@ -218,14 +218,14 @@ public class CommandTests : ArTest.TestSuit
 			new CmdSpawn(tlWest0, 4),
 		]);
 	
-		await m_Lv.TickOnceAsync();
+		await Lvl.TickOnceAsync();
 		AssertTrue(tlEast0.HasItem());
 		AssertTrue(tlSouth0.HasItem());
 		AssertTrue(tlNorth0.HasItem());
 		AssertTrue(tlWest0.HasItem());
 		AssertFalse(injy0.HasPendingCmds());
 
-		await m_Lv.EndTickAsync();
+		await Lvl.EndTickAsync();
 		injy0.PendParallel([
 			new CmdSlide(tlEast0, Direction.East),
 			new CmdSlide(tlSouth0, Direction.South),
@@ -238,7 +238,7 @@ public class CommandTests : ArTest.TestSuit
 		var itNorth = tlNorth0.Item;
 		var itWest = tlWest0.Item;
 
-		await m_Lv.TickOnceAsync();
+		await Lvl.TickOnceAsync();
 		AssertFalse(tlEast0.HasItem());
 		AssertTrue(tlEast1.HasItem());
 		AssertTrue(tlEast1.Item.IsMidAnimation());
@@ -260,7 +260,7 @@ public class CommandTests : ArTest.TestSuit
 		AssertRefEq(itNorth, tlNorth1.Item);
 		AssertRefEq(itWest, tlWest1.Item);
 
-		await m_Lv.EndTickAsync();
+		await Lvl.EndTickAsync();
 		AssertFalse(tlEast0.HasItem());
 		AssertTrue(tlEast1.HasItem());
 		AssertFalse(tlEast1.Item.IsMidAnimation());
@@ -281,7 +281,7 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdSlide_Destination_item_is_still_coming()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(new(0, 0));
 		var tl1 = world.InstallEmptyTile(new(1, 0));
 
@@ -291,7 +291,7 @@ public class CommandTests : ArTest.TestSuit
 		// For now on I will only test east and assume the rest will work similarly because
 		// otherwise the code size will explode for a very stupid reason...
 		
-		using var _ = m_Lv.PlaySimulationInDebug();
+		using var _ = Lvl.PlaySimulationInDebug();
 
 		// Across units
 		injy0.PendParallel([ // The kill happens external to the unit
@@ -300,23 +300,23 @@ public class CommandTests : ArTest.TestSuit
 			new CmdSlide(tl0, Direction.East),
 		]);
 
-		await m_Lv.TickOnceAsync();
+		await Lvl.TickOnceAsync();
 		AssertTrue(tl0.HasItem());
 		AssertTrue(tl1.HasItem());
 		AssertEq(tl0.Item.Value, 1);
 		AssertEq(tl1.Item.Value, 2);
 
-		await m_Lv.EndTickAsync();
+		await Lvl.EndTickAsync();
 		injy1.PendParallel([new CmdKill(tl1)]);
 
 		// injy1 goes for the kill, but the overlap algo kicks in.
-		await m_Lv.TickOnceAsync();
+		await Lvl.TickOnceAsync();
 		AssertFalse(tl0.HasItem());
 		AssertTrue(tl1.HasItem());
 		AssertTrue(tl1.Item.IsMidAnimation());
 		AssertEq(tl1.Item.Value, 1);
 
-		await m_Lv.EndTickAsync();
+		await Lvl.EndTickAsync();
 		AssertFalse(tl0.HasItem());
 		AssertTrue(tl1.HasItem());
 		AssertFalse(tl1.Item.IsMidAnimation());
@@ -335,13 +335,13 @@ public class CommandTests : ArTest.TestSuit
 		]);
 
 		// Internal
-		await m_Lv.TickOnceAsync();
+		await Lvl.TickOnceAsync();
 		AssertFalse(tl0.HasItem());
 		AssertTrue(tl1.HasItem());
 		AssertTrue(tl1.Item.IsMidAnimation());
 		AssertEq(tl1.Item.Value, 1);
 
-		await m_Lv.EndTickAsync();
+		await Lvl.EndTickAsync();
 		AssertFalse(tl0.HasItem());
 		AssertTrue(tl1.HasItem());
 		AssertFalse(tl1.Item.IsMidAnimation());
@@ -352,73 +352,73 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdSlide_INVALID_CASES()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var injy0 = world.PlaceInjector();
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
 
 		// Sliding from non-existing tile
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy0.PendParallel([new CmdSlide(new Vector2I(0, 1), Direction.North)]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy0.HasPendingCmds());
 		}
 
 		// Sliding from to a non-existant tile
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, -294);
 			injy0.PendParallel([new CmdSlide(tl0, Direction.South)]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy0.HasPendingCmds());
 		}
 
 		// Sliding against the border of the world
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy0.PendParallel([new CmdSlide(tl0, Direction.North)]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy0.HasPendingCmds());
 		}
 
 		// Sliding nothing on existing tiles
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			tl0.DestroyItem();
 			injy0.PendParallel([new CmdSlide(tl0, Direction.East)]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy0.HasPendingCmds());
 		}
 
 		// Sliding from out of bounds
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl1, 949);
 			injy0.PendParallel([new CmdSlide(new Vector2I(0, -1), Direction.South)]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy0.HasPendingCmds());
 		}
 
 		// Sliding to out of bounds is just the same as the against world boundary case.
 
 		// Sliding from and to out of bounds
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl1, 949);
 			injy0.PendParallel([new CmdSlide(new Vector2I(0, -1), Direction.North)]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy0.HasPendingCmds());
 		}
 	}
 
 	[ArTest.Test] public async Task TestCmdAwait_After_spawn()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var injy0 = world.PlaceInjector();
 		
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			var wait0 = new CmdAwait([tl0]);
 			injy0.PendFullSequence([
@@ -430,7 +430,7 @@ public class CommandTests : ArTest.TestSuit
 				],
 			]);
 
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertTrue(tl0.HasItem());
 			AssertTrue(wait0.IsDone());
 		}
@@ -438,12 +438,12 @@ public class CommandTests : ArTest.TestSuit
 	
 	[ArTest.Test] public async Task TestCmdAwait_after_slide_on_dest()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
 		var injy0 = world.PlaceInjector();
 
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{ 
 			world.SpawnItem(tl0, 447);
 			var wait1 = new CmdAwait(tl1);
@@ -452,12 +452,12 @@ public class CommandTests : ArTest.TestSuit
 				wait1, // Also does nothing here...
 			]);
 
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertFalse(tl0.HasItem());
 			AssertTrue(tl1.HasItem());
 			AssertTrue(tl1.Item.IsMidAnimation());
 			AssertFalse(wait1.IsDone());
-			await m_Lv.EndTickAsync();
+			await Lvl.EndTickAsync();
 			AssertFalse(tl0.HasItem());
 			AssertTrue(tl1.HasItem());
 			AssertFalse(tl1.Item.IsMidAnimation()); // Animation ends.
@@ -467,21 +467,21 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdAwait_cross_unit()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl = world.InstallEmptyTile(new(1, 0));
 		var injy0 = world.PlaceInjector();
 		var injy1 = world.PlaceInjector();
 		
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			var wait = new CmdAwait(tl);
 			injy0.PendParallel([wait]);
 
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertFalse(tl.HasItem());
 			AssertFalse(wait.IsDone());
 			AssertTrue(injy0.HasPendingCmds());
-			await m_Lv.EndTickAsync();
+			await Lvl.EndTickAsync();
 			AssertFalse(tl.HasItem());
 			AssertFalse(wait.IsDone());
 			AssertTrue(injy0.HasPendingCmds());
@@ -490,13 +490,13 @@ public class CommandTests : ArTest.TestSuit
 				new CmdSpawn(tl, 9), // Second injector is waiting for this.
 			]);
 
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertTrue(tl.HasItem());
 			AssertFalse(wait.IsDone()); // Spawn happens after await checks
 			AssertTrue(injy0.HasPendingCmds());
 			AssertFalse(injy1.HasPendingCmds());
 
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertTrue(tl.HasItem());
 			AssertTrue(wait.IsDone());
 			AssertFalse(injy0.HasPendingCmds());
@@ -506,19 +506,19 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdVacate_Lone_vacate()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
 		var vac = new CmdVacate([tl]);
 		var injy0 = world.PlaceInjector();
 
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy0.PendParallel([ vac ]);
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertFalse(tl.HasItem());
 			AssertTrue(vac.IsDone());
 			AssertFalse(injy0.HasPendingCmds());
-			await m_Lv.EndTickAsync();
+			await Lvl.EndTickAsync();
 			AssertFalse(tl.HasItem());
 			AssertTrue(vac.IsDone());
 			AssertFalse(injy0.HasPendingCmds());
@@ -527,13 +527,13 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdVacate_On_slide_dest()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
 		var vac = new CmdVacate([tl0]);
 		var injy0 = world.PlaceInjector();
 
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy0.PendParallel([
 			new CmdSpawn(tl0, 7),
@@ -541,12 +541,12 @@ public class CommandTests : ArTest.TestSuit
 				vac, // Should be done immediately because they don't wait for items to finish sliding.
 			]);
 
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertFalse(tl0.HasItem());
 			AssertTrue(tl1.HasItem());
 			AssertTrue(tl1.Item.IsMidAnimation());
 			AssertTrue(vac.IsDone());
-			await m_Lv.EndTickAsync();
+			await Lvl.EndTickAsync();
 			AssertFalse(tl0.HasItem());
 			AssertTrue(tl1.HasItem());
 			AssertFalse(tl1.Item.IsMidAnimation());
@@ -557,14 +557,14 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdVacate_Multiple_tiles()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl00 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl10 = world.InstallEmptyTile(new(1, 0));
 		var tl01 = world.InstallEmptyTile(new(0, 1));
 		var tl11 = world.InstallEmptyTile(new(1, 1));
 		var injy = world.PlaceInjector();
 
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl10, 731);
 			world.SpawnItem(tl11, 125);
@@ -575,7 +575,7 @@ public class CommandTests : ArTest.TestSuit
 			], 0);
 			injy.PendParallel([vac], 1);
 
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertFalse(tl10.HasItem());
 			AssertFalse(tl11.HasItem());
 			AssertTrue(tl00.HasItem());
@@ -584,12 +584,12 @@ public class CommandTests : ArTest.TestSuit
 			AssertTrue(tl01.Item.IsMidAnimation());
 			AssertFalse(vac.IsDone());
 
-			await m_Lv.EndTickAsync();
+			await Lvl.EndTickAsync();
 			AssertFalse(tl00.Item.IsMidAnimation());
 			AssertFalse(tl01.Item.IsMidAnimation());
 			AssertFalse(vac.IsDone());
 
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertTrue(vac.IsDone());
 			AssertFalse(injy.HasPendingCmds());
 		}
@@ -605,21 +605,21 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdUpdate_Vanilla()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
 		var injy = world.PlaceInjector();
 
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl, 274);
 			injy.PendParallel([ new CmdUpdate(tl, UnaryOperation.Mul, 2), new CmdSleep(1) ]);
 			injy.PendParallel([ new CmdUpdate(tl, UnaryOperation.Add, 5) ], 1);
 
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertTrue(tl.HasItem());
 			AssertEq(tl.Item.Value, 2*274);
 
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertTrue(tl.HasItem());
 			AssertEq(tl.Item.Value, 2*274 + 5);
 			AssertFalse(injy.HasPendingCmds());
@@ -628,61 +628,61 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdUpdate_INVALID_CASES()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
 		var injy = world.PlaceInjector();
 
 		// Updating nothing (existing tile)
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy.PendParallel([(new CmdUpdate(tl0, UnaryOperation.Override, 559))]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 
 		// Updating nothing (no tile)
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy.PendParallel([ new CmdUpdate(new Vector2I(2, 3), UnaryOperation.Override, 12) ]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 
 		// Updating nothing (out of bounds)
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy.PendParallel([ new CmdUpdate(new Vector2I(-1, 2), UnaryOperation.Override, -320) ]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 
 		// Updating something mid-animation
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, 376);
 			injy.PendParallel([
 				new CmdSlide(tl0, Direction.East),
 				new CmdUpdate(tl1, UnaryOperation.Override, -552)
 			]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 	}
 
 	[ArTest.Test] public async Task TestCmdClone_Vanilla()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
 		var tl2 = world.InstallEmptyTile(new(1, 1));
 		var injy = world.PlaceInjector();
 
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, 940);
 			injy.PendParallel([ new CmdClone(tl0, [tl1, tl2]) ]);
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertTrue(tl1.HasItem());
 			AssertEq(tl1.Item.Value, tl0.Item.Value);
 			AssertTrue(tl2.HasItem());
@@ -696,56 +696,56 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdClone_INVALID_CASES()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
 		var tl2 = world.InstallEmptyTile(new(1, 1));
 		var injy = world.PlaceInjector();
 
 		// No item to clone (existing tile)
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy.PendParallel([ new CmdClone(tl0, [tl1, tl2]) ]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 
 		// No item to clone (non-existing tile)
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy.PendParallel([ new CmdClone(new Vector2I(2, 3), [tl1.GridLoc, tl2.GridLoc]) ]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 
 		// Cloning to non-existing tile
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, -73);
 			injy.PendParallel([ new CmdClone(tl0.GridLoc, [new Vector2I(2, 3), tl2.GridLoc]) ]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 
 		// Cloning to already occupied tile
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, -73);
 			world.SpawnItem(tl1, 222);
 			injy.PendParallel([ new CmdClone(tl0, [tl1, tl2]) ]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 
 		// Cloning an item mid-animation (should I allow this?)
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, -73);
 			injy.PendParallel([
 				new CmdSlide(tl0, Direction.East),
 				new CmdClone(tl1, [tl0, tl2])
 			]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 	}
@@ -803,18 +803,18 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdCombine_Vanilla()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(0, 1));
 		var tl2 = world.InstallEmptyTile(new(1, 0));
 		var injy = world.PlaceInjector();
 
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, -401);
 			world.SpawnItem(tl1, 665);
 			injy.PendParallel([ new CmdCombine(tl0, tl1, tl2, BinaryOperation.Add) ]);
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertFalse(tl0.HasItem());
 			AssertFalse(tl1.HasItem());
 			AssertTrue(tl2.HasItem());
@@ -825,17 +825,17 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdCombine_Overlap()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(0, 1));
 		var injy = world.PlaceInjector();
 
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, 493);
 			world.SpawnItem(tl1, -40);
 			injy.PendParallel([ new CmdCombine(tl0, tl1, tl1, BinaryOperation.Add) ]);
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertFalse(tl0.HasItem());
 			AssertTrue(tl1.HasItem());
 			AssertEq(tl1.Item.Value, 493 + -40);
@@ -845,70 +845,70 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdCombine_INVALID_CASES()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(0, 1));
 		var tl2 = world.InstallEmptyTile(new(1, 0));
 		var injy = world.PlaceInjector();
 
 		// Missing item (existing tile)
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, 43);
 			injy.PendParallel([ new CmdCombine(tl0, tl1, tl2, BinaryOperation.BitOr) ]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 
 		// Missing tile (source)
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, 587);
 			injy.PendParallel([ new CmdCombine(tl0.GridLoc, new Vector2I(2, 3), tl1.GridLoc, BinaryOperation.BitOr) ]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 
 		// Missing tile (destination)
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, -792);
 			injy.PendParallel([ new CmdCombine(tl0.GridLoc, tl1.GridLoc, new Vector2I(2, 3), BinaryOperation.BitOr) ]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 
 		// Out of bounds (source)
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, 587);
 			injy.PendParallel([ new CmdCombine(tl0.GridLoc, new Vector2I(2, -3), tl1.GridLoc, BinaryOperation.BitOr) ]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 
 		// Out of bounds (destination)
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, -792);
 			injy.PendParallel([ new CmdCombine(tl0.GridLoc, tl1.GridLoc, new Vector2I(-2, 3), BinaryOperation.BitOr) ]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 
 		// Destination tile already occupied
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, -68);
 			world.SpawnItem(tl1, -270);
 			world.SpawnItem(tl2, -483);
 			injy.PendParallel([ new CmdCombine(tl0, tl1, tl2, BinaryOperation.BitOr) ]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 
 		// Source item mid-animation
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl1, 404);
 			world.SpawnItem(tl2, -502);
@@ -916,23 +916,23 @@ public class CommandTests : ArTest.TestSuit
 				new CmdSlide(tl2, Direction.West),
 				new CmdCombine(tl0, tl1, tl2, BinaryOperation.BitOr)
 			]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 	}
 
 	[ArTest.Test] public async Task TestCmdTeleport_vanilla()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(0, 1));
 		var injy = world.PlaceInjector();
 
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			var myItem = world.SpawnItem(tl0, -744);
 			injy.PendParallel([ new CmdTeleport(tl0, tl1) ]);
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertFalse(tl0.HasItem());
 			AssertTrue(tl1.HasItem());
 			AssertEq(tl1.Item.Value, -744);
@@ -943,15 +943,15 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdTeleport_to_same_tile()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var injy = world.PlaceInjector();
 
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			var myItem = world.SpawnItem(tl0, -744);
 			injy.PendParallel([ new CmdTeleport(tl0, tl0) ]);
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertTrue(tl0.HasItem());
 			AssertEq(tl0.Item.Value, -744);
 			AssertRefEq(tl0.Item, myItem);
@@ -961,69 +961,69 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdTeleport_INVALID_CASES()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(0, 1));
 		var injy = world.PlaceInjector();
 
 		// Missing item (existing tile)
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy.PendParallel([ new CmdTeleport(tl0, tl1) ]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 
 		// Missing source tile
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy.PendParallel([ new CmdTeleport(new Vector2I(2, 3), tl1.GridLoc) ]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 
 		// Missing destination tile
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy.PendParallel([ new CmdTeleport(tl0.GridLoc, new Vector2I(2, 3)) ]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 
 		// Out of bounds (source)
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy.PendParallel([ new CmdTeleport(new Vector2I(-2, 3), tl1.GridLoc) ]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 
 		// Out of bounds (destination)
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy.PendParallel([ new CmdTeleport(tl0.GridLoc, new Vector2I(2, -3)) ]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 
 		// Destination tile already occupied
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl1, 6);
 			injy.PendParallel([ new CmdTeleport(tl0, tl1) ]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 
 		// Teleporting mid-animation
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl1, -254);
 			injy.PendParallel([
 				new CmdSlide(tl1, Direction.West),
 				new CmdTeleport(tl0, tl1)
 			]);
-			await AssertThrow(m_Lv.TickOnceAsync);
+			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
 	}
@@ -1033,7 +1033,7 @@ public class CommandTests : ArTest.TestSuit
 		// Apply is a function that must be used by the implementation of CmdIf to check the
 		// condition.
 
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 
 		// No tile: all except NoTile and NoItem return false.
 		AssertTrue(CmdIf.Apply(CmdIf.CheckType.NoTile, null, -1));
@@ -1099,12 +1099,12 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdIf_vanilla()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
 		var injy = world.PlaceInjector();
 
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy.PendParallel([
 				new CmdIf(tl0, CmdIf.CheckType.NoItem, -1,
@@ -1118,13 +1118,13 @@ public class CommandTests : ArTest.TestSuit
 				]),
 			]);
 
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertFalse(tl0.HasItem());
 			AssertTrue(tl1.HasItem());
 			AssertEq(tl1.Item.Value, 6);
 			AssertTrue(tl1.Item.IsMidAnimation());
 
-			await m_Lv.EndTickAsync();
+			await Lvl.EndTickAsync();
 			AssertFalse(tl0.HasItem());
 			AssertTrue(tl1.HasItem());
 			AssertEq(tl1.Item.Value, 6);
@@ -1135,12 +1135,12 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdIf_no_else_branch()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
 		var injy = world.PlaceInjector();
 
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy.PendParallel([
 				new CmdIf(tl0, CmdIf.CheckType.NoItem, -1,
@@ -1150,13 +1150,13 @@ public class CommandTests : ArTest.TestSuit
 				]),
 			]);
 
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertFalse(tl0.HasItem());
 			AssertTrue(tl1.HasItem());
 			AssertEq(tl1.Item.Value, 6);
 			AssertTrue(tl1.Item.IsMidAnimation());
 
-			await m_Lv.EndTickAsync();
+			await Lvl.EndTickAsync();
 			AssertFalse(tl0.HasItem());
 			AssertTrue(tl1.HasItem());
 			AssertEq(tl1.Item.Value, 6);
@@ -1167,30 +1167,30 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdIf_empty_branches()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var injy = world.PlaceInjector();
 
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy.PendParallel([
 				new CmdIf(tl0, CmdIf.CheckType.NoItem, -1, [ ], [ ]),
 			]);
 
-			await m_Lv.TickOnceAsync();
-			await m_Lv.EndTickAsync();
+			await Lvl.TickOnceAsync();
+			await Lvl.EndTickAsync();
 			AssertFalse(injy.HasPendingCmds());
 		}
 	}
 
 	[ArTest.Test] public async Task TestCmdIf_else_branch()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
 		var injy = world.PlaceInjector();
 
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy.PendParallel([
 				new CmdIf(tl0, CmdIf.CheckType.Greater, Item.MaxValue,
@@ -1204,13 +1204,13 @@ public class CommandTests : ArTest.TestSuit
 				]),
 			]);
 
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertFalse(tl0.HasItem());
 			AssertTrue(tl1.HasItem());
 			AssertEq(tl1.Item.Value, 6);
 			AssertTrue(tl1.Item.IsMidAnimation());
 
-			await m_Lv.EndTickAsync();
+			await Lvl.EndTickAsync();
 			AssertFalse(tl0.HasItem());
 			AssertTrue(tl1.HasItem());
 			AssertEq(tl1.Item.Value, 6);
@@ -1221,12 +1221,12 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdIf_on_null_tile()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
 		var injy = world.PlaceInjector();
 
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy.PendParallel([
 				new CmdIf(new Vector2I(2, 3), CmdIf.CheckType.NoItem, -1,
@@ -1236,13 +1236,13 @@ public class CommandTests : ArTest.TestSuit
 				]),
 			]);
 
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertFalse(tl0.HasItem());
 			AssertTrue(tl1.HasItem());
 			AssertEq(tl1.Item.Value, 6);
 			AssertTrue(tl1.Item.IsMidAnimation());
 
-			await m_Lv.EndTickAsync();
+			await Lvl.EndTickAsync();
 			AssertFalse(tl0.HasItem());
 			AssertTrue(tl1.HasItem());
 			AssertEq(tl1.Item.Value, 6);
@@ -1253,12 +1253,12 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestCmdIf_on_out_of_bounds_tile()
 	{
-		var world = m_Lv!.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
 		var injy = world.PlaceInjector();
 
-		using (m_Lv.PlaySimulationInDebug())
+		using (Lvl.PlaySimulationInDebug())
 		{
 			injy.PendParallel([
 				new CmdIf(new Vector2I(-2, 3), CmdIf.CheckType.NoItem, -1,
@@ -1268,13 +1268,13 @@ public class CommandTests : ArTest.TestSuit
 				]),
 			]);
 
-			await m_Lv.TickOnceAsync();
+			await Lvl.TickOnceAsync();
 			AssertFalse(tl0.HasItem());
 			AssertTrue(tl1.HasItem());
 			AssertEq(tl1.Item.Value, 6);
 			AssertTrue(tl1.Item.IsMidAnimation());
 
-			await m_Lv.EndTickAsync();
+			await Lvl.EndTickAsync();
 			AssertFalse(tl0.HasItem());
 			AssertTrue(tl1.HasItem());
 			AssertEq(tl1.Item.Value, 6);

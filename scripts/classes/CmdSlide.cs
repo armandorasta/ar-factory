@@ -10,9 +10,9 @@ public class CmdSlide : Command
 {
 	public Vector2I GridFrom { get; private set; }
 	public Direction Dir { get; private set; }
-	public WeakReference<Item> TrackedItemRef { get; private set; }
+	public WeakReference<Item>? TrackedItemRef { get; private set; }
 	
-	private Action<Level> m_StateFunc;
+	private Action<Level>? m_StateFunc;
 
 	public CmdSlide(Vector2I gfrom, Direction dir) : base(1, true)
 	{
@@ -32,7 +32,8 @@ public class CmdSlide : Command
 	public bool CanSlideNextTick(WorldPanel world)
 	{
 		var destTl = world.GetTileOrNull(GetGridTo());
-		return destTl.CanItemEnter(Dir.Invert()) // No wall in the way
+		return destTl is not null 
+			&& destTl.CanItemEnter(Dir.Invert()) // No wall in the way
 			&& !destTl.IsReserved();             // No item already there/about to be there
 	}
 
@@ -44,10 +45,10 @@ public class CmdSlide : Command
 	{
 		Debug.AssertEq(m_StateFunc, HandleDefault);
 		Debug.AssertNotNull(TrackedItemRef);
-		Debug.Assert(TrackedItemRef.TryGetTarget(out var it) && it.IsAllowedToMove());
+		Debug.Assert(TrackedItemRef!.TryGetTarget(out var it) && it.IsAllowedToMove());
 		Debug.Assert(world.HasTile(GetGridTo()));
 
-		if (!world.GetTileOrNull(GetGridTo()).IsReserved())
+		if (!world.GetTileNonNull(GetGridTo()).IsReserved())
 		{
 			PrepTrackedItemForSlidingAnim(world);
 			CountThisTick(); // Undo the pausing because the command has advanced.
@@ -58,7 +59,7 @@ public class CmdSlide : Command
 
 	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{
-		m_StateFunc.Invoke(lv);
+		m_StateFunc!.Invoke(lv);
 	}
 
 	protected override void DoPerFrame(double dt, Level lv)
@@ -96,7 +97,7 @@ public class CmdSlide : Command
 		Debug.Assert(HasTileWithItem(lv.World, GridFrom));
 
 		// Assume the destination tile exists.
-		var destTile = lv.World.GetTileOrNull(GetGridTo());
+		var destTile = lv.World.GetTileNonNull(GetGridTo());
 		if (!destTile.CanItemEnter(Dir.Invert()))
 		{
 			PauseThisTick();
@@ -120,7 +121,7 @@ public class CmdSlide : Command
 
 	private void PrepTrackedItemForSlidingAnim(WorldPanel world)
 	{
-		var trackedIt = world.TeleportItemNoSync(GridFrom, GetGridTo());
+		var trackedIt = world.TeleportItemNoSync(GridFrom, GetGridTo())!;
 		trackedIt.DisallowMovementThisTick();
 		trackedIt.SetMidAnimationFlag(true);
 		TrackedItemRef = new(trackedIt);

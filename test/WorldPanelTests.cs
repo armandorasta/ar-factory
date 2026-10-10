@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Godot;
 
 namespace ArFactory.Tests;
@@ -8,35 +6,37 @@ using static ArTest.Asserts;
 
 public class WorldPanelTests : ArTest.TestSuit
 {
-	private Level m_Lv;
+	public Level Lvl => m_Lv!;
+	private Level? m_Lv;
 
 	public override void BeforeAll()
 	{
 		var levelScene = GD.Load<PackedScene>("res://scenes/level.tscn");
 		m_Lv = levelScene.Instantiate<Level>();
 		AddNode(m_Lv);
+		m_Lv.SetTickRate(100);
 	}
 
 	public override void BeforeEach()
 	{
-		m_Lv.World.Reset();
-		m_Lv.World.SetDims(new(15, 10));
+		Lvl.World.Reset();
+		Lvl.World.SetDims(new(15, 10));
 	}
 
 	public override void AfterEach()
 	{
-		AssertFalse(m_Lv.IsSimRunning());
+		AssertFalse(Lvl.IsSimRunning());
 	}
 
 	public override void AfterAll()
 	{
-		m_Lv.QueueFree();
-		RemoveNode(m_Lv);
+		Lvl.QueueFree();
+		RemoveNode(Lvl);
 	}
 
 	[ArTest.Test] public void TestInstallTile()
 	{
-		var world = m_Lv.World;
+		var world = Lvl.World;
 		AssertFalse(world.HasTile(Vector2I.One));
 		AssertNull(world[1, 1]);
 
@@ -59,7 +59,7 @@ public class WorldPanelTests : ArTest.TestSuit
 	{
 		// Items will not be tested here, as tile tests don't depend on item tests.
 
-		var world = m_Lv.World;
+		var world = Lvl.World;
 		world.InstallEmptyTile(Vector2I.One);
 		world.DeleteTile(Vector2I.One);
 		AssertFalse(world.HasTile(Vector2I.One));
@@ -73,7 +73,7 @@ public class WorldPanelTests : ArTest.TestSuit
 
 	[ArTest.Test] public void TestMoveTile()
 	{
-		var world = m_Lv.World;
+		var world = Lvl.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
 		var movedTl = world.MoveTile(tl, Vector2I.One);
 		AssertRefEq(tl, movedTl);
@@ -87,13 +87,13 @@ public class WorldPanelTests : ArTest.TestSuit
 
 	[ArTest.Test] public void TestExtractTile()
 	{
-		var world = m_Lv.World;
+		var world = Lvl.World;
 		var installedTl = world.InstallEmptyTile(new(3, 4));
 		var extractedTl = world.ExtractTile(installedTl.GridLoc);
 		AssertRefEq(installedTl, extractedTl);
 		AssertFalse(world.HasTile(installedTl.GridLoc));
 
-		extractedTl.SetGridLocUnsafe(Vector2I.Zero); // Should be ignored and overriden.
+		extractedTl!.SetGridLocUnsafe(Vector2I.Zero); // Should be ignored and overriden.
 		var anotherTl = world.InstallTile(extractedTl, new(1, 2));
 		AssertTrue(world.HasTile(new(1, 2)));
 		AssertFalse(world.HasTile(new(3, 4))); // Ignore the tile's grid-loc
@@ -111,7 +111,7 @@ public class WorldPanelTests : ArTest.TestSuit
 
 	[ArTest.Test] public void TestIsInstalled()
 	{
-		var world = m_Lv.World;
+		var world = Lvl.World;
 		var tl = new Tile();
 		AssertFalse(world.IsInstalled(tl));
 		
@@ -121,11 +121,11 @@ public class WorldPanelTests : ArTest.TestSuit
 
 	[ArTest.Test] public void TestSpawnItem()
 	{
-		var world = m_Lv.World;
+		var world = Lvl.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
 		AssertFalse(tl.HasItem());
 
-		var it = world.SpawnItem(tl, 7);
+		var it = world.SpawnItem(tl, 7)!;
 		AssertNotNull(it);
 		AssertRefEq(it, tl.Item);
 		AssertTrue(tl.HasItem());
@@ -144,23 +144,24 @@ public class WorldPanelTests : ArTest.TestSuit
 
 	[ArTest.Test] public void TestInstallItem()
 	{
-		var world = m_Lv.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(Vector2I.One);
 		world.SpawnItem(tl0, 7);
-		var extractedIt = tl0.ExtractItem();
+		var extractedIt = tl0.ExtractItem()!;
 
 		var installedIt = world.InstallItem(extractedIt, tl1);
 		AssertRefEq(installedIt, extractedIt);
 		AssertRefEq(tl1.Item, installedIt);
-		AssertEq(installedIt.Value, 7);
+		AssertEq(installedIt!.Value, 7);
 		AssertFalse(tl0.HasItem());
 
 		// Installing null crashes the program.
 		// Though for now installing null in a non-existant tile just does nothing...
-		AssertThrow(() => world.InstallItem(null, tl0), typeof(NullReferenceException));
+		Item? some = null; // For the wrarning to disappear
+		AssertThrow(() => world.InstallItem(some!, tl0), typeof(NullReferenceException));
 
-		var it1 = AddNode(tl1.ExtractItem());
+		var it1 = AddNode(tl1.ExtractItem()!);
 		
 		// Installing into a non-exitant IN-BOUNDS tile => noop
 		AssertNull(world.InstallItem(it1, new Vector2I(1, 0)));
@@ -171,10 +172,10 @@ public class WorldPanelTests : ArTest.TestSuit
 
 	[ArTest.Test] public void TestCloneItem()
 	{
-		var world = m_Lv.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(new(1, 2));
 		var tl1 = world.InstallEmptyTile(new(3, 4));
-		var it0 = world.SpawnItem(tl0, 5);
+		var it0 = world.SpawnItem(tl0, 5)!;
 		var cloneIt = world.CloneItem(tl0, tl1);
 		AssertTrue(tl0.HasItem());
 		AssertTrue(tl0.IsReserved());
@@ -228,10 +229,10 @@ public class WorldPanelTests : ArTest.TestSuit
 
 	[ArTest.Test] public void TestTeleportItem()
 	{
-		var world = m_Lv.World;
+		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(new(1, 2));
 		var tl1 = world.InstallEmptyTile(new(3, 4));
-		var it0 = world.SpawnItem(tl0, 50);
+		var it0 = world.SpawnItem(tl0, 50)!;
 		var teleIt = world.TeleportItem(tl0, tl1);
 		AssertRefEq(it0, teleIt);
 		AssertRefEq(it0, tl1.Item);
@@ -242,7 +243,7 @@ public class WorldPanelTests : ArTest.TestSuit
 		AssertEq(tl1.Item.Value, 50);
 
 		// Both have items, should just override the destination (requires bOverride in debug).
-		it0 = world.SpawnItem(tl0, 85);
+		it0 = world.SpawnItem(tl0, 85)!;
 		teleIt = world.TeleportItem(tl0, tl1);
 		AssertRefEq(it0, teleIt);
 		AssertRefEq(it0, tl1.Item);
@@ -282,7 +283,7 @@ public class WorldPanelTests : ArTest.TestSuit
 	// [ArTest.RunThisOnly]
 	[ArTest.Test] public void TestSetDims()
 	{
-		var world = m_Lv.World;
+		var world = Lvl.World;
 		var tls = new Tile[]
 		{
 			world.InstallEmptyTile(new(1, 2)),

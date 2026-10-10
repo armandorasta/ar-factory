@@ -29,7 +29,7 @@ public class CmdVacate : Command
 			return; // Forever and ever...
 		}
 
-		if (!myTiles.All(tl => !tl.IsReserved()))
+		if (!myTiles.All(tl => tl!.IsReserved() is false))
 		{
 			PauseThisTick();
 			return;

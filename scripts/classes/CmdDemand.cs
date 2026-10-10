@@ -22,7 +22,7 @@ public class CmdDemand : Command
 
 	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{
-		var targetTile = lv.World.GetTileOrNull(GridLoc);
+		var targetTile = lv.World.GetTileNonNull(GridLoc);
 		var itVal = targetTile.Item.Value;
 		if (itVal == Value)
 		{

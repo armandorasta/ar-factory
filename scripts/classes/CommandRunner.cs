@@ -6,47 +6,44 @@ namespace ArFactory;
 
 public readonly struct CommandRunner()
 {
-	public class CmdWrapper(Command cmd, IEnumerable<Command> dep)
+	public class CmdWrapper(Unit penderUnit, Command cmd, IEnumerable<Command> dep)
 	{
 		public readonly Command Cmd = cmd;
 		public readonly List<Command> DepCmds = [.. dep];
-		public bool bHasNextCmd = false;
+		public readonly Unit PenderUnit = penderUnit;
 		public bool bRanThisTick = false;
 
 		public bool AllDepsDone() => DepCmds.All(c => c.IsDone());
 		public override string ToString() => Cmd.ToString();
 	}
 
-	
-	public readonly struct OnTickPender()
+	public class OnTickPender()
 	{
 		public readonly List<List<CmdWrapper>> Groups = [];
+		public Unit? PenderUnit;
 
 		public void Pend(IEnumerable<IEnumerable<Command>> newSequence, int startIndex = 0)
 		{
 			Debug.Assert(0 <= startIndex && startIndex <= Groups.Count);
+			Debug.AssertNotNull(PenderUnit);
+			
 			IEnumerable<Command> lastNewCmdGroup = [];
 			var i = startIndex;
 			foreach (var ng in newSequence)
 			{
 				if (i < Groups.Count)
 				{
-					Groups[i].AddRange(ng.Select(c => new CmdWrapper(c, lastNewCmdGroup)));
+					Groups[i].AddRange(ng.Select(c => new CmdWrapper(PenderUnit!, c, lastNewCmdGroup)));
 				}
 				else
 				{
-					Groups.Add([.. ng.Select(c => new CmdWrapper(c, lastNewCmdGroup))]);
-				}
-				if (i > startIndex)
-				{
-					foreach (var cmdWrapper in Groups[i - 1])
-					{
-						cmdWrapper.bHasNextCmd = true;
-					}
+					Groups.Add([.. ng.Select( c => new CmdWrapper(PenderUnit!, c, lastNewCmdGroup) )]);
 				}
 				lastNewCmdGroup = ng;
 				++i;
 			}
+
+			PenderUnit!.AddCommandsToWaitList(newSequence);
 		}
 	}
 
@@ -93,7 +90,7 @@ public readonly struct CommandRunner()
 	/// </summary>
 	public bool IsDone() => m_Groups.Count == 0;
 
-	public void PendFullSequence(IEnumerable<IEnumerable<Command>> newSequence, int startIndex = 0)
+	public void PendFullSequence(Unit penderUnit, IEnumerable<IEnumerable<Command>> newSequence, int startIndex = 0)
 	{
 		Debug.Assert(0 <= startIndex && startIndex <= m_Groups.Count);
 		IEnumerable<Command> lastGroup = [];
@@ -102,22 +99,17 @@ public readonly struct CommandRunner()
 		{
 			if (i < m_Groups.Count)
 			{
-				m_Groups[i].AddRange(ng.Select(c => new CmdWrapper(c, lastGroup)));
+				m_Groups[i].AddRange(ng.Select(c => new CmdWrapper(penderUnit, c, lastGroup)));
 			}
 			else
 			{
-				m_Groups.Add([.. ng.Select(c => new CmdWrapper(c, lastGroup))]);
-			}
-			if (i > startIndex)
-			{
-				foreach (var cmdWrapper in m_Groups[i - 1])
-				{
-					cmdWrapper.bHasNextCmd = true;
-				}
+				m_Groups.Add([.. ng.Select(c => new CmdWrapper(penderUnit, c, lastGroup))]);
 			}
 			lastGroup = ng;
 			++i;
 		}
+
+		penderUnit.AddCommandsToWaitList(newSequence);
 	}
 
 	/// <summary>
@@ -126,7 +118,7 @@ public readonly struct CommandRunner()
 	public bool OnTick(Level lv)
 	{
 		if (IsDone()) return true;
-		for (var gIndex = 0;;)
+		for (var gIndex = 0; gIndex < m_Groups.Count; ++gIndex)
 		{
 			var currGroup = m_Groups[gIndex];
 			var bGoingNextGroup = false;
@@ -137,19 +129,21 @@ public readonly struct CommandRunner()
 				{
 					if (cw.AllDepsDone() && !cw.bRanThisTick)
 					{
+						otPender.PenderUnit = cw.PenderUnit;
 						cw.Cmd.HandleOnTick(lv, otPender);
 						cw.bRanThisTick = true;
 						if (!cw.Cmd.IsSmooth()) 
 						{
 							cw.Cmd.CountThisTick();
 						}
+
+						bGoingNextGroup = true;
 					}
 				}
-				bGoingNextGroup = currGroup.Any(c => c.Cmd.IsDone() && c.bHasNextCmd);
 				currGroup.RemoveAll(c => c.Cmd.IsDone());
 				if (otPender.Groups.Count > 0)
 				{
-					var i = 0;
+					var i = gIndex;
 					foreach (var ng in otPender.Groups)
 					{
 						if (i < m_Groups.Count)
@@ -166,12 +160,11 @@ public readonly struct CommandRunner()
 				}
 				else break;
 			}
-			
-			if (bGoingNextGroup)
+
+			if (!bGoingNextGroup)
 			{
-				++gIndex;
+				break;
 			}
-			else break;
 		}
 
 		m_Groups.RemoveAll(g => g.Count == 0);
@@ -232,8 +225,8 @@ public readonly struct CommandRunner()
 	public void QueueBlockedSlideCmdByAnotherItem(WorldPanel world, CmdSlide cmd)
 	{
 		Debug.Assert(world.HasTile(cmd.GridFrom));
-		Debug.Assert(world.GetTile(cmd.GridFrom).HasItem()); // Is there an actual item?
-		Debug.Assert(world.GetTile(cmd.GetGridTo()).IsReserved()); // And is it blocked?
+		Debug.Assert(world.GetTileNonNull(cmd.GridFrom).HasItem()); // Is there an actual item?
+		Debug.Assert(world.GetTileNonNull(cmd.GetGridTo()).IsReserved()); // And is it blocked?
 		Debug.Assert(!m_BlockedSlideCmdsByItems.Contains(cmd));
 
 		m_BlockedSlideCmdsByItems.Add(cmd);

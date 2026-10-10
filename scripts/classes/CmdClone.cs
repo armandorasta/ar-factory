@@ -31,7 +31,7 @@ public class CmdClone : Command
 		Debug.Assert(HasTileWithItem(lv.World, SourceGL));
 		Debug.Assert(!DestinationGLs.All( l => HasTileUnreserved(lv.World, l) ));
 
-		Item it = lv.World.GetTileOrNull(SourceGL).Item;
+		Item it = lv.World.GetTileNonNull(SourceGL).Item;
 		if (it.IsMidAnimation())
 		{
 			throw new InvalidProgramException();

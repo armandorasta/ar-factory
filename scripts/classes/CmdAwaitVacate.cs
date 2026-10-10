@@ -27,27 +27,33 @@ public class CmdAwaitVacate : Command
 
 	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{
-		var waitTls = WaitGridLocs.Select(lv.World.GetTileOrNull);
-		var vacateTls = VacateGridLocs.Select(lv.World.GetTileOrNull);
-		if (!waitTls.All(tl => tl is not null) || !vacateTls.All(tl => tl is not null))
+		var waitTls = WaitGridLocs.Select(lv.World.GetTile);
+		var vacateTls = VacateGridLocs.Select(lv.World.GetTile);
+		if (!waitTls.All(tl => tl is not null))
 		{
-			// PauseThisTick();
+			PauseThisTick();
 			return; // Forever and ever...
 		}
 
-		if (!waitTls.All(tl => tl.HasItem() && !tl.Item.IsMidAnimation()))
+		if (!vacateTls.All(tl => tl is not null))
+		{
+			PauseThisTick();
+			return; // Forever and ever...
+		}
+
+		if (!waitTls.All(tl => tl!.HasItem() && !tl.Item.IsMidAnimation()))
 		{
 			PauseThisTick();
 			return;
 		}
 
-		if (!vacateTls.All(tl => !tl.IsReserved()))
+		if (!vacateTls.All(tl => tl!.IsReserved() is false))
 		{
 			PauseThisTick();
 			return;
 		}
 
-		Debug.Assert(waitTls.All(tl => tl.Item.IsAllowedToMove()));
+		Debug.Assert(waitTls.All(tl => tl!.Item.IsAllowedToMove()));
 	}
 
 	public override string ToString()
