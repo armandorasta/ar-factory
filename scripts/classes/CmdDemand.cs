@@ -17,7 +17,7 @@ public class CmdDemand : Command
 		Value = reqVal;
 	}
 
-	public CmdDemand(Tile tl, int reqVal) : this(tl.GridLoc, reqVal) { }
+	public CmdDemand(Tile tl, int reqVal) : this(tl.GLocation, reqVal) { }
 
 
 	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)

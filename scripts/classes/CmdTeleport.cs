@@ -11,7 +11,7 @@ public class CmdTeleport(Vector2I gfrom, Vector2I gto) : Command(1)
 	public Vector2I SourceGL { get; private set; } = gfrom;
 	public Vector2I DestinationGL { get; private set; } = gto;
 
-	public CmdTeleport(Tile tlFrom, Tile tlTo) : this(tlFrom.GridLoc, tlTo.GridLoc) { }
+	public CmdTeleport(Tile tlFrom, Tile tlTo) : this(tlFrom.GLocation, tlTo.GLocation) { }
 
 	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{

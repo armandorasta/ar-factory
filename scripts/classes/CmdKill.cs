@@ -10,7 +10,7 @@ public class CmdKill(Vector2I gloc) : Command(1)
 {
 	public Vector2I GLocation { get; private set; } = gloc;
 
-	public CmdKill (Tile tl) : this(tl.GridLoc) { }
+	public CmdKill (Tile tl) : this(tl.GLocation) { }
 
 	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{

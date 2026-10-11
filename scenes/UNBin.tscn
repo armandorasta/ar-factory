@@ -1,8 +1,10 @@
 [gd_scene format=3 uid="uid://cd2tfygwms3sj"]
 
+[ext_resource type="Script" uid="uid://bc88661mfpnrw" path="res://scripts/UNBin.cs" id="1_bcvj3"]
 [ext_resource type="Texture2D" uid="uid://bet3fwwk1rtv0" path="res://resources/bin.png" id="2_8gb72"]
 
 [node name="Bin" type="Node2D" unique_id=2081016730]
+script = ExtResource("1_bcvj3")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=172897121]
 texture = ExtResource("2_8gb72")

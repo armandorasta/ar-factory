@@ -22,7 +22,7 @@ public class CmdAwaitVacate : Command
 	}
 
 	public CmdAwaitVacate(IEnumerable<Tile> waitTiles, IEnumerable<Tile> vacateTiles) 
-		: this(waitTiles.Select(tl => tl.GridLoc), vacateTiles.Select(tl => tl.GridLoc)) 
+		: this(waitTiles.Select(tl => tl.GLocation), vacateTiles.Select(tl => tl.GLocation)) 
 	{ }
 
 	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)

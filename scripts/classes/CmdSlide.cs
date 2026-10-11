@@ -21,7 +21,7 @@ public class CmdSlide : Command
 		m_StateFunc = HandleDefault;
 	}
 	
-	public CmdSlide(Tile tlFrom, Direction dir) : this(tlFrom.GridLoc, dir) { }
+	public CmdSlide(Tile tlFrom, Direction dir) : this(tlFrom.GLocation, dir) { }
 	
 
 	public bool IsAwaitingAnim() => m_StateFunc is null;
@@ -44,14 +44,13 @@ public class CmdSlide : Command
 	public bool TryMovingByOverlap(WorldPanel world)
 	{
 		Debug.AssertEq(m_StateFunc, HandleDefault);
-		Debug.AssertNotNull(TrackedItemRef);
-		Debug.Assert(TrackedItemRef!.TryGetTarget(out var it) && it.IsAllowedToMove());
+		Debug.Assert(TrackedItemRef is null); // Set in PrepTrackedItemForSlidingAnim.
 		Debug.Assert(world.HasTile(GetGridTo()));
 
 		if (!world.GetTileNonNull(GetGridTo()).IsReserved())
 		{
 			PrepTrackedItemForSlidingAnim(world);
-			CountThisTick(); // Undo the pausing because the command has advanced.
+			CountThisTick(); // Undo the pausing.
 			return true;
 		}
 		else return false;

@@ -18,7 +18,7 @@ public class CmdVacate : Command
 		Debug.Assert(GridLocs.Length > 0);
 	}
 
-	public CmdVacate(IEnumerable<Tile> tls) : this(tls.Select(tl => tl.GridLoc)) { }
+	public CmdVacate(IEnumerable<Tile> tls) : this(tls.Select(tl => tl.GLocation)) { }
 
 	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{

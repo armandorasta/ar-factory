@@ -7,8 +7,6 @@ using Godot;
 
 namespace ArTest;
 
-#if TEST
-
 using static AnsiColors;
 
 public partial class TestHandler : Godot.Node
@@ -46,7 +44,11 @@ public partial class TestHandler : Godot.Node
 
 	public override void _Ready()
 	{
+#if TEST
 		m_WholeProgramTask = RunTestsImpl();
+#else
+		throw new InvalidProgramException("Forgot to define the TEST macro");
+#endif
 	}
 
 	public override void _Process(double dt)
@@ -327,5 +329,3 @@ public partial class TestHandler : Godot.Node
 		return $"{Cyan}test {mainPart} ({rest}){Reset}";
 	}
 }
-
-#endif // TEST

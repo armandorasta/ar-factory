@@ -175,15 +175,29 @@ public readonly struct CommandRunner()
 
 	public bool DoPerFrame(double dt, Level lv)
 	{
-		if (!IsDone())
+		if (IsDone())
 		{
-			foreach (var cmd in m_Groups[0])
-			{
-				cmd.Cmd.HandleFrame(dt, lv);
-			}
-			return false;
+			return true;
 		}
-		return true;
+
+		foreach (var group in m_Groups)
+		{
+			var bSomethingRan = false;
+			foreach (var cw in group)
+			{
+				if (cw.bRanThisTick && cw.Cmd.IsSmooth())
+				{
+					cw.Cmd.HandleFrame(dt, lv);
+					bSomethingRan = true;
+				}
+			}
+			if (!bSomethingRan)
+			{
+				break;
+			}
+		}
+
+		return false;
 	}
 
 	/// <summary>

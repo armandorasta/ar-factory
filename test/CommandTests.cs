@@ -595,7 +595,7 @@ public class CommandTests : ArTest.TestSuit
 		}
 	}
 
-	[ArTest.Test] public void Test_CmdUpdate_Apply()
+	[ArTest.Test] public void Test_UnaryOperation()
 	{
 		AssertEq(UnaryOperation.Add.Apply(-29, -715), -29 + -715);
 		// This should work because apply doesn't concern itself with item value limits.
@@ -713,7 +713,7 @@ public class CommandTests : ArTest.TestSuit
 		// No item to clone (non-existing tile)
 		using (Lvl.PlaySimulationInDebug())
 		{
-			injy.PendParallel([ new CmdClone(new Vector2I(2, 3), [tl1.GridLoc, tl2.GridLoc]) ]);
+			injy.PendParallel([ new CmdClone(new Vector2I(2, 3), [tl1.GLocation, tl2.GLocation]) ]);
 			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
@@ -722,7 +722,7 @@ public class CommandTests : ArTest.TestSuit
 		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, -73);
-			injy.PendParallel([ new CmdClone(tl0.GridLoc, [new Vector2I(2, 3), tl2.GridLoc]) ]);
+			injy.PendParallel([ new CmdClone(tl0.GLocation, [new Vector2I(2, 3), tl2.GLocation]) ]);
 			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
@@ -864,7 +864,7 @@ public class CommandTests : ArTest.TestSuit
 		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, 587);
-			injy.PendParallel([ new CmdCombine(tl0.GridLoc, new Vector2I(2, 3), tl1.GridLoc, BinaryOperation.BitOr) ]);
+			injy.PendParallel([ new CmdCombine(tl0.GLocation, new Vector2I(2, 3), tl1.GLocation, BinaryOperation.BitOr) ]);
 			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
@@ -873,7 +873,7 @@ public class CommandTests : ArTest.TestSuit
 		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, -792);
-			injy.PendParallel([ new CmdCombine(tl0.GridLoc, tl1.GridLoc, new Vector2I(2, 3), BinaryOperation.BitOr) ]);
+			injy.PendParallel([ new CmdCombine(tl0.GLocation, tl1.GLocation, new Vector2I(2, 3), BinaryOperation.BitOr) ]);
 			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
@@ -882,7 +882,7 @@ public class CommandTests : ArTest.TestSuit
 		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, 587);
-			injy.PendParallel([ new CmdCombine(tl0.GridLoc, new Vector2I(2, -3), tl1.GridLoc, BinaryOperation.BitOr) ]);
+			injy.PendParallel([ new CmdCombine(tl0.GLocation, new Vector2I(2, -3), tl1.GLocation, BinaryOperation.BitOr) ]);
 			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
@@ -891,7 +891,7 @@ public class CommandTests : ArTest.TestSuit
 		using (Lvl.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl0, -792);
-			injy.PendParallel([ new CmdCombine(tl0.GridLoc, tl1.GridLoc, new Vector2I(-2, 3), BinaryOperation.BitOr) ]);
+			injy.PendParallel([ new CmdCombine(tl0.GLocation, tl1.GLocation, new Vector2I(-2, 3), BinaryOperation.BitOr) ]);
 			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
@@ -977,7 +977,7 @@ public class CommandTests : ArTest.TestSuit
 		// Missing source tile
 		using (Lvl.PlaySimulationInDebug())
 		{
-			injy.PendParallel([ new CmdTeleport(new Vector2I(2, 3), tl1.GridLoc) ]);
+			injy.PendParallel([ new CmdTeleport(new Vector2I(2, 3), tl1.GLocation) ]);
 			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
@@ -985,7 +985,7 @@ public class CommandTests : ArTest.TestSuit
 		// Missing destination tile
 		using (Lvl.PlaySimulationInDebug())
 		{
-			injy.PendParallel([ new CmdTeleport(tl0.GridLoc, new Vector2I(2, 3)) ]);
+			injy.PendParallel([ new CmdTeleport(tl0.GLocation, new Vector2I(2, 3)) ]);
 			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
@@ -993,7 +993,7 @@ public class CommandTests : ArTest.TestSuit
 		// Out of bounds (source)
 		using (Lvl.PlaySimulationInDebug())
 		{
-			injy.PendParallel([ new CmdTeleport(new Vector2I(-2, 3), tl1.GridLoc) ]);
+			injy.PendParallel([ new CmdTeleport(new Vector2I(-2, 3), tl1.GLocation) ]);
 			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}
@@ -1001,7 +1001,7 @@ public class CommandTests : ArTest.TestSuit
 		// Out of bounds (destination)
 		using (Lvl.PlaySimulationInDebug())
 		{
-			injy.PendParallel([ new CmdTeleport(tl0.GridLoc, new Vector2I(2, -3)) ]);
+			injy.PendParallel([ new CmdTeleport(tl0.GLocation, new Vector2I(2, -3)) ]);
 			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy.HasPendingCmds());
 		}

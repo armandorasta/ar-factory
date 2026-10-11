@@ -11,7 +11,7 @@ public class CmdSpawn(Vector2I gloc, int val) : Command(1)
 	public Vector2I GLocation { get; private set; } = gloc;
 	public int Value { get; private set; } = val;
 
-	public CmdSpawn(Tile tl, int val) : this(tl.GridLoc, val) { }
+	public CmdSpawn(Tile tl, int val) : this(tl.GLocation, val) { }
 
 
 	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)

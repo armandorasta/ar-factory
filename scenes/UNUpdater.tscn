@@ -15,6 +15,7 @@ height = 128
 script = ExtResource("1_fyyjp")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=691290124]
+visible = false
 texture = SubResource("GradientTexture2D_4xhep")
 
 [node name="CenterContainer" type="MarginContainer" parent="Sprite2D" unique_id=1762224801]

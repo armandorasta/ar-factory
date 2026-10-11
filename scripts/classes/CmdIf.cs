@@ -69,7 +69,7 @@ public class CmdIf : Command
 	public CmdIf(Tile tl, CheckType check, int cmpVal, 
 		IEnumerable<IEnumerable<Command>> cmdsIfTrue, 
 		IEnumerable<IEnumerable<Command>>? cmdsIfFalse = null)
-		: this(tl.GridLoc, check, cmpVal, cmdsIfTrue, cmdsIfFalse)
+		: this(tl.GLocation, check, cmpVal, cmdsIfTrue, cmdsIfFalse)
 	{ }
 
 

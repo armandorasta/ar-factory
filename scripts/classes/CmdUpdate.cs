@@ -20,7 +20,7 @@ public class CmdUpdate : Command
 		Value = val;
 	}
 
-	public CmdUpdate(Tile tl, UnaryOperation op, int val) : this(tl.GridLoc, op, val) { }
+	public CmdUpdate(Tile tl, UnaryOperation op, int val) : this(tl.GLocation, op, val) { }
 
 
 	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)

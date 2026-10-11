@@ -29,7 +29,7 @@ public partial class UNSupplier : Unit
 		}
 
 		var startIndex = HasPendingCmds() ? 1 : 0;
-		Vector2I destLoc = m_Out0!.GridLoc + Dir.ToGrid();
+		Vector2I destLoc = m_Out0!.GLocation + Dir.ToGrid();
 		pender.Pend([
 			[ new CmdVacate([m_Out0!]) ],
 			[ new CmdSpawn(m_Out0!, PopNextValue()) ],

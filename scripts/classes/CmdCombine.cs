@@ -20,7 +20,7 @@ public class CmdCombine(Vector2I glLeft, Vector2I glRight, Vector2I glDest, Bina
 	public readonly BinaryOperation Op = op;
 
 	public CmdCombine(Tile tlLeft, Tile tlRight, Tile tlDest, BinaryOperation op) 
-		: this(tlLeft.GridLoc, tlRight.GridLoc, tlDest.GridLoc, op)
+		: this(tlLeft.GLocation, tlRight.GLocation, tlDest.GLocation, op)
 	{ }
 
 

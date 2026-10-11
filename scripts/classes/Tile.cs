@@ -19,7 +19,7 @@ public class Tile
 
 
 	// Publics
-	public Vector2I GridLoc => m_GridLoc;
+	public Vector2I GLocation => m_GL;
 	/// <summary>
 	/// This accessor crashes the program in debug mode if the item is null, use <see cref="GetItemMaybeNull"/> if that
 	/// behaviour is not desired.
@@ -35,11 +35,10 @@ public class Tile
 
 
 	// Privates
-	private Vector2I m_GridLoc = Vector2I.Zero;
-	// High to low: west -> south -> east -> north.
-	private Int32 m_WallFlags;
+	private Vector2I m_GL = Vector2I.Zero;
+	private Int32 m_WallFlags; // High to low: west -> south -> east -> north.
 	private Item? m_Item;
-	// This flag is only set from outside, function IsReserved checks this and the item directly.
+	/// This flag is only set from outside, <see cref="IsReserved"> checks this and the item directly.
 	private bool m_bReserved = false;
 
 
@@ -49,9 +48,9 @@ public class Tile
 	{
 		return new Tile()
 			.SetWall(Direction.North, WallType.Solid)
-			.SetWall(Direction.East, WallType.Solid)
+			.SetWall(Direction.East , WallType.Solid)
 			.SetWall(Direction.South, WallType.Solid)
-			.SetWall(Direction.West, WallType.Solid);
+			.SetWall(Direction.West , WallType.Solid);
 	}
 
 	#endregion // .Factory Methods
@@ -60,7 +59,7 @@ public class Tile
 	/// <summary>
 	/// Use this if the tile is floating, otherwise use <see cref="WorldPanel.MoveTile"/> instead.
 	/// </summary>
-	public void SetGridLocUnsafe(Vector2I gloc) { m_GridLoc = gloc; }
+	public void SetGridLocUnsafe(Vector2I gloc) { m_GL = gloc; }
 
 	/// <summary>
 	/// Returns true if the item can slide into through the edge facing <paramref name="wallDir"/>.
@@ -69,28 +68,18 @@ public class Tile
 	/// <param name="wallDir">Direction of the tile edge</param>
 	public bool CanItemEnter(Direction wallDir)
 	{
-		return GetWall(wallDir) switch
-		{
-			WallType.Nothing => true,
-			WallType.Input => true,
-			_ => false,
-		};
+		return GetWall(wallDir) is WallType.Nothing or WallType.Input;
 	}
 
 	public bool CanItemExit(Direction wallDir)
 	{
-		return GetWall(wallDir.Invert()) switch
-		{
-			WallType.Nothing => true,
-			WallType.Output => true,
-			_ => false,
-		};
+		return GetWall(wallDir.Invert()) is WallType.Nothing or WallType.Output;
 	}
 
 	/// <summary>
 	/// Items are not allowed to slide into reserved tiles.<br/>
 	/// </summary>
-	public bool IsReserved() => m_bReserved || m_Item != null;
+	public bool IsReserved() => m_bReserved || m_Item is not null;
 
 	/// <summary>
 	/// Items are not allowed to slide into reserved tiles. <br/>
@@ -220,7 +209,6 @@ public class Tile
 	public bool DestroyItem(bool bMaybeNull = false)
 	{
 		Debug.Assert(bMaybeNull || HasItem());
-		Debug.Assert(bMaybeNull || m_bReserved);
 		if (m_Item is not null)
 		{
 			m_Item.QueueFree();
@@ -251,7 +239,7 @@ public class Tile
 
 	public virtual void DebugDraw(WorldPanel world)
 	{
-		var myPos = world.GridToPos(GridLoc);
+		var myPos = world.GridToPos(GLocation);
 		var col = Godot.Colors.DarkGray;
 
 		// I know I can make the following checks faster with some bit arithmatic, but I just don't
@@ -294,7 +282,7 @@ public class Tile
 
 			var myScale = 0.15f;
 			if (IsInput(d) && 
-				!(world.HasTile(GridLoc + gdir) && world.GetTileNonNull(GridLoc + gdir).IsOutput(d.Invert())))
+				!(world.HasTile(GLocation + gdir) && world.GetTileNonNull(GLocation + gdir).IsOutput(d.Invert())))
 			{
 				myScale *= 0.5f;
 				myCol.A = 0.3f;
@@ -309,7 +297,7 @@ public class Tile
 	public override string ToString() 
 	{
 		var itStr = m_Item != null ? $" with item {m_Item.Value}" : "";
-		return $"Tile[{GridLoc}]{itStr}";
+		return $"Tile[{GLocation}]{itStr}";
 	}
 	#endregion // .Private Methods
 }

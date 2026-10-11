@@ -38,9 +38,9 @@ public partial class UNUpdater : Unit
 
 	public void Setup(WorldPanel world, Vector2I gloc, int workRate, Direction dir, UpdateType upT)
 	{
-		BaseInit(world, TickType.OnDemand, workRate, gloc, Vector2I.One, dir);
 		Debug.Assert(Enum.IsDefined(upT));
-		
+		BaseInit(world, TickType.OnDemand, workRate, gloc, Vector2I.One, dir);
+
 		m_UpType = upT;
 		UpTypeLabel.Text = upT switch
 		{
@@ -59,8 +59,8 @@ public partial class UNUpdater : Unit
 
 	public override void PendNewCommands(WorldPanel.PendProxy pender)
 	{
-		var tl = GetTileNonNull(Vector2I.Zero);
-		var destLoc = tl.GridLoc + Dir.ToGrid();
+		var tl = GetTile(Vector2I.Zero);
+		var destLoc = tl.GLocation + Dir.ToGrid();
 		pender.Pend([
 			[ Apply(m_UpType, tl) ],
 			World.HasTile(destLoc) ? [ new CmdSlide(tl, Dir) ] : [],

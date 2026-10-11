@@ -44,7 +44,7 @@ public class WorldPanelTests : ArTest.TestSuit
 		var reTl = world.InstallTile(tl, Vector2I.One);
 		AssertRefEq(tl, reTl);
 		AssertRefEq(world[1, 1], tl);
-		AssertEq(tl.GridLoc, Vector2I.One);
+		AssertEq(tl.GLocation, Vector2I.One);
 		AssertTrue(world.HasTile(Vector2I.One));
 
 		var newTl = world.InstallTile(new Tile(), Vector2I.One); // Should override the old one.
@@ -79,7 +79,7 @@ public class WorldPanelTests : ArTest.TestSuit
 		AssertRefEq(tl, movedTl);
 		AssertFalse(world.HasTile(Vector2I.Zero));
 		AssertTrue(world.HasTile(Vector2I.One));
-		AssertEq(tl.GridLoc, Vector2I.One);
+		AssertEq(tl.GLocation, Vector2I.One);
 
 		// Moving from and/or to out of bounds crashes the program
 		AssertThrow(() => world.MoveTile(Vector2I.One * 1000, Vector2I.One * 1001));
@@ -89,9 +89,9 @@ public class WorldPanelTests : ArTest.TestSuit
 	{
 		var world = Lvl.World;
 		var installedTl = world.InstallEmptyTile(new(3, 4));
-		var extractedTl = world.ExtractTile(installedTl.GridLoc);
+		var extractedTl = world.ExtractTile(installedTl.GLocation);
 		AssertRefEq(installedTl, extractedTl);
-		AssertFalse(world.HasTile(installedTl.GridLoc));
+		AssertFalse(world.HasTile(installedTl.GLocation));
 
 		extractedTl!.SetGridLocUnsafe(Vector2I.Zero); // Should be ignored and overriden.
 		var anotherTl = world.InstallTile(extractedTl, new(1, 2));
@@ -294,10 +294,10 @@ public class WorldPanelTests : ArTest.TestSuit
 
 		// All tiles fit
 		world.SetDims(new(10, 10));
-		AssertEq(tls[0].GridLoc, new(1, 2));
-		AssertEq(tls[1].GridLoc, new(3, 3));
-		AssertEq(tls[2].GridLoc, new(0, 7));
-		AssertEq(tls[3].GridLoc, new(2, 0));
+		AssertEq(tls[0].GLocation, new(1, 2));
+		AssertEq(tls[1].GLocation, new(3, 3));
+		AssertEq(tls[2].GLocation, new(0, 7));
+		AssertEq(tls[3].GLocation, new(2, 0));
 		AssertRefEq(tls[0], world[1, 2]);
 		AssertRefEq(tls[1], world[3, 3]);
 		AssertRefEq(tls[2], world[0, 7]);
@@ -305,9 +305,9 @@ public class WorldPanelTests : ArTest.TestSuit
 
 		// Third tile gets its ass handed over to it
 		world.SetDims(new(5, 5));
-		AssertEq(tls[0].GridLoc, new(1, 2));
-		AssertEq(tls[1].GridLoc, new(3, 3));
-		AssertEq(tls[3].GridLoc, new(2, 0));
+		AssertEq(tls[0].GLocation, new(1, 2));
+		AssertEq(tls[1].GLocation, new(3, 3));
+		AssertEq(tls[3].GLocation, new(2, 0));
 		AssertFalse(world.IsInstalled(tls[2]));
 
 		AssertRefEq(tls[0], world[1, 2]);

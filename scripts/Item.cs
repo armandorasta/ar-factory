@@ -1,5 +1,3 @@
-using System;
-using System.Runtime.CompilerServices;
 using System.Text;
 using Godot;
 
@@ -11,8 +9,11 @@ public partial class Item : Node2D
 	public const int MinValue = -MaxValue;
 
 	// Nodes
-	public Sprite2D? Sprite { get; private set; }
-	public Label? CenterLabel { get; private set; }
+	public Sprite2D Sprite => m_Sprite!;
+	public Label CenterLabel => m_CenterLabel!;
+
+	private Sprite2D? m_Sprite;
+	private Label? m_CenterLabel;
 
 
 	// Publics
@@ -26,7 +27,7 @@ public partial class Item : Node2D
 		get
 		{
 			Debug.AssertNotNull(m_ParentTile);
-			return m_ParentTile!.GridLoc;
+			return m_ParentTile!.GLocation;
 		}
 	}
 
@@ -44,8 +45,8 @@ public partial class Item : Node2D
 
 	public override void _Ready()
 	{
-		Sprite = GetNode<Sprite2D>("CenterContainer/Sprite2D");
-		CenterLabel = GetNode<Label>("CenterContainer/Sprite2D/CenterContainer/Label");
+		m_Sprite = GetNode<Sprite2D>("CenterContainer/Sprite2D");
+		m_CenterLabel = GetNode<Label>("CenterContainer/Sprite2D/CenterContainer/Label");
 	}
 	
 	public void Setup(WorldPanel world, Vector2I gloc, int val)
@@ -53,8 +54,8 @@ public partial class Item : Node2D
 		m_ParentTile = world.GetTile(gloc);
 		SetValue(val);
 		SyncPosWithGrid(world);
-		Sprite!.ApplyScale(world.CellWidth / 200.0f * Vector2.One);
-		Sprite.Translate(0.5f * world.CellWidth * Vector2.One);
+		m_Sprite!.ApplyScale(world.CellWidth / 200.0f * Vector2.One);
+		m_Sprite.Translate(0.5f * world.CellWidth * Vector2.One);
 	}
 
 	/// <summary>
@@ -75,7 +76,7 @@ public partial class Item : Node2D
 	{
 		// Debug.Assert(IsValueWithinRange(newValue));
 		m_Value = Clamp(newVal);
-		CenterLabel!.Text = m_Value.ToString();
+		m_CenterLabel!.Text = m_Value.ToString();
 	}
 
 	/// <summary>
@@ -96,7 +97,7 @@ public partial class Item : Node2D
 	public void SyncPosWithGrid(WorldPanel world)
 	{
 		Debug.AssertNotNull(m_ParentTile);
-		Position = world.GridToPos(m_ParentTile!.GridLoc);
+		Position = world.GridToPos(m_ParentTile!.GLocation);
 	}
 
 	/// <summary>

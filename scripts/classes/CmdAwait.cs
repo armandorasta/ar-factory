@@ -18,8 +18,8 @@ public class CmdAwait : Command
 		Debug.Assert(GridLocs.Length > 0);
 	}
 
-	public CmdAwait(IEnumerable<Tile> tls) : this(tls.Select(tl => tl.GridLoc)) { }
-	public CmdAwait(Tile tl) : this([tl.GridLoc]) { }
+	public CmdAwait(IEnumerable<Tile> tls) : this(tls.Select(tl => tl.GLocation)) { }
+	public CmdAwait(Tile tl) : this([tl.GLocation]) { }
 
 	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{

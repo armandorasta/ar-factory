@@ -22,7 +22,7 @@ public class CmdClone : Command
 	}
 
 	public CmdClone(Tile srcTl, IEnumerable<Tile> destTls) 
-		: this(srcTl.GridLoc, destTls.Select(tl => tl.GridLoc))
+		: this(srcTl.GLocation, destTls.Select(tl => tl.GLocation))
 	{ }
 
 

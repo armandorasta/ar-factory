@@ -376,7 +376,6 @@ public partial class Level : Godot.Node2D
 	{
 		switch (m_CurrPlayMode) {
 		case PlayMode.Off:
-			SetPlayMode(PlayMode.Debug);
 			StartSimulation(bPauseOnEntry: true);
 			break;
 		

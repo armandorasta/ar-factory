@@ -47,15 +47,10 @@ public partial class WorldPanel : Godot.Panel
 
 
 	// Privates
-	private Vector2I m_Dims = new(15, 10);
-	private List<Unit> m_Units = [];
+	private Vector2I m_Dims = new(10, 10);
+	private readonly List<Unit> m_Units = [];
 	private List<Tile?> m_Tiles = [];
 	private readonly CommandRunner m_Runner = new();
-
-#if DEBUG
-	// Used to prevent injecting commands after OnTick and before OnEdge.
-	private bool m_bCmdInjectionAllowed = false;
-#endif
 
 
 	#region .Essential Functions
@@ -120,14 +115,14 @@ public partial class WorldPanel : Godot.Panel
 #if DEBUG
 		return GetTile(gloc) ?? throw new InvalidProgramException();
 #else
-		return m_Tiles[GridToIndex(gloc)];
+		return GetTile(gloc)!;
 #endif
 	}
 	/// <summary>
 	/// Returns true if the tile is installed within this world, returns false if it's floating or
 	/// installed in another world somehow.
 	/// </summary>
-	public bool IsInstalled(Tile tl) => IsWithin(tl.GridLoc) && object.ReferenceEquals(tl, GetTileOrNull(tl.GridLoc));
+	public bool IsInstalled(Tile tl) => IsWithin(tl.GLocation) && object.ReferenceEquals(tl, GetTileOrNull(tl.GLocation));
 
 	/// <summary>
 	/// Returns the whichever unit that <paramref name="gloc"/> lands on.
@@ -196,7 +191,7 @@ public partial class WorldPanel : Godot.Panel
 	public void DeleteTile(Tile tl)
 	{
 		Debug.Assert(IsInstalled(tl));
-		DeleteTile(tl.GridLoc);
+		DeleteTile(tl.GLocation);
 	}
 
 	/// <summary>
@@ -233,7 +228,7 @@ public partial class WorldPanel : Godot.Panel
 	public Tile MoveTile(Tile tl, Vector2I gTo, bool bOverride = false)
 	{
 		Debug.Assert(IsInstalled(tl));
-		return MoveTile(tl.GridLoc, gTo, false, bOverride)!;
+		return MoveTile(tl.GLocation, gTo, false, bOverride)!;
 	}
 
 	/// <summary>
@@ -290,7 +285,7 @@ public partial class WorldPanel : Godot.Panel
 	{
 		Debug.Assert(IsInstalled(tl0));
 		Debug.Assert(IsInstalled(tl1));
-		SwapTiles(tl0.GridLoc, tl1.GridLoc, false);
+		SwapTiles(tl0.GLocation, tl1.GLocation, false);
 	}
 
 
@@ -326,7 +321,7 @@ public partial class WorldPanel : Godot.Panel
 	public Item? SpawnItem(Tile tl, int value)
 	{
 		Debug.Assert(IsInstalled(tl));
-		return SpawnItem(tl.GridLoc, value);
+		return SpawnItem(tl.GLocation, value);
 	}
 
 	/// <summary>
@@ -362,7 +357,7 @@ public partial class WorldPanel : Godot.Panel
 	public Item? InstallItem(Item it, Tile tl)
 	{
 		Debug.Assert(IsInstalled(tl));
-		return InstallItem(it, tl.GridLoc);
+		return InstallItem(it, tl.GLocation);
 	}
 
 	/// <summary>
@@ -401,7 +396,7 @@ public partial class WorldPanel : Godot.Panel
 	{
 		Debug.Assert(IsInstalled(tlSrc));
 		Debug.Assert(IsInstalled(tlDest));
-		return CloneItem(tlSrc.GridLoc, tlDest.GridLoc, bMaybeNull, bOverride);
+		return CloneItem(tlSrc.GLocation, tlDest.GLocation, bMaybeNull, bOverride);
 	}
 
 	/// <summary>
@@ -428,7 +423,7 @@ public partial class WorldPanel : Godot.Panel
 	{
 		Debug.Assert(IsInstalled(tlSrc));
 		Debug.Assert(IsInstalled(tlDest));
-		return TeleportItem(tlSrc.GridLoc, tlDest.GridLoc, bMaybeNull, bOverride);
+		return TeleportItem(tlSrc.GLocation, tlDest.GLocation, bMaybeNull, bOverride);
 	}
 
 	/// <summary>
@@ -477,7 +472,7 @@ public partial class WorldPanel : Godot.Panel
 	{
 		Debug.Assert(IsInstalled(tlSrc));
 		Debug.Assert(IsInstalled(tlDest));
-		return TeleportItemNoSync(tlSrc.GridLoc, tlDest.GridLoc, bMaybeNull, bOverride);
+		return TeleportItemNoSync(tlSrc.GLocation, tlDest.GLocation, bMaybeNull, bOverride);
 	}
 
 
@@ -500,13 +495,13 @@ public partial class WorldPanel : Godot.Panel
 
 		foreach (var u in m_Units)
 		{
-			var pender = new PendProxy(u, m_Runner);
-			u.HandlePendingNewCommands(pender); // So when I press F11 it doesn't dive into the ctor.
+			u.PreprocessTick();
 		}
 
 		foreach (var u in m_Units)
 		{
-			u.PreprocessTick();
+			var pender = new PendProxy(u, m_Runner);
+			u.HandlePendingNewCommands(pender); // So when I press F11 it doesn't dive into the ctor.
 		}
 
 		m_Runner.OnTick(lv);
@@ -538,7 +533,7 @@ public partial class WorldPanel : Godot.Panel
 	public override void _Ready()
 	{
 		Reset();
-		SetDims(m_Dims);
+		SetDims(m_Dims, true);
 		PlaceSomeUnits();
 	}
 
@@ -571,58 +566,60 @@ public partial class WorldPanel : Godot.Panel
 	[Conditional("DEBUG")]
 	private void PlaceSomeUnits()
 	{
-		PlaceSupplier(new(0, 6), Direction.East, 3, [1, 2, 3, 4, 5, 6]);
-		// PlaceSlider(new(2, 7), Direction.East);
-		// PlaceSlider(new(3, 7), Direction.North);
-		// PlaceSlider(new(3, 6), Direction.East);
-		// PlaceUpdater(new(4, 6), Direction.East, 3, UnUpdater.UpdateType.Double);
-		// PlaceSlider(new(5, 6), Direction.East);
+		PlaceSupplier(new(1, 7), Direction.East, 3, [1, 2, 3, 4, 5, 6]);
+		PlaceSlider(new(2, 7), Direction.East);
+		PlaceSlider(new(3, 7), Direction.North);
+		PlaceSlider(new(3, 6), Direction.East);
+		PlaceUpdater(new(4, 6), Direction.East, 4, UNUpdater.UpdateType.Double);
+		PlaceSlider(new(5, 6), Direction.East);
+		PlaceBin(new(6, 6));
 		// PlaceSlider(new(6, 6), Direction.South);
 		// PlaceSlider(new(6, 7), Direction.South);
 		// PlaceSlider(new(6, 8), Direction.West);
-		// PlaceUpdater(new(5, 8), Direction.West, 3, UnUpdater.UpdateType.Double);
+		// PlaceUpdater(new(5, 8), Direction.West, 3, UNUpdater.UpdateType.Double);
 		// PlaceSlider(new(4, 8), Direction.West);
 		// PlaceSlider(new(3, 8), Direction.North);
 	}
 
 	public UNCmdInjector PlaceInjector()
 	{
-		var u = new UNCmdInjector();
-		AddUnit(u);
-		u.Setup(this);
-		return u;
+		var injy = new UNCmdInjector();
+		AddUnit(injy);
+		injy.Setup(this);
+		return injy;
 	}
 
 	public UNSupplier PlaceSupplier(Vector2I gloc, Direction dir, int rate, IEnumerable<int> seq)
 	{
-		var u = UNSupplierScene.Instantiate<UNSupplier>();
-		AddUnit(u);
-		u.Setup(this, gloc, rate, dir, seq);
-		return u;
+		var suppy = UNSupplierScene.Instantiate<UNSupplier>();
+		AddUnit(suppy);
+		suppy.Setup(this, gloc, rate, dir, seq);
+		return suppy;
 	}
 
 	public UNSlider PlaceSlider(Vector2I gloc, Direction dir, int rate = 1)
 	{
-		var u = UNSliderScene.Instantiate<UNSlider>();
-		AddUnit(u);
-		u.Setup(this, gloc, rate, dir);
-		return u;
+		var slidy = UNSliderScene.Instantiate<UNSlider>();
+		AddUnit(slidy);
+		slidy.Setup(this, gloc, rate, dir);
+		return slidy;
 	}
 
 	public UNUpdater PlaceUpdater(Vector2I gloc, Direction dir, int rate, UNUpdater.UpdateType UpT)
 	{
-		var u = UNUpdaterScene.Instantiate<UNUpdater>();
-		AddUnit(u);
-		u.Setup(this, gloc, rate, dir, UpT);
-		return u;
+		var updater = UNUpdaterScene.Instantiate<UNUpdater>();
+		AddUnit(updater);
+		updater.Setup(this, gloc, rate, dir, UpT);
+		return updater;
 	}
 
-	// public void PlaceBin(Vector2I gloc)
-	// {
-	// 	var bin = UNBinScene.Instantiate<UnBin>();
-	// 	AddUnit(bin);
-	// 	bin.("setup", this, gloc);		
-	// }
+	public UNBin PlaceBin(Vector2I gloc)
+	{
+		var bin = UNBinScene.Instantiate<UNBin>();
+		AddUnit(bin);
+		bin.Setup(this, gloc);
+		return bin;
+	}
 
 	// public void PlaceDemander(Vector2I gloc, Direction dir, int[] seq)
 	// {
@@ -656,11 +653,11 @@ public partial class WorldPanel : Godot.Panel
 	#endregion // Placement Functions
 	#region .Other Methods
 
-	public void SetDims(Vector2I toWhat)
+	public void SetDims(Vector2I toWhat, bool bForce = false)
 	{
 		var oldDims = m_Dims;
 		var newDims = toWhat.Clamp(MinDims, MaxDims);
-		if (oldDims == newDims)
+		if (!bForce && oldDims == newDims)
 		{
 			return;		
 		}

@@ -2,8 +2,6 @@ using System;
 
 namespace ArTest;
 
-#if TEST
-
 [AttributeUsage(AttributeTargets.Method)] 
 public class TestAttribute : Attribute { }
 
@@ -12,5 +10,3 @@ public class IgnoreAttribute : Attribute { }
 
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
 public class RunThisOnlyAttribute : Attribute { }
-
-#endif

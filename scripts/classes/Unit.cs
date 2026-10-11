@@ -23,28 +23,27 @@ public abstract partial class Unit : Node2D
 	public Vector2I GLocation => m_GL;
 	public Direction Dir => m_Dir;
 	public Vector2I Dimensions => m_Dims;
-	public int Rate => m_Rate;
+	public int Rate => m_Rate; // Ticks per work
 	public WorldPanel World => m_World!;
 
 
 	// Privates
-
 	private TickType m_TickType;
 	private Vector2I m_GL;
 	private Direction m_Dir = Direction.East;
 	private Vector2I m_Dims;
 	private int m_Rate;
-	private List<Command> m_PendingCmds = [];
+	private readonly List<Command> m_PendingCmds = [];
 
 	/// <summary>
 	/// Keeps track of <see cref="Rate"/> every tick.
 	/// </summary>
-	private int m_Count = 1;
+	private int m_Count = 0;
 
 	/// <summary>
 	/// These are checked by the on-demand units
 	/// </summary>
-	private List<Tile> m_TickTiles = [];
+	private readonly List<Tile> m_TickTiles = [];
 	private WorldPanel? m_World;
 
 
@@ -147,7 +146,7 @@ public abstract partial class Unit : Node2D
 			GLocation, 
 			$"{m_Dims.X}x{m_Dims.Y}",
 			m_Dir,
-			$"{m_Rate}t/s",
+			$"{m_Rate}s/t",
 		]));
 		return bui.Append(']').ToString();
 	}
@@ -166,15 +165,13 @@ public abstract partial class Unit : Node2D
 	/// Checks if <paramref name="gloc"/> is within the world in grid-space.
 	/// </summary>
 	public bool IsWithin(Vector2I gloc) => GetRect2I().HasPoint(gloc);
-	public Tile? GetTileOrNull(Vector2I gloc) => World.GetTileOrNull(m_GL + gloc);
-	public Tile? GetTile(Vector2I gloc) => World.GetTile(m_GL + gloc);
-	public Tile GetTileNonNull(Vector2I gloc) => World.GetTileNonNull(m_GL + gloc);
+	public Tile GetTile(Vector2I gloc) => World.GetTileNonNull(m_GL + gloc);
 
 	/// <summary>
 	/// Returns true if the machine is expected to operate during this tick, <see cref="m_Rate"/> determines how often 
 	/// this function returns true, ex. when <see cref="m_Rate"/> is 1, it returns true every single tick.
 	/// </summary>
-	private bool IsWorkTick() => m_Count % m_Rate == 0;
+	private bool IsWorkTick() => m_Count > 0 && m_Count % m_Rate == 0;
 
 	/// <summary>
 	/// Returns true if the command queue still has commands to be executed. You usually pend all the commands you want 
@@ -259,7 +256,7 @@ public abstract partial class Unit : Node2D
 
 		if (m_Dims == Vector2I.One)
 		{
-			GetTileNonNull(Vector2I.Zero).Rotate180();
+			GetTile(Vector2I.Zero).Rotate180();
 			m_Dir = m_Dir.Invert();
 			return;
 		}
@@ -271,8 +268,8 @@ public abstract partial class Unit : Node2D
 			for (var x = 0; x < m_Dims.X; ++x)
 			{
 				var vec = new Vector2I(x, y);
-				GetTileNonNull(vec).Rotate180();
-				GetTileNonNull(maxGL - vec).Rotate180();
+				GetTile(vec).Rotate180();
+				GetTile(maxGL - vec).Rotate180();
 				World.SwapTiles(m_GL + vec, m_GL + (maxGL - vec));
 			}
 		}
@@ -290,7 +287,7 @@ public abstract partial class Unit : Node2D
 
 		if (m_Dims == Vector2I.One)
 		{
-			GetTileNonNull(Vector2I.Zero).Rotate90();
+			GetTile(Vector2I.Zero).Rotate90();
 			m_Dir = m_Dir.Rotate90();
 			return;
 		}
@@ -330,7 +327,7 @@ public abstract partial class Unit : Node2D
 		if (m_Dims == Vector2I.One)
 		{
 			Debug.Assert(CanFaceDir(m_Dir.Rotate270()));
-			GetTileNonNull(Vector2I.Zero).Rotate270();
+			GetTile(Vector2I.Zero).Rotate270();
 			m_Dir = m_Dir.Rotate270();
 			return;
 		}
@@ -353,13 +350,13 @@ public abstract partial class Unit : Node2D
 	public Tile AddInput(Vector2I gloc, Direction dir, bool bKeepTrack = false)
 	{
 		Debug.Assert(IsWithin(m_GL + gloc));
-		Debug.Assert(GetTileNonNull(gloc).IsSolid(dir));
-		Debug.Assert(dir != Direction.East);
+		Debug.Assert(GetTile(gloc).IsSolid(dir));
+		Debug.Assert(m_TickType == TickType.OnDemand || !bKeepTrack);
 
 		// Must be facing out of the unit.
 		Debug.Assert(!IsWithin(m_GL + gloc + dir.ToGrid()));
 
-		var tl = GetTileNonNull(gloc);
+		var tl = GetTile(gloc);
 		tl.MakeInput(dir, true);
 		if (bKeepTrack)
 		{
@@ -380,13 +377,13 @@ public abstract partial class Unit : Node2D
 	public Tile AddOutput(Vector2I gloc, Direction dir, bool bKeepTrack = false)
 	{
 		Debug.Assert(IsWithin(m_GL + gloc));
-		Debug.Assert(GetTileNonNull(gloc).IsSolid(dir));
-		Debug.Assert(dir != Direction.West);
+		Debug.Assert(GetTile(gloc).IsSolid(dir));
+		Debug.Assert(m_TickType == TickType.OnDemand || !bKeepTrack);
 
 		// Must be facing out of the unit.
 		Debug.Assert(!IsWithin(m_GL + gloc + dir.ToGrid()));
 
-		var tl = GetTileNonNull(gloc);
+		var tl = GetTile(gloc);
 		tl.MakeOutput(dir, true);
 		if (bKeepTrack)
 		{
@@ -405,12 +402,27 @@ public abstract partial class Unit : Node2D
 	/// </summary>
 	public void PreprocessTick()
 	{
-		m_Count = m_TickType switch 
-		{
-			TickType.Steady => m_Count + 1,
-			TickType.OnDemand => m_TickTiles.Any(tl => !tl.HasItem()) ? 0 : m_Count + 1,
-			_ => throw new NotImplementedException(),
-		};
+		switch (m_TickType) {
+		case TickType.Steady:
+			m_Count += 1;
+			break;
+
+		case TickType.OnDemand:
+			// Any returns false for empty containers, this means an on-demand container with no tick tiles won't 
+			// function ever.
+			if (m_TickTiles.Any(tl => !tl.HasItem() || tl.Item.IsMidAnimation()))
+			{
+				m_Count = 0;	
+			}
+			else
+			{
+				m_Count += 1;
+			}
+			break;
+
+		default:
+			throw new NotImplementedException("New tick type?");
+		}
 
 		m_PendingCmds.RemoveAll(c => c.IsDone());
 	}
