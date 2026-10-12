@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="arFactory (C#)"
-run/main_scene="uid://klsj0xfb4qp2"
+run/main_scene="uid://c0ui7qr3tkv1i"
 config/features=PackedStringArray("4.7", "C#", "Forward Plus")
 config/icon="res://resources/icon.svg"
 

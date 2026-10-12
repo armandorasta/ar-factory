@@ -28,6 +28,12 @@ public partial class UNSupplier : Unit
 			return;
 		}
 
+		if (HasPendingCmds())
+		{
+			PauseThisTick();
+			return;
+		}
+
 		var startIndex = HasPendingCmds() ? 1 : 0;
 		Vector2I destLoc = m_Out0!.GLocation + Dir.ToGrid();
 		pender.Pend([

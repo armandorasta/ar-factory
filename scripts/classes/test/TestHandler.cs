@@ -53,7 +53,7 @@ public partial class TestHandler : Godot.Node
 
 	public override void _Process(double dt)
 	{
-		if (m_WholeProgramTask is { IsCompleted: true })
+		if (m_WholeProgramTask!.IsCompleted)
 		{
 			GetTree().Quit();
 		}

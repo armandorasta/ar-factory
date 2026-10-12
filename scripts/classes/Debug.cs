@@ -15,8 +15,6 @@ using DebugAssertionDebuggerVisibiltyAttribute = DebuggerStepThroughAttribute;
 using DebugAssertionDebuggerVisibiltyAttribute = DebuggerHiddenAttribute;
 #endif
 
-#nullable enable
-
 internal static class Debug
 {
 	public static SceneTree? TreePtr;
@@ -74,18 +72,6 @@ internal static class Debug
 		HandleImpl(testValue is not null, "AssertNotNull: Expected non-null.", msg);
 	}
 
-	/// <summary>
-	/// Used in branches meant to be impossible.
-	/// </summary>
-	[StackTraceHidden] 
-	[DebugAssertionDebuggerVisibilty] 
-	[DoesNotReturn]
-	public static void AssertUnreachable()
-	{
-		PrintStackTrace();
-		throw new NotImplementedException("AssertUnreachable: Code shouldn't be able to reach here!");
-	}
-
 
 	[Conditional("ASSERTIONS")]
 	[DebuggerHidden] 
@@ -94,15 +80,20 @@ internal static class Debug
 	{
 		if (!bMustBe)
 		{
+#if TEST
+			throw new InvalidOperationException($"Debug assertion failed: {specialMsg}");
+#else
 			GD.PrintErr($"\n{specialMsg}");
 			if (!string.IsNullOrEmpty(userMsg))
 			{
 				GD.PrintErr($"Message: {userMsg}");
 			}
 
+
 			PrintStackTrace(3);
 			// GD.PushError($"Assertion Failed! {msg}");
 			TreePtr?.Quit();
+#endif
 		}
 	}
 

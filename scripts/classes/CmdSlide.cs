@@ -93,7 +93,7 @@ public class CmdSlide : Command
 	private void HandleDefault(Level lv)
 	{
 		Debug.Assert(TrackedItemRef is null);
-		Debug.Assert(HasTileWithItem(lv.World, GridFrom));
+		Debug.Assert(HasTileWithItemNotMidAnim(lv.World, GridFrom));
 
 		// Assume the destination tile exists.
 		var destTile = lv.World.GetTileNonNull(GetGridTo());

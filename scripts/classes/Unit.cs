@@ -374,22 +374,16 @@ public abstract partial class Unit : Node2D
 	/// <param name="bKeepTrack">
 	/// All tiles kept track of must be filled before the tick counter starts counting for on-demand units.
 	/// </param>
-	public Tile AddOutput(Vector2I gloc, Direction dir, bool bKeepTrack = false)
+	public Tile AddOutput(Vector2I gloc, Direction dir)
 	{
 		Debug.Assert(IsWithin(m_GL + gloc));
 		Debug.Assert(GetTile(gloc).IsSolid(dir));
-		Debug.Assert(m_TickType == TickType.OnDemand || !bKeepTrack);
 
 		// Must be facing out of the unit.
 		Debug.Assert(!IsWithin(m_GL + gloc + dir.ToGrid()));
 
 		var tl = GetTile(gloc);
 		tl.MakeOutput(dir, true);
-		if (bKeepTrack)
-		{
-			Debug.Assert(!m_TickTiles.Contains(tl));
-			m_TickTiles.Add(tl);
-		}
 		return tl;
 	}
 
@@ -402,41 +396,45 @@ public abstract partial class Unit : Node2D
 	/// </summary>
 	public void PreprocessTick()
 	{
-		switch (m_TickType) {
-		case TickType.Steady:
-			m_Count += 1;
-			break;
-
-		case TickType.OnDemand:
-			// Any returns false for empty containers, this means an on-demand container with no tick tiles won't 
-			// function ever.
-			if (m_TickTiles.Any(tl => !tl.HasItem() || tl.Item.IsMidAnimation()))
-			{
-				m_Count = 0;	
-			}
-			else
-			{
+		switch (m_TickType)
+		{
+			case TickType.Steady:
 				m_Count += 1;
-			}
-			break;
+				break;
 
-		default:
-			throw new NotImplementedException("New tick type?");
+			case TickType.OnDemand:
+				if (!IsWorkTick() && AreAllTickTilesFilled())
+				{
+					// Workticks will advance immediately, this matters when PauseThisTick was used one or more times,
+					// in that case without this check the unit will pend new commands without checking if all the tick
+					// tiles are filled.
+					m_Count += 1;
+				}
+				else
+				{
+					m_Count = 0;
+				}
+				break;
+
+			default:
+				throw new NotImplementedException("New tick type?");
 		}
 
 		m_PendingCmds.RemoveAll(c => c.IsDone());
 	}
 
+	private bool AreAllTickTilesFilled()
+	{
+		// Any returns false for empty containers, this means an on-demand container with no tick tiles won't function 
+		// ever.
+		return !m_TickTiles.Any(tl => !tl.HasItem() || tl.Item.IsMidAnimation());
+	}
+
+
 	public void HandlePendingNewCommands(WorldPanel.PendProxy pender)
 	{
 		if (IsWorkTick())
 		{
-			if (!IsSafeToPendCmds())
-			{
-				PauseThisTick(); // So next tick is also work tick.
-				return;
-			}
-
 			PendNewCommands(pender);
 		}
 	}

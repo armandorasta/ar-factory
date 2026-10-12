@@ -19,6 +19,7 @@ public class CmdClone : Command
 		SourceGL = srcGLoc;
 		DestinationGLs = [.. destGLocs];
 		Debug.Assert(!DestinationGLs.IsEmpty());
+		Debug.Assert(DestinationGLs.All(l => l != SourceGL));
 	}
 
 	public CmdClone(Tile srcTl, IEnumerable<Tile> destTls) 
@@ -28,20 +29,20 @@ public class CmdClone : Command
 
 	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{
-		Debug.Assert(HasTileWithItem(lv.World, SourceGL));
-		Debug.Assert(!DestinationGLs.All( l => HasTileUnreserved(lv.World, l) ));
+		Debug.Assert(HasTileWithItemNotMidAnim(lv.World, SourceGL));
+		Debug.Assert(DestinationGLs.All( l => HasTileUnreserved(lv.World, l) ));
 
 		Item it = lv.World.GetTileNonNull(SourceGL).Item;
 		if (it.IsMidAnimation())
 		{
-			throw new InvalidProgramException();
+			throw new InvalidProgramException("Forgot to call CmdAwait before CmdClone");
 		}
 
 		foreach (var dgloc in DestinationGLs)
 		{
 			if (lv.World.SpawnItem(dgloc, it.Value) is null)
 			{
-				throw new InvalidProgramException();
+				throw new InvalidProgramException($"CmdClone failed to spawn clone on {dgloc}");
 			}
 		}
 	}

@@ -47,7 +47,7 @@ public abstract class Command
 	protected int m_Count = 0;
 
 
-	protected static bool HasTileWithItem(WorldPanel world, Vector2I gloc)
+	protected static bool HasTileWithItemNotMidAnim(WorldPanel world, Vector2I gloc)
 	{
 		return world.HasTile(gloc) 
 			&& world.GetTileNonNull(gloc).HasItem() 

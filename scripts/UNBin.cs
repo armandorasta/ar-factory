@@ -11,9 +11,15 @@ public partial class UNBin : Unit
 
 	public override void PendNewCommands(WorldPanel.PendProxy pender)
 	{
+		if (HasPendingCmds())
+		{
+			PauseThisTick();
+			return;
+		}
+
 		Tile tl = GetTile(Vector2I.Zero);
 		pender.Pend([
-			[ new CmdAwait(tl) ], 
+			[ new CmdAwait([tl]) ], 
 			[ new CmdKill(tl) ],
 		]);
 	}

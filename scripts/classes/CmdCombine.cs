@@ -26,9 +26,9 @@ public class CmdCombine(Vector2I glLeft, Vector2I glRight, Vector2I glDest, Bina
 
 	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{
-		Debug.Assert(HasTileWithItem(lv.World, LeftGL));
-		Debug.Assert(HasTileWithItem(lv.World, RightGL));
-		Debug.Assert(HasTileUnreserved(lv.World, ResultGL));
+		Debug.Assert(HasTileWithItemNotMidAnim(lv.World, LeftGL));
+		Debug.Assert(HasTileWithItemNotMidAnim(lv.World, RightGL));
+		Debug.Assert(ResultGL == LeftGL || ResultGL == RightGL || HasTileUnreserved(lv.World, ResultGL));
 
 		Tile tlLeft = lv.World.GetTileNonNull(LeftGL);
 		Tile tlRight = lv.World.GetTileNonNull(RightGL);

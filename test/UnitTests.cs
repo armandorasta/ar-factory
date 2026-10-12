@@ -90,14 +90,14 @@ public class UnitTests : ArTest.TestSuit
 		AssertFalse(Unit.CanFitIn(world, Vector2I.Zero, new(1000, 1), Direction.East));
 		AssertFalse(Unit.CanFitIn(world, Vector2I.Zero, new(1, 1000), Direction.North));
 		AssertFalse(Unit.CanFitIn(world, Vector2I.Zero, new(1000, 1000), Direction.South));
-		AssertFalse(Unit.CanFitIn(world, Vector2I.One, world.Dims, Direction.East)); // Barely clipping
+		AssertFalse(Unit.CanFitIn(world, Vector2I.One, world.Dimensions, Direction.East)); // Barely clipping
 
 		// 4. Perfect fit
 		// As big as the whole world exactly.
-		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, world.Dims, Direction.East));
-		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, world.Dims, Direction.West));
-		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, new(world.Dims.Y, world.Dims.X), Direction.North));
-		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, new(world.Dims.Y, world.Dims.X), Direction.South));
+		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, world.Dimensions, Direction.East));
+		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, world.Dimensions, Direction.West));
+		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, new(world.Dimensions.Y, world.Dimensions.X), Direction.North));
+		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, new(world.Dimensions.Y, world.Dimensions.X), Direction.South));
 		// 1x1
 		world.InstallEmptyTile(new(1, 0));
 		world.InstallEmptyTile(new(0, 1));
@@ -469,6 +469,108 @@ public class UnitTests : ArTest.TestSuit
 			await Lvl.TickOnceAsync(); // Gets bombed
 			AssertTrue(it.IsQueuedForDeletion());
 			AssertFalse(tlBin.IsReserved());
+		}
+	}
+
+	[ArTest.Test] public async Task TestBranch_vanilla()
+	{
+		var world = Lvl.World;
+		// For now I am only planning on allowing the value zero.
+		var bra = world.PlaceBranch(new Vector2I(1, 2), Direction.East, CmdIf.CheckType.Greater, 0);
+		var injy = world.PlaceInjector();
+
+		var tlIn = world.InstallEmptyTile(bra.GLocation + bra.Dir.Invert().ToGrid());
+		var tlTrue = world.InstallEmptyTile(bra.GLocation + bra.Dir.ToGrid());
+		var tlFalse = world.InstallEmptyTile(tlTrue.GLocation + new Vector2I(0, 1));
+
+		using (Lvl.PlaySimulationInDebug())
+		{
+			// When the check returns true
+			var positiveIt = world.SpawnItem(tlIn, 535)!;
+			injy.PendFullSequence([[ new CmdSlide(tlIn, bra.Dir) ]]);
+			await Lvl.TickOnceAsync(); // Item slides in.
+			AssertFalse(tlIn.HasItem());
+			AssertTrue(positiveIt.IsMidAnimation());
+			await Lvl.EndTickAsync();
+			AssertFalse(injy.HasPendingCmds());
+			
+			await Lvl.TickOnceAsync(); // Item pops out of the true tile
+			AssertFalse(tlFalse.HasItem());
+			AssertTrue(tlTrue.HasItem());
+			AssertTrue(tlTrue.Item.IsMidAnimation());
+			AssertRefEq(tlTrue.Item, positiveIt);
+			await Lvl.EndTickAsync();
+			AssertTrue(tlTrue.HasItem());
+			AssertFalse(tlTrue.Item.IsMidAnimation());
+			tlTrue.DestroyItem();
+
+			// When the check returns false
+			var negativeIt = world.SpawnItem(tlIn, -312)!;
+			injy.PendFullSequence([[ new CmdSlide(tlIn, bra.Dir) ]]);
+			await Lvl.TickOnceAsync(); // Item slides in.
+			AssertFalse(tlIn.HasItem());
+			AssertTrue(negativeIt.IsMidAnimation());
+			await Lvl.EndTickAsync();
+			AssertFalse(injy.HasPendingCmds());
+			
+			await Lvl.TickOnceAsync(); // Item pops out of the false tile
+			AssertFalse(tlTrue.HasItem());
+			AssertTrue(tlFalse.HasItem());
+			AssertTrue(tlFalse.Item.IsMidAnimation());
+			AssertRefEq(tlFalse.Item, negativeIt);
+			await Lvl.EndTickAsync();
+			AssertTrue(tlFalse.HasItem());
+			AssertFalse(tlFalse.Item.IsMidAnimation());
+			tlFalse.DestroyItem();
+		}
+	}
+
+	[ArTest.Test] public async Task TestBranch_clogged()
+	{
+		var world = Lvl.World;
+		// For now I am only planning on allowing the value zero.
+		var bra = world.PlaceBranch(new Vector2I(1, 2), Direction.East, CmdIf.CheckType.Greater, 0);
+		var injy = world.PlaceInjector();
+
+		var tlIn = world.InstallEmptyTile(bra.GLocation + bra.Dir.Invert().ToGrid());
+		var tlTrue = world.InstallEmptyTile(bra.GLocation + bra.Dir.ToGrid());
+		var tlFalse = world.InstallEmptyTile(tlTrue.GLocation + new Vector2I(0, 1));
+
+		using (Lvl.PlaySimulationInDebug())
+		{
+			// Blocking both output tiles.
+			world.SpawnItem(tlTrue, 27);
+			world.SpawnItem(tlFalse, 761);
+
+			// When the check returns true
+			var positiveIt = world.SpawnItem(tlIn, 535)!;
+			injy.PendFullSequence([[ new CmdSlide(tlIn, bra.Dir) ]]);
+			await Lvl.TickOnceAsync(); // Item slides in.
+			await Lvl.EndTickAsync();
+			AssertFalse(injy.HasPendingCmds());
+			await Lvl.TickOnceAsync(); // Nothing happens
+			tlTrue.DestroyItem();
+			
+			await Lvl.TickOnceAsync(); // Item pops out of the true tile
+			AssertTrue(tlTrue.HasItem());
+			AssertTrue(tlTrue.Item.IsMidAnimation());
+			AssertRefEq(tlTrue.Item, positiveIt);
+			await Lvl.EndTickAsync();
+			AssertFalse(tlTrue.Item.IsMidAnimation());
+
+			// When the check returns false
+			var negativeIt = world.SpawnItem(tlIn, -312)!;
+			injy.PendFullSequence([[ new CmdSlide(tlIn, bra.Dir) ]]);
+			await Lvl.TickOnceAsync(); // Item slides in.
+			await Lvl.EndTickAsync();
+			AssertFalse(injy.HasPendingCmds());
+			await Lvl.TickOnceAsync(); // Nothing happens
+			tlFalse.DestroyItem();
+			
+			await Lvl.TickOnceAsync(); // Item pops out of the false tile
+			AssertTrue(tlTrue.HasItem()); // From last time, need to make sure it doesn't get deleted somehow.
+			AssertTrue(tlFalse.HasItem());
+			AssertRefEq(tlFalse.Item, negativeIt);
 		}
 	}
 }

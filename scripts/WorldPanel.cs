@@ -41,7 +41,7 @@ public partial class WorldPanel : Godot.Panel
 
 
 	// Public interface
-	public Vector2I Dims => m_Dims;
+	public Vector2I Dimensions => m_Dims;
 	public readonly float CellWidth = 100.0f;
 	public Tile? this[int x, int y] => GetTileOrNull(new(x, y));
 
@@ -113,7 +113,7 @@ public partial class WorldPanel : Godot.Panel
 	public Tile GetTileNonNull(Vector2I gloc)
 	{
 #if DEBUG
-		return GetTile(gloc) ?? throw new InvalidProgramException();
+		return GetTile(gloc) ?? throw new InvalidProgramException("GetTileNonNull returns a null tile??");
 #else
 		return GetTile(gloc)!;
 #endif
@@ -411,7 +411,10 @@ public partial class WorldPanel : Godot.Panel
 	public Item? TeleportItem(Vector2I gSrc, Vector2I gDest, bool bMaybeNull = false, bool bOverride = false)
 	{
 		var it = TeleportItemNoSync(gSrc, gDest, bMaybeNull, bOverride);
-		it?.SyncPosWithGrid(this);
+		if (gSrc != gDest) // Avoid marshalling for in-place teleports.
+		{
+			it?.SyncPosWithGrid(this);		
+		}
 		return it;
 	}
 
@@ -621,6 +624,14 @@ public partial class WorldPanel : Godot.Panel
 		return bin;
 	}
 
+	public UNBranch PlaceBranch(Vector2I gloc, Direction dir, CmdIf.CheckType check, int value)
+	{
+		var bra = UNBranchScene.Instantiate<UNBranch>();
+		AddUnit(bra);
+		bra.Setup(this, gloc, dir, check, value);
+		return bra;
+	}
+
 	// public void PlaceDemander(Vector2I gloc, Direction dir, int[] seq)
 	// {
 	// 	var dem = UNDemanderScene.Instantiate<UnDemander>();
@@ -746,10 +757,12 @@ public partial class WorldPanel : Godot.Panel
 		u.QueueFree();
 		m_Units.Remove(u);
 
-		var bLeftRight = u.Dir == Direction.East || u.Dir == Direction.West;
-		for (int y = 0, ylim = bLeftRight ? u.Dimensions.Y : u.Dimensions.X; y < ylim; ++y)
+		var limVec = u.Dir is Direction.East or Direction.West 
+			? u.Dimensions 
+			: new Vector2I(u.Dimensions.Y, u.Dimensions.X);
+		for (int y = 0; y < limVec.Y; ++y)
 		{
-			for (int x = 0, xlim = bLeftRight ? u.Dimensions.X : u.Dimensions.Y; x < xlim; ++x)
+			for (int x = 0; x < limVec.X; ++x)
 			{
 				DeleteTile(u.GLocation + new Vector2I(x, y));
 			}

@@ -75,8 +75,6 @@ public class CmdIf : Command
 
 	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{
-		Debug.Assert(lv.World.HasTile(GLocation));
-
 		var bCondMet = Apply(Check, lv.World.GetTileOrNull(GLocation), CmpValue);
 		var winnerBranch = bCondMet ? TrueBranch : ElseBranch;
 		if (winnerBranch is not null)

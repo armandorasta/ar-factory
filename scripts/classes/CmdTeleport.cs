@@ -15,11 +15,11 @@ public class CmdTeleport(Vector2I gfrom, Vector2I gto) : Command(1)
 
 	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{
-		Debug.Assert(HasTileWithItem(lv.World, SourceGL));
-		Debug.Assert(HasTileUnreserved(lv.World, DestinationGL));
+		Debug.Assert(HasTileWithItemNotMidAnim(lv.World, SourceGL));
+		Debug.Assert(SourceGL == DestinationGL || HasTileUnreserved(lv.World, DestinationGL));
 		if (lv.World.TeleportItem(SourceGL, DestinationGL) is null)
 		{
-			throw new InvalidProgramException();
+			throw new InvalidProgramException("CmdTeleport failed");
 		}
 	}
 

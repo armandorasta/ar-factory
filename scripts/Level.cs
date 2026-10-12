@@ -168,6 +168,7 @@ public partial class Level : Godot.Node2D
 
 	private void OnTick()
 	{
+		Debug.Assert(m_CurrPlayMode is PlayMode.Play or PlayMode.Debug);
 		World.OnTick(this);
 		m_TickCount += 1;
 		UpdateTickCountLabel();
@@ -210,7 +211,7 @@ public partial class Level : Godot.Node2D
 		case PlayMode.Play:
 		case PlayMode.Debug:
 		default:
-			throw new InvalidProgramException();
+			throw new InvalidProgramException("Simulation must start with PlayMode.Off");
 		}
 	}
 
@@ -242,7 +243,7 @@ public partial class Level : Godot.Node2D
 	/// </summary>
 	public void HaltSimulation()
 	{
-		Debug.Assert(m_CurrPlayMode != PlayMode.Off);		
+		Debug.Assert(m_CurrPlayMode is PlayMode.Play or PlayMode.Debug);
 		// This has to be called before switching the PlayMode for fast tick rates.
 		OnSimulationEnd();
 		SetPlayMode(PlayMode.Off);
@@ -256,7 +257,7 @@ public partial class Level : Godot.Node2D
 	/// </summary>
 	public void TickOnce()
 	{
-		Debug.Assert(m_CurrPlayMode != PlayMode.Off);
+		Debug.Assert(m_CurrPlayMode is PlayMode.Play or PlayMode.Debug);
 		Debug.Assert(!m_TickTimer.Paused);
 		Debug.Assert(IsPausedRightBeforeOnTick());
 
@@ -271,7 +272,7 @@ public partial class Level : Godot.Node2D
 	/// </summary>
 	public async Task EndTickAsync()
 	{
-		Debug.Assert(m_CurrPlayMode != PlayMode.Off);
+		Debug.Assert(m_CurrPlayMode is PlayMode.Play or PlayMode.Debug);
 		if (m_TickTimer.TimeLeft > 0.0)
 		{
 			await ToSignal(m_TickTimer, Godot.Timer.SignalName.Timeout);
@@ -287,7 +288,7 @@ public partial class Level : Godot.Node2D
 	/// </summary>
 	public async Task TickOnceAsync()
 	{
-		Debug.Assert(m_CurrPlayMode != PlayMode.Off);
+		Debug.Assert(m_CurrPlayMode is PlayMode.Play or PlayMode.Debug);
 		await EndTickAsync();
 		TickOnce();
 	}
@@ -298,7 +299,7 @@ public partial class Level : Godot.Node2D
 	/// </summary>
 	public async Task TickNTimesAsync(int tickCount)
 	{
-		Debug.Assert(m_CurrPlayMode != PlayMode.Off);
+		Debug.Assert(m_CurrPlayMode is PlayMode.Play or PlayMode.Debug);
 		for (var i = 0; i < tickCount; ++i)
 		{
 			await TickOnceAsync();
@@ -312,7 +313,7 @@ public partial class Level : Godot.Node2D
 	/// </summary>
 	public async Task WaitForNTicks(int tickCount)
 	{
-		Debug.Assert(m_CurrPlayMode != PlayMode.Off);
+		Debug.Assert(m_CurrPlayMode is PlayMode.Play or PlayMode.Debug);
 		for (var i = 0; i < tickCount; ++i)
 		{
 			await ToSignal(this, SignalName.TickProcessed);
@@ -324,7 +325,7 @@ public partial class Level : Godot.Node2D
 
 	private void OnTickTimer_TimeOut()
 	{
-		Debug.Assert(m_CurrPlayMode != PlayMode.Off);
+		Debug.Assert(m_CurrPlayMode is PlayMode.Play or PlayMode.Debug);
 		World.OnEdge(this);
 		BeginTick();
 	}
@@ -335,6 +336,7 @@ public partial class Level : Godot.Node2D
 	/// <exception cref="InvalidProgramException"></exception>
 	private void BeginTick()
 	{
+		Debug.Assert(m_CurrPlayMode is PlayMode.Play or PlayMode.Debug);
 		switch (m_CurrPlayMode) {
 		case PlayMode.Play:
 			TickOnce();
@@ -345,25 +347,27 @@ public partial class Level : Godot.Node2D
 
 		case PlayMode.Off:
 		default:
-			throw new InvalidProgramException();
+			throw new InvalidProgramException("BeginTick with PlayMode.Off?");
 		}
 	}
 
 
 	private void OnPlayButt_Pressed()
 	{
-		Debug.Assert(m_CurrPlayMode != PlayMode.Play);
+		Debug.Assert(m_CurrPlayMode is PlayMode.Off or PlayMode.Debug);
 		switch (m_CurrPlayMode) {
 		case PlayMode.Off:
 			StartSimulation(bPauseOnEntry: false);
 			break;
 		
-		case PlayMode.Play:
-			throw new InvalidProgramException();
 
 		case PlayMode.Debug:
 			ResumeSimulation();
 			break;
+		
+		case PlayMode.Play:
+		default:
+			throw new InvalidProgramException("Somehow pressed the play button in PlayMode.Play");
 		}
 	}
 
@@ -391,6 +395,9 @@ public partial class Level : Godot.Node2D
 
 			TickOnce();
 			break;
+		
+		default:
+			throw new NotImplementedException("New PlayMode?");
 		}
 	}
 
@@ -430,6 +437,9 @@ public partial class Level : Godot.Node2D
 			PlayHBox.Show();
 			ToolsHBox.Hide();
 			break;
+
+		default:
+			throw new NotImplementedException("New PlayMode?");
 		}
 	}
 
@@ -440,6 +450,7 @@ public partial class Level : Godot.Node2D
 
 	private void OnSimulationEnd()
 	{
+		Debug.Assert(m_CurrPlayMode is PlayMode.Play or PlayMode.Debug);
 		m_TickTimer.Paused = true;
 		m_TickCount = 0;
 		World.CleanUpAfterSim();

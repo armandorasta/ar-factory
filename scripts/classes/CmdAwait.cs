@@ -1,6 +1,8 @@
 using Godot;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace ArFactory;
 
@@ -18,8 +20,9 @@ public class CmdAwait : Command
 		Debug.Assert(GridLocs.Length > 0);
 	}
 
-	public CmdAwait(IEnumerable<Tile> tls) : this(tls.Select(tl => tl.GLocation)) { }
-	public CmdAwait(Tile tl) : this([tl.GLocation]) { }
+	public CmdAwait(IEnumerable<Tile> tls) 
+		: this(tls.Select(tl => tl.GLocation)) 
+	{ }
 
 	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
 	{

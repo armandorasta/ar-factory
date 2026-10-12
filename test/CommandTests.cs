@@ -34,7 +34,7 @@ public class CommandTests : ArTest.TestSuit
 		RemoveNode(Lvl);
 	}
 
-	[ArTest.Test] public async Task TestCmdSpawn_Vanilla()
+	[ArTest.Test] public async Task TestCmdSpawn_vanilla()
 	{
 		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
@@ -88,7 +88,7 @@ public class CommandTests : ArTest.TestSuit
 		}
 	}
 
-	[ArTest.Test] public async Task TestCmdKill_Vanilla()
+	[ArTest.Test] public async Task TestCmdKill_vanilla()
 	{
 		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
@@ -193,7 +193,7 @@ public class CommandTests : ArTest.TestSuit
 		}
 	}
 
-	[ArTest.Test] public async Task TestCmdSlide_Vanilla()
+	[ArTest.Test] public async Task TestCmdSlide_vanilla()
 	{
 		var world = Lvl.World;
 		var tlEast0 = world.InstallEmptyTile(new(0, 0));
@@ -385,7 +385,6 @@ public class CommandTests : ArTest.TestSuit
 		// Sliding nothing on existing tiles
 		using (Lvl.PlaySimulationInDebug())
 		{
-			tl0.DestroyItem();
 			injy0.PendParallel([new CmdSlide(tl0, Direction.East)]);
 			await AssertThrow(Lvl.TickOnceAsync);
 			AssertTrue(injy0.HasPendingCmds());
@@ -446,7 +445,7 @@ public class CommandTests : ArTest.TestSuit
 		using (Lvl.PlaySimulationInDebug())
 		{ 
 			world.SpawnItem(tl0, 447);
-			var wait1 = new CmdAwait(tl1);
+			var wait1 = new CmdAwait([tl1]);
 			injy0.PendParallel([
 				new CmdSlide(tl0, Direction.East),
 				wait1, // Also does nothing here...
@@ -474,7 +473,7 @@ public class CommandTests : ArTest.TestSuit
 		
 		using (Lvl.PlaySimulationInDebug())
 		{
-			var wait = new CmdAwait(tl);
+			var wait = new CmdAwait([tl]);
 			injy0.PendParallel([wait]);
 
 			await Lvl.TickOnceAsync();
@@ -603,7 +602,7 @@ public class CommandTests : ArTest.TestSuit
 		AssertEq(UnaryOperation.Override.Apply(348, -976), -976);
 	}
 
-	[ArTest.Test] public async Task TestCmdUpdate_Vanilla()
+	[ArTest.Test] public async Task TestCmdUpdate_vanilla()
 	{
 		var world = Lvl.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
@@ -670,7 +669,7 @@ public class CommandTests : ArTest.TestSuit
 		}
 	}
 
-	[ArTest.Test] public async Task TestCmdClone_Vanilla()
+	[ArTest.Test] public async Task TestCmdClone_vanilla()
 	{
 		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
@@ -801,7 +800,7 @@ public class CommandTests : ArTest.TestSuit
 		AssertEq(BinaryOperation.LessEq.Apply(273, 273), 1);
 	}
 
-	[ArTest.Test] public async Task TestCmdCombine_Vanilla()
+	[ArTest.Test] public async Task TestCmdCombine_vanilla()
 	{
 		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
