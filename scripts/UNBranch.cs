@@ -8,9 +8,13 @@ public partial class UNBranch : Unit
 	public CmdIf.CheckType Check { get; private set; }
 	public int CmpValue { get; private set; }
 
+	public Tile InTile => m_tlInput!;
+	public Tile OutTrueTile => m_tlOutTrue!;
+	public Tile OutFalseTile => m_tlOutFalse!;
+
 	private Tile? m_tlInput;
-	private Tile? m_tlTrue;
-	private Tile? m_tlFalse;
+	private Tile? m_tlOutTrue;
+	private Tile? m_tlOutFalse;
 
 	public void Setup(WorldPanel world, Vector2I gloc, Direction dir, CmdIf.CheckType check, int value)
 	{
@@ -22,8 +26,8 @@ public partial class UNBranch : Unit
 	protected override void BuildTilesAsIfFacingEast()
 	{
 		m_tlInput = AddInput(Vector2I.Zero, Direction.West, true);
-		m_tlTrue  = AddOutput(Vector2I.Zero, Direction.East);
-		m_tlFalse = AddOutput(new(0, 1), Direction.East);
+		m_tlOutTrue  = AddOutput(Vector2I.Zero, Direction.East);
+		m_tlOutFalse = AddOutput(new(0, 1), Direction.East);
 	}
 
 	public override void PendNewCommands(WorldPanel.PendProxy pender)
@@ -34,22 +38,21 @@ public partial class UNBranch : Unit
 			return;
 		}
 
-		var startIndex = HasPendingCmds() ? 1 : 0; // Overlapping with a slide from last time?
-		if (CmdIf.Apply(Check, m_tlInput, CmpValue))
+		if (CmdIf.Apply(Check, InTile, CmpValue))
 		{
 			pender.Pend([
-				[ new CmdAwait([m_tlInput!]) ],
-				[ new CmdSlide(m_tlTrue!, Dir) ],
-			], startIndex);
+				[ new CmdAwait([InTile]) ],
+				[ new CmdSlide(OutTrueTile, Dir) ],
+			]);
 		}
 		else
 		{
 			pender.Pend([
-				[ new CmdAwait([m_tlInput!]) ],
-				[ new CmdVacate([m_tlFalse!]) ],
-				[ new CmdTeleport(m_tlInput!, m_tlFalse!) ],
-				[ new CmdSlide(m_tlFalse!, Dir) ],				
-			], startIndex);
+				[ new CmdAwait([InTile]) ],
+				[ new CmdVacate([OutFalseTile]) ],
+				[ new CmdTeleport(InTile, OutFalseTile) ],
+				[ new CmdSlide(OutFalseTile, Dir) ],		
+			]);
 		}
 	}
 }

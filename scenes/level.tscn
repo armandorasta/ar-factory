@@ -93,15 +93,10 @@ theme_override_constants/margin_bottom = 4
 [node name="ToolsHBox" type="HBoxContainer" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer" unique_id=324215663]
 layout_mode = 2
 
-[node name="BusButt" type="Button" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/ToolsHBox" unique_id=1704232459]
-custom_minimum_size = Vector2(100, 0)
+[node name="Button" type="Button" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/ToolsHBox" unique_id=2043644016]
+visible = false
 layout_mode = 2
-text = "BUS"
-
-[node name="DoublerButt" type="Button" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/ToolsHBox" unique_id=1127859206]
-custom_minimum_size = Vector2(100, 0)
-layout_mode = 2
-text = "2X"
+text = ">>>"
 
 [node name="PlayHBox" type="HBoxContainer" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer" unique_id=866974895]
 visible = false

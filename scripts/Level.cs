@@ -1,11 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using Godot;
 
 namespace ArFactory;
 
 public partial class Level : Godot.Node2D
 {
-	public class SimulationAutoEnder(Level lv) : IDisposable
+	public sealed class SimulationAutoEnder(Level lv) : IDisposable
 	{
 		private readonly Level m_Level = lv;
 
@@ -16,6 +18,9 @@ public partial class Level : Godot.Node2D
 		}
 	}
 
+	private record struct UnitPlacement(Godot.ButtonGroup ButtGroup, Godot.Button? Butt, Direction Dir);
+	private record ToolBoxButtInfo(Vector2I Dims, Action<Vector2I, Direction> PlacementFunc);
+
 	public const float MinTickRate = 0.1f;
 	public const float MaxTickRate = 1000.0f;
 
@@ -23,6 +28,7 @@ public partial class Level : Godot.Node2D
 	enum PlayMode 
 	{ 
 		Off,
+		Placement,
 		Play,
 		Debug,
 	}
@@ -68,17 +74,25 @@ public partial class Level : Godot.Node2D
 	private int m_TickCount = 0; // Number of ticks since the start.
 	private float m_TickMillis;
 
+	private UnitPlacement m_CurrUnitPlacement = new();
+	private readonly Dictionary<string, ToolBoxButtInfo> m_ToolboxButtInfos = [];
+
+
+	#region .Init
+
+	public override void _EnterTree()
+	{
+		Debug.TreePtr = GetTree();
+	}
 
 	public override void _Ready()
 	{
 		GetAllNodes();
-		
-		Cam!.Position = World!.Size * 0.5f;
-		
+		Cam!.Position = World!.Size * 0.5f;		
 		InitTimer();
 		InitSimButts();
 		InitSimSpeedSlider();
-		AddTools();
+		InitTools();
 	}
 
 	private void GetAllNodes()
@@ -118,16 +132,109 @@ public partial class Level : Godot.Node2D
 		SpeedSlider.Value = GetTickRate();
 	}
 
-	public override void _EnterTree()
+	private void InitTools()
 	{
-		Debug.TreePtr = GetTree();
+		m_CurrUnitPlacement.ButtGroup = new() { AllowUnpress = true };
+		m_CurrUnitPlacement.ButtGroup.Pressed += OnToolsHBox_Pressed;
+		AddTool("||>", Vector2I.One, (l, d) => World.PlaceSupplier(l, d, 1, [1, 2, 3, 4, 5, 6]));
+		AddTool(">>>", Vector2I.One, (l, d) => World.PlaceSlider(l, d, 1));
+		AddTool("xX", Vector2I.One, (l, d) => World.PlaceBin(l));
+		AddTool("?:", new Vector2I(1, 2), (l, d) => World.PlaceBranch(l, d, CmdIf.CheckType.Greater, 3));
+		AddTool("1>2", Vector2I.One, (l, d) => World.PlaceUpdater(l, d, 2, UNUpdater.UpdateType.Double));
+	}
+
+	private void AddTool(string text, Vector2I dims, Action<Vector2I, Direction> placementFunc)
+	{
+		var butt = new Godot.Button
+		{
+			Text = text,
+			CustomMinimumSize = new Vector2I(80, 0),
+			ButtonGroup = m_CurrUnitPlacement.ButtGroup,
+			ToggleMode = true,
+		};
+		ToolsHBox.AddChild(butt);
+		m_ToolboxButtInfos.Add(butt.Name, new(dims, placementFunc));
+	}
+
+	#endregion // Init
+
+
+	public override void _Input(InputEvent ev)
+	{
+		switch (m_CurrPlayMode) {
+		case PlayMode.Placement:
+		{
+			if (ev is InputEventMouseButton mev)
+			{
+				switch (mev.ButtonIndex) {
+				case MouseButton.Right:
+					if (mev.IsPressed())
+					{
+						SetPlayMode(PlayMode.Off);
+						m_CurrUnitPlacement.Butt!.ButtonPressed = false;	
+					}
+					break;
+				
+				case MouseButton.Left:
+					if (mev.IsPressed())
+					{
+						var mousePos = GetLocalMousePosition();
+						if (World.GetWorldRect().HasPoint(mousePos))
+						{
+							var info = m_ToolboxButtInfos[m_CurrUnitPlacement.Butt!.Name];
+							Vector2I gloc = World.PosToGrid(mousePos);
+							if (Unit.CanFitIn(World, gloc, info.Dims, m_CurrUnitPlacement.Dir))
+							{
+								info.PlacementFunc.Invoke(World.PosToGrid(mousePos), m_CurrUnitPlacement.Dir);
+							}
+							else
+							{
+								GD.Print($"Nope, a {info.Dims.X}x{info.Dims.Y} unit can't fit on {gloc} buddy");
+							}
+						}
+					}
+					break;
+				
+				default: break;
+				}
+			}
+			break;
+		}
+		case PlayMode.Off:
+		{
+			if (ev is InputEventMouseButton mev)
+			{
+				switch (mev.ButtonIndex) {
+				case MouseButton.Right:
+					if (!mev.IsReleased() && mev.CtrlPressed)
+					{
+						var mouseGL = World.PosToGrid(GetLocalMousePosition());
+						var u = World.GetUnit(mouseGL);
+						if (u is not null)
+						{
+							World.DeleteUnit(u);	
+						}
+					}
+					break;
+				}
+			}
+			break;
+		}
+		case PlayMode.Play:
+		case PlayMode.Debug:
+		default:
+			break;
+		}
 	}
 
 	// Called every frame. 'delta' is the elapsed time since the previous frame.
+
 	public override void _Process(double dt)
 	{
 		switch (m_CurrPlayMode) {
-		case PlayMode.Off: break;
+		case PlayMode.Off: 
+			break;
+		
 		case PlayMode.Debug:
 		case PlayMode.Play: 
 			World.DoPerFrame((float)dt, this);
@@ -351,7 +458,6 @@ public partial class Level : Godot.Node2D
 		}
 	}
 
-
 	private void OnPlayButt_Pressed()
 	{
 		Debug.Assert(m_CurrPlayMode is PlayMode.Off or PlayMode.Debug);
@@ -407,6 +513,14 @@ public partial class Level : Godot.Node2D
 		TickSpeedLabel.Text = $"{GetTickRate()} tick/s";
 	}
 
+	private void OnToolsHBox_Pressed(Godot.BaseButton baseButt)
+	{
+		Debug.AssertIs(baseButt, typeof(Godot.Button));
+		var butt = (baseButt as Godot.Button)!;
+		SetPlayMode(PlayMode.Placement);
+		m_CurrUnitPlacement.Butt = butt;
+		m_CurrUnitPlacement.Dir = Direction.East;
+	}
 	
 	#endregion .Signal Handlers
 
@@ -422,6 +536,14 @@ public partial class Level : Godot.Node2D
 			ToolsHBox.Show();
 			break;
 		
+		case PlayMode.Placement:
+			PlayButt.Disabled = true;
+			HaltButt.Disabled = true;
+			DebugButt.Disabled = true;
+			PlayHBox.Hide();
+			ToolsHBox.Show();
+			break;
+
 		case PlayMode.Play:
 			PlayButt.Disabled = true;
 			HaltButt.Disabled = false;
@@ -470,9 +592,5 @@ public partial class Level : Godot.Node2D
 	private void UpdateTickCountLabel()
 	{
 		TicksLabel.Text = $"tick: {m_TickCount}";
-	}
-
-	private void AddTools()
-	{
 	}
 }

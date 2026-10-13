@@ -5,6 +5,8 @@ namespace ArFactory;
 
 public partial class UNSupplier : Unit
 {
+	public Tile Output => m_Out0!;
+
 	private int[]? m_Sequence;
 	private int m_Index = -1;
 
@@ -34,16 +36,23 @@ public partial class UNSupplier : Unit
 			return;
 		}
 
-		var startIndex = HasPendingCmds() ? 1 : 0;
-		Vector2I destLoc = m_Out0!.GLocation + Dir.ToGrid();
-		pender.Pend([
-			[ new CmdVacate([m_Out0!]) ],
-			[ new CmdSpawn(m_Out0!, PopNextValue()) ],
-			World.HasTile(destLoc) ? [ new CmdSlide(m_Out0, Dir) ] : [],
-			// [ new CmdIf(m_Out0!.GridLoc + Dir.ToGrid(), CmdIf.CheckType.HasTile, -1, [
-			// 	[ new CmdSlide(m_Out0, Dir) ]
-			// ])]
-		], startIndex);
+		Vector2I destLoc = Output.GLocation + Dir.ToGrid();
+		if (World.HasTile(destLoc))
+		{
+			pender.Pend([
+				[ new CmdVacate([Output]) ],
+				[ new CmdSpawn(Output, PopNextValue()) ],
+				[ new CmdSlide(Output, Dir) ],
+			]);
+		}
+		else
+		{
+			pender.Pend([
+				[ new CmdVacate([Output]) ],
+				[ new CmdSpawn(Output, PopNextValue()) ],
+			]);
+		}
+		
 	}
 
 	public bool IsDoneWithInputSeq() => m_Index >= m_Sequence!.Length - 1;

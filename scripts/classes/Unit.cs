@@ -403,11 +403,14 @@ public abstract partial class Unit : Node2D
 				break;
 
 			case TickType.OnDemand:
-				if (!IsWorkTick() && AreAllTickTilesFilled())
+				if (IsWorkTick()) // Checking last tick btw.
 				{
-					// Workticks will advance immediately, this matters when PauseThisTick was used one or more times,
-					// in that case without this check the unit will pend new commands without checking if all the tick
-					// tiles are filled.
+					// Reset after work tick.
+					m_Count = 0;
+				}
+
+				if (AreAllTickTilesFilled())
+				{
 					m_Count += 1;
 				}
 				else

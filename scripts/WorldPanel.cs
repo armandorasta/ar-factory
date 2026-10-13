@@ -136,8 +136,26 @@ public partial class WorldPanel : Godot.Panel
 				return u;
 			}
 		}
-
 		return null;
+	}
+
+	public void DeleteUnit(Unit u)
+	{
+		u.Reset();
+		RemoveChild(u);
+		u.QueueFree();
+		m_Units.Remove(u);
+
+		var limVec = u.Dir is Direction.East or Direction.West 
+			? u.Dimensions 
+			: new Vector2I(u.Dimensions.Y, u.Dimensions.X);
+		for (int y = 0; y < limVec.Y; ++y)
+		{
+			for (int x = 0; x < limVec.X; ++x)
+			{
+				DeleteTile(u.GLocation + new Vector2I(x, y));
+			}
+		}
 	}
 
 
@@ -569,19 +587,22 @@ public partial class WorldPanel : Godot.Panel
 	[Conditional("DEBUG")]
 	private void PlaceSomeUnits()
 	{
-		PlaceSupplier(new(1, 7), Direction.East, 3, [1, 2, 3, 4, 5, 6]);
-		PlaceSlider(new(2, 7), Direction.East);
-		PlaceSlider(new(3, 7), Direction.North);
-		PlaceSlider(new(3, 6), Direction.East);
-		PlaceUpdater(new(4, 6), Direction.East, 4, UNUpdater.UpdateType.Double);
-		PlaceSlider(new(5, 6), Direction.East);
-		PlaceBin(new(6, 6));
-		// PlaceSlider(new(6, 6), Direction.South);
-		// PlaceSlider(new(6, 7), Direction.South);
-		// PlaceSlider(new(6, 8), Direction.West);
-		// PlaceUpdater(new(5, 8), Direction.West, 3, UNUpdater.UpdateType.Double);
-		// PlaceSlider(new(4, 8), Direction.West);
-		// PlaceSlider(new(3, 8), Direction.North);
+		PlaceSupplier(new Vector2I(1, 7), Direction.East, 3, [1, 2, 3, 4, 5, 6]);
+		PlaceSlider(new Vector2I(2, 7), Direction.East);
+		PlaceSlider(new Vector2I(3, 7), Direction.North);
+		PlaceSlider(new Vector2I(3, 6), Direction.East);
+		PlaceSlider(new Vector2I(4, 6), Direction.East);
+		PlaceSlider(new Vector2I(5, 6), Direction.East);
+		PlaceBranch(new Vector2I(6, 6), Direction.East, CmdIf.CheckType.Greater, 100);
+		PlaceSlider(new Vector2I(7, 6), Direction.East);
+		PlaceBin(new Vector2I(8, 6));
+		PlaceSlider(new Vector2I(7, 7), Direction.South);
+		PlaceSlider(new Vector2I(7, 8), Direction.South);
+		PlaceSlider(new Vector2I(7, 9), Direction.West);
+		PlaceUpdater(new Vector2I(6, 9), Direction.West, 2, UNUpdater.UpdateType.Double);
+		PlaceSlider(new Vector2I(5, 9), Direction.North);
+		PlaceSlider(new Vector2I(5, 8), Direction.North);
+		PlaceSlider(new Vector2I(5, 7), Direction.North);
 	}
 
 	public UNCmdInjector PlaceInjector()
@@ -748,25 +769,6 @@ public partial class WorldPanel : Godot.Panel
 	{
 		m_Units.Add(newUnit);
 		AddChild(newUnit);
-	}
-
-	private void DeleteUnit(Unit u)
-	{
-		u.Reset();
-		RemoveChild(u);
-		u.QueueFree();
-		m_Units.Remove(u);
-
-		var limVec = u.Dir is Direction.East or Direction.West 
-			? u.Dimensions 
-			: new Vector2I(u.Dimensions.Y, u.Dimensions.X);
-		for (int y = 0; y < limVec.Y; ++y)
-		{
-			for (int x = 0; x < limVec.X; ++x)
-			{
-				DeleteTile(u.GLocation + new Vector2I(x, y));
-			}
-		}
 	}
 
 	#endregion
