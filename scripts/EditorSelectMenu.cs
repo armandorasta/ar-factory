@@ -3,29 +3,32 @@ using System;
 
 namespace ArFactory;
 
-public partial class EditorSelectMenu : Control
+public partial class EditorSelectMenu : Godot.Control
 {
 	const string LevelsFolderPath = "res://Levels/";
 
-	public Button BackButt;
-	public Button AddButt;
+	public Godot.Button BackButt => m_BackButt!;
+	public Godot.Button AddButt => m_AddButt!;
+
+	private Godot.Button? m_BackButt;
+	private Godot.Button? m_AddButt;
 
 	public override void _Ready()
 	{
-		BackButt = GetNode<Button>("Panel/VBoxContainer/MarginContainer/HBoxContainer/BackButt");
-		AddButt = GetNode<Button>("Panel/VBoxContainer/MarginContainer/HBoxContainer/AddButt");
+		m_BackButt = GetNode<Godot.Button>("Panel/VBoxContainer/MarginContainer/HBoxContainer/BackButt");
+		m_AddButt = GetNode<Godot.Button>("Panel/VBoxContainer/MarginContainer/HBoxContainer/AddButt");
 
-		BackButt.Connect(Button.SignalName.Pressed, Callable.From(OnBackButt_Pressed));
-		AddButt.Connect(Button.SignalName.Pressed, Callable.From(OnAddButt_Pressed));
+		m_BackButt.Pressed += OnBackButt_Pressed;
+		m_AddButt.Pressed += OnAddButt_Pressed;
 	}
 
 	private void OnBackButt_Pressed()
 	{
-		GetTree().ChangeSceneToFile("res://scenes/main_menu.tscn");
+		SceneManager.MoveToMainMenu(GetTree());
 	}
 
 	private void OnAddButt_Pressed()
 	{
-		GetTree().ChangeSceneToFile("res://scenes/level.tscn");
+		SceneManager.MoveToLevel(GetTree());
 	}
 }

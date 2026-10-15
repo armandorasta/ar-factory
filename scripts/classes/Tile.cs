@@ -59,7 +59,7 @@ public class Tile
 	/// <summary>
 	/// Use this if the tile is floating, otherwise use <see cref="WorldPanel.MoveTile"/> instead.
 	/// </summary>
-	public void SetGridLocUnsafe(Vector2I gloc) { m_GL = gloc; }
+	public void _SetGLUnsafe(Vector2I gloc) { m_GL = gloc; }
 
 	/// <summary>
 	/// Returns true if the item can slide into through the edge facing <paramref name="wallDir"/>.
@@ -188,7 +188,7 @@ public class Tile
 	/// Only works with extracted tiles in debug, use <see cref="WorldPanel.SpawnItem"/> or
 	/// <see cref="WorldPanel.InstallItem"/>.<br/>
 	/// </summary>
-	public void SetItemUnsafe(Item newItem, bool bOverride = false)
+	public void _SetItemUnsafe(Item newItem, bool bOverride = false)
 	{
 		Debug.AssertEq(newItem.GetParent(), null, "Use 'WorldPanel.SpawnItem' or 'WorldPanel.InstallItem'");
 		Debug.Assert(!ReferenceEquals(newItem.ParentTile, this), 
@@ -206,7 +206,7 @@ public class Tile
 	/// <see langword="true"/> if there was an item and it was destroyed, 
 	/// <see langword="false"/> if the tile was empty in the first place.
 	/// </returns>
-	public bool DestroyItem(bool bMaybeNull = false)
+	public void DestroyItem(bool bMaybeNull = false)
 	{
 		Debug.Assert(bMaybeNull || HasItem());
 		if (m_Item is not null)
@@ -214,9 +214,7 @@ public class Tile
 			m_Item.QueueFree();
 			m_Item.GetParent().RemoveChild(m_Item);
 			m_Item = null;
-			return true;
 		}
-		else return false;
 	}
 
 	/// <summary>
@@ -225,11 +223,13 @@ public class Tile
 	public Item? ExtractItem(bool bMaybeNull = false)
 	{
 		Debug.Assert(bMaybeNull || HasItem());
-		var extractedIt = m_Item;
-		m_Item = null;
-		m_bReserved = false;
-		// Parents might be null if the user carelessly uses SetItemUnsafe directly.
-		extractedIt?.GetParent().RemoveChild(extractedIt);
+		var extractedIt = m_Item!;
+		if (extractedIt is not null)
+		{
+			extractedIt.GetParent().RemoveChild(extractedIt);
+			extractedIt.OnExtractItem();
+			m_Item = null; // Has to happen after the above call.
+		}
 		return extractedIt;
 	}
 

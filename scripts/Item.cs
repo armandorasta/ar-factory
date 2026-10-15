@@ -22,7 +22,7 @@ public partial class Item : Node2D
 	/// <summary>
 	/// Crashes the program when the tile is floating!
 	/// </summary>
-	public Vector2I GridLoc
+	public Vector2I GLocation
 	{
 		get
 		{
@@ -90,6 +90,19 @@ public partial class Item : Node2D
 	}
 
 	/// <summary>
+	/// Use <see cref="Tile.ExtractItem"/> instead.
+	/// </summary>
+	internal void OnExtractItem()
+	{
+		Debug.AssertNotNull(m_ParentTile);
+		Debug.Assert(m_ParentTile!.HasItem());
+		Debug.AssertRefEq(m_ParentTile.Item, this);
+		Debug.Assert(GetParent() is null);
+		Debug.AssertNotNull(m_ParentTile);
+		m_ParentTile = null;
+	}
+
+	/// <summary>
 	/// This function obviously crashes the program if the item is floating.
 	/// Syncs it's actual position on the grid with it's grid location.
 	/// <b>This function sets the position attribute, so ovoid using it in a loop.</b>
@@ -129,7 +142,7 @@ public partial class Item : Node2D
 	public override string ToString()
 	{
 		var bui = new StringBuilder($"Item[{m_Value} ");
-		bui.Append(m_ParentTile is null? "(floating)" : $"at {GridLoc}");
+		bui.Append(m_ParentTile is null? "(floating)" : $"at {GLocation}");
 		if (IsMidAnimation()) bui.Append(", anim");
 		if (!IsAllowedToMove()) bui.Append(", stuck");
 		return bui.Append(']').ToString();

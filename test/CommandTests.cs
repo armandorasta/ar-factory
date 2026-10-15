@@ -11,7 +11,7 @@ public class CommandTests : ArTest.TestSuit
 
 	public override void BeforeAll()
 	{
-		var levelScene = GD.Load<PackedScene>("res://scenes/level.tscn");
+		var levelScene = GD.Load<Godot.PackedScene>(SceneManager.LevelScenePath);
 		m_Lv = levelScene.Instantiate<Level>();
 		AddNode(Lvl);
 		Lvl.SetTickRate(100);

@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://klsj0xfb4qp2"]
 
-[ext_resource type="Script" uid="uid://b4jpngaeplurr" path="res://scripts/Level.cs" id="1_mx8sn"]
-[ext_resource type="Script" uid="uid://b32qsjvwapht7" path="res://scripts/WorldPanel.cs" id="2_mx8sn"]
-[ext_resource type="Script" uid="uid://dli18m8xc1m77" path="res://scripts/Cam.cs" id="3_mx8sn"]
+[ext_resource type="Script" uid="uid://b4jpngaeplurr" path="res://scripts/Level.cs" id="1_6vs76"]
+[ext_resource type="Script" uid="uid://b32qsjvwapht7" path="res://scripts/WorldPanel.cs" id="2_kl8ac"]
+[ext_resource type="Script" uid="uid://dli18m8xc1m77" path="res://scripts/Cam.cs" id="3_qifjx"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0wfyh"]
 bg_color = Color(0.23046875, 0.23046875, 0.23046875, 1)
@@ -44,16 +44,17 @@ keycode = 4194341
 events = [SubResource("InputEventKey_ppgk2")]
 
 [node name="Level" type="Node2D" unique_id=1731236255]
-script = ExtResource("1_mx8sn")
+script = ExtResource("1_6vs76")
 
 [node name="WorldPanel" type="Panel" parent="." unique_id=1258821105]
 offset_right = 1200.0
 offset_bottom = 720.0
-script = ExtResource("2_mx8sn")
+mouse_filter = 1
+script = ExtResource("2_kl8ac")
 
 [node name="Cam" type="Camera2D" parent="WorldPanel" unique_id=330737528]
 position = Vector2(530, 248)
-script = ExtResource("3_mx8sn")
+script = ExtResource("3_qifjx")
 
 [node name="HUDLayer" type="CanvasLayer" parent="WorldPanel" unique_id=1773833209]
 

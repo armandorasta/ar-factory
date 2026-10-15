@@ -36,8 +36,7 @@ public partial class UNSupplier : Unit
 			return;
 		}
 
-		Vector2I destLoc = Output.GLocation + Dir.ToGrid();
-		if (World.HasTile(destLoc))
+		if (World.HasTile(Output.GLocation + Dir.ToGrid()))
 		{
 			pender.Pend([
 				[ new CmdVacate([Output]) ],
@@ -45,14 +44,6 @@ public partial class UNSupplier : Unit
 				[ new CmdSlide(Output, Dir) ],
 			]);
 		}
-		else
-		{
-			pender.Pend([
-				[ new CmdVacate([Output]) ],
-				[ new CmdSpawn(Output, PopNextValue()) ],
-			]);
-		}
-		
 	}
 
 	public bool IsDoneWithInputSeq() => m_Index >= m_Sequence!.Length - 1;

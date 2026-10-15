@@ -232,7 +232,7 @@ public partial class TestHandler : Godot.Node
 					GD.Print($"    {FormatTestName(tmeth)} {Green}passes!{Reset}");
 				}
 			}
-			catch (Exception ex)
+			catch (TargetInvocationException ex)
 			{
 				if (bPrintClassIntro)
 				{
@@ -241,19 +241,24 @@ public partial class TestHandler : Godot.Node
 					bPrintClassIntro = false;
 				}
 
-				if (ex is TestAssertFailedException)
+				if (ex.InnerException is TestAssertFailedException)
 				{
-					GD.Print(ex.Message.Indent(sc_IndentationStr));
+					GD.Print(ex.InnerException.Message.Indent(sc_IndentationStr));
 				}
 				else
 				{
 					var errMsg = $"{FormatTestName(tmeth)} {Red}failed{Reset}" + 
-						$" because of Unexpected {Red}'{ex.GetType()}'{Reset}:\n{ex.Message}";
+						$" because of Unexpected {Red}'{ex.InnerException!.GetType()}'{Reset}:\n" +
+						$"{ex.InnerException.Message}";
 					GD.Print(errMsg.Indent(sc_IndentationStr));
-					GD.Print(ex.StackTrace);
+					GD.Print(ex.InnerException.StackTrace);
 				}
 
 				bSkipFromNowOn = IsStopOnFirstFail;
+			}
+			catch (Exception)
+			{
+				throw new InvalidProgramException("WTF??");
 			}
 		}
 		tclass.GetMethod("AfterAll")?.Invoke(instance, []);

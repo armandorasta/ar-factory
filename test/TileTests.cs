@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-using System.Security.Cryptography;
 using Godot;
 
 namespace ArFactory.Tests;
@@ -12,7 +10,7 @@ public class TileTests : ArTest.TestSuit
 
 	public override void BeforeAll()
 	{
-		var levelScene = GD.Load<PackedScene>("res://scenes/level.tscn");
+		var levelScene = GD.Load<Godot.PackedScene>(SceneManager.LevelScenePath);
 		m_Lv = levelScene.Instantiate<Level>();
 		AddNode(Lvl);
 		Lvl.SetTickRate(50);
@@ -56,9 +54,9 @@ public class TileTests : ArTest.TestSuit
 
 		tl.MakeSolid(Direction.West);
 		AssertTrue(tl.IsSolid(Direction.West));
-		tl.MakeInput(Direction.West);
+		tl.MakeInput(Direction.West, true);
 		AssertTrue(tl.IsInput(Direction.West));
-		tl.MakeOutput(Direction.West);
+		tl.MakeOutput(Direction.West, true);
 		AssertTrue(tl.IsOutput(Direction.West));
 		tl.ClearWall(Direction.West);
 		AssertTrue(tl.IsClear(Direction.West));
@@ -81,11 +79,21 @@ public class TileTests : ArTest.TestSuit
 		AssertTrue(tl.IsInput(Direction.South));
 		AssertTrue(tl.IsClear(Direction.West));
 
-		tl.MakeSolid(Direction.West);
+		tl.MakeSolid(Direction.West, true);
 		AssertTrue(tl.IsSolid(Direction.North));
 		AssertTrue(tl.IsOutput(Direction.East));
 		AssertTrue(tl.IsInput(Direction.South));
 		AssertTrue(tl.IsSolid(Direction.West));
+	}
+
+	[ArTest.Test] public void Test_SetWall_and_GetWall_INVALID_CASE_overriding_without_flag()
+	{
+		var tl = Lvl.World.InstallEmptyTile(Vector2I.Zero);
+		tl.MakeOutput(Direction.North);
+		tl.ClearWall(Direction.North);
+		tl.MakeOutput(Direction.North); // Should work still
+		AssertTrue(tl.IsOutput(Direction.North));
+		AssertThrow(() => tl.MakeOutput(Direction.North)); // Flag required
 	}
 
 	[ArTest.Test] public void TestRotation()
@@ -93,7 +101,7 @@ public class TileTests : ArTest.TestSuit
 		var world = Lvl.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
 		tl.MakeSolid(Direction.North).MakeInput(Direction.East).MakeOutput(Direction.South);
-		
+
 		tl.Rotate90();
 		AssertTrue(tl.IsClear(Direction.North));
 		AssertTrue(tl.IsSolid(Direction.East));
@@ -114,7 +122,7 @@ public class TileTests : ArTest.TestSuit
 		AssertTrue(tl.IsInput(Direction.East));
 		AssertTrue(tl.IsOutput(Direction.South));
 		AssertTrue(tl.IsClear(Direction.West));
-	
+
 		tl.Rotate180();
 		AssertTrue(tl.IsOutput(Direction.North));
 		AssertTrue(tl.IsClear(Direction.East));
@@ -126,7 +134,7 @@ public class TileTests : ArTest.TestSuit
 		AssertTrue(tl.IsOutput(Direction.South));
 		AssertTrue(tl.IsClear(Direction.West));
 
-		
+
 		tl.Rotate270();
 		AssertTrue(tl.IsInput(Direction.North));
 		AssertTrue(tl.IsOutput(Direction.East));
@@ -154,13 +162,13 @@ public class TileTests : ArTest.TestSuit
 		var tl = Lvl.World.InstallEmptyTile(Vector2I.Zero);
 		tl.MakeSolid(Direction.North);
 		AssertFalse(tl.CanItemEnter(Direction.North));
-		
+
 		tl.MakeOutput(Direction.East);
 		AssertFalse(tl.CanItemEnter(Direction.East));
-		
+
 		tl.MakeInput(Direction.South);
 		AssertTrue(tl.CanItemEnter(Direction.South));
-		
+
 		tl.ClearWall(Direction.West);
 		AssertTrue(tl.CanItemEnter(Direction.West));
 
@@ -193,25 +201,33 @@ public class TileTests : ArTest.TestSuit
 		AssertTrue(tl.CanItemExit(Direction.West));
 	}
 
-	[ArTest.Test] public void TestDestroyItem()
+	[ArTest.Test] public void TestDestroyItem_vanilla()
 	{
 		var world = Lvl.World;
-		var tl = world.InstallEmptyTile(Vector2I.Zero);		
-		var it = world.SpawnItem(tl, 8)!;
-		AssertNotNull(it);
-		AssertTrue(tl.HasItem());
-		AssertEq(it.Value, 8);
+		var tl = world.InstallEmptyTile(Vector2I.Zero);
 
+		var it = world.SpawnItem(tl, 8)!;
 		tl.DestroyItem();
-		AssertFalse(tl.HasItem());
-		AssertTrue(it.IsQueuedForDeletion());
-		
-		tl.DestroyItem(); // Should just do nothing and not cause any trouble in release.
 		AssertFalse(tl.HasItem());
 		AssertTrue(it.IsQueuedForDeletion());
 	}
 
-	[ArTest.Test] public void TestExtractItem()
+	[ArTest.Test] public void TestDestroyItem_with_no_item_with_flag()
+	{
+		var world = Lvl.World;
+		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		tl.DestroyItem(true); // Should just do nothing and not cause any trouble in release.
+		AssertFalse(tl.HasItem());
+	}
+
+	[ArTest.Test] public void TestDestroyItem_INVALID_CASE_with_no_item_no_flag()
+	{
+		var world = Lvl.World;
+		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		AssertThrow(() => tl.DestroyItem());
+	}
+
+	[ArTest.Test] public void TestExtractItem_vanilla()
 	{
 		var world = Lvl.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
@@ -221,5 +237,22 @@ public class TileTests : ArTest.TestSuit
 		AssertFalse(tl.HasItem());
 		AssertRefEq(spawnedIt, extractedIt);
 		AssertEq(extractedIt.Value, 7);
+	}
+
+	[ArTest.Test] public void TestExtractItem_no_item_with_flag()
+	{
+		var world = Lvl.World;
+		var tl = world.InstallEmptyTile(Vector2I.Zero);
+
+		var extractedIt = tl.ExtractItem(true);
+		AssertNull(extractedIt);
+		AssertFalse(tl.HasItem());
+	}
+
+	[ArTest.Test] public void TestExtractItem_no_item_no_flag()
+	{
+		var world = Lvl.World;
+		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		AssertThrow(() => tl.ExtractItem());
 	}
 }

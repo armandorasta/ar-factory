@@ -4,7 +4,6 @@ using Godot;
 namespace ArFactory.Tests;
 using static ArTest.Asserts;
 
-[ArTest.RunThisOnly]
 public class UnitTests : ArTest.TestSuit
 {
 	private Level Lvl => m_Lv!;
@@ -12,7 +11,7 @@ public class UnitTests : ArTest.TestSuit
 
 	public override void BeforeAll()
 	{
-		var levelScene = GD.Load<PackedScene>("res://scenes/level.tscn");
+		var levelScene = GD.Load<Godot.PackedScene>(SceneManager.LevelScenePath);
 		m_Lv = levelScene.Instantiate<Level>();
 		AddNode(Lvl);
 		Lvl.SetTickRate(100);
@@ -184,7 +183,6 @@ public class UnitTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestSupplier_clogged()
 	{
 		var world = Lvl.World;
-		world.Reset();
 		var supp = world.PlaceSupplier(Vector2I.One, Direction.East, 2, [261, 296]);
 		var injy = world.PlaceInjector();
 		var tlNearby = world.InstallEmptyTile(supp.GLocation + supp.Dir.ToGrid());
@@ -223,6 +221,34 @@ public class UnitTests : ArTest.TestSuit
 			AssertEq(tlFar.Item.Value, 261);
 
 			AssertTrue(supp.IsDoneWithInputSeq());
+		}
+	}
+
+	[ArTest.Test] public async Task TestSupplier_missing_connections()
+	{
+		var world = Lvl.World;
+		var supp = world.PlaceSupplier(Vector2I.One, Direction.East, 2, [854, 743, -374]);
+		var tlSupp = supp.GetTile(Vector2I.Zero);
+
+		using (Lvl.PlaySimulationInDebug())
+		{
+			await Lvl.TickOnceAsync(); // Nothing happens
+			await Lvl.TickOnceAsync(); // Item would slide out if the supplier was connected.
+			await Lvl.TickOnceAsync(); // clogged
+			await Lvl.TickOnceAsync(); // clogged
+			await Lvl.TickOnceAsync(); // clogged
+
+			var tl = world.InstallEmptyTile(tlSupp.GLocation + supp.Dir.ToGrid());
+			await Lvl.TickOnceAsync(); // First item slides out
+			AssertTrue(tl.HasItem());
+			AssertEq(tl.Item.Value, 854);
+			await Lvl.EndTickAsync();
+			world.DeleteTile(tl.GLocation);
+
+			await Lvl.TickOnceAsync(); // Next item would slide out if I didn't delete the tile.
+			await Lvl.TickOnceAsync(); // clogged
+			await Lvl.TickOnceAsync(); // clogged
+			await Lvl.TickOnceAsync(); // clogged
 		}
 	}
 
@@ -409,6 +435,33 @@ public class UnitTests : ArTest.TestSuit
 			await Lvl.TickOnceAsync(); // Updated item pops out.
 			AssertTrue(tlOut.HasItem());
 			AssertEq(tlOut.Item.Value, 402 + 1);
+		}
+	}
+
+	[ArTest.Test] public async Task TestUpdater_clogged()
+	{
+		var world = Lvl.World;
+		var upd = world.PlaceUpdater(new Vector2I(3, 4), Direction.East, 2, UNUpdater.UpdateType.Increment);
+		var injy = world.PlaceInjector();
+		var tlIn = world.InstallEmptyTile(upd.Output.GLocation + upd.Dir.Invert().ToGrid());
+
+		using (Lvl.PlaySimulationInDebug())
+		{
+			world.SpawnItem(tlIn, 142);
+			injy.PendFullSequence([[ new CmdSlide(tlIn, upd.Dir) ]]);
+			
+			await Lvl.TickOnceAsync(); // Slides in and updater starts counting ticks.
+			await Lvl.TickOnceAsync(); // 1
+			await Lvl.TickOnceAsync(); // 2, would slide out if there was a way.
+			await Lvl.TickOnceAsync(); // Clogged
+			await Lvl.TickOnceAsync(); // Clogged
+			await Lvl.TickOnceAsync(); // Clogged
+
+			var tlOut = world.InstallEmptyTile(upd.Output.GLocation + upd.Dir.ToGrid());
+			await Lvl.TickOnceAsync(); // Item slides out updated
+			AssertTrue(tlOut.HasItem());
+			AssertTrue(tlOut.Item.IsMidAnimation());
+			AssertEq(tlOut.Item.Value, 142 + 1);
 		}
 	}
 

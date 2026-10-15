@@ -16,10 +16,11 @@ public class CmdKill(Vector2I gloc) : Command(1)
 	{
 		Debug.Assert(HasTileWithItemNotMidAnim(lv.World, GLocation));
 		Tile tl = lv.World.GetTileNonNull(GLocation);
-		if (tl.Item.IsMidAnimation() || !tl.DestroyItem())
+		if (tl.Item.IsMidAnimation())
 		{
 			throw new InvalidProgramException();	
 		}
+		tl.DestroyItem();
 	}
 
 	public override string ToString()

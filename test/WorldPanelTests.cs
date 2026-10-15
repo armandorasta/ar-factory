@@ -11,7 +11,7 @@ public class WorldPanelTests : ArTest.TestSuit
 
 	public override void BeforeAll()
 	{
-		var levelScene = GD.Load<PackedScene>("res://scenes/level.tscn");
+		var levelScene = GD.Load<Godot.PackedScene>(SceneManager.LevelScenePath);
 		m_Lv = levelScene.Instantiate<Level>();
 		AddNode(m_Lv);
 		m_Lv.SetTickRate(100);
@@ -34,7 +34,7 @@ public class WorldPanelTests : ArTest.TestSuit
 		RemoveNode(Lvl);
 	}
 
-	[ArTest.Test] public void TestInstallTile()
+	[ArTest.Test] public void TestInstallTile_vanilla()
 	{
 		var world = Lvl.World;
 		AssertFalse(world.HasTile(Vector2I.One));
@@ -46,16 +46,32 @@ public class WorldPanelTests : ArTest.TestSuit
 		AssertRefEq(world[1, 1], tl);
 		AssertEq(tl.GLocation, Vector2I.One);
 		AssertTrue(world.HasTile(Vector2I.One));
-
-		var newTl = world.InstallTile(new Tile(), Vector2I.One); // Should override the old one.
+	}
+	
+	[ArTest.Test] public void TestInstallTile_overriding_with_flag()
+	{
+		var world = Lvl.World;
+		var tl = world.InstallEmptyTile(Vector2I.One);
+		var newTl = world.InstallEmptyTile(Vector2I.One, true); // Should override the old one.
 		AssertRefNotEq(tl, newTl);
 		AssertRefEq(world[1, 1], newTl);
-
-		// Installing out of bounds will crash the program.
-		AssertThrow(() => world.InstallTile(new Tile(), Vector2I.One * 1000));
 	}
 
-	[ArTest.Test] public void TestDeleteTile()
+	[ArTest.Test] public void TestInstallTile_INVALID_CASE_out_of_bounds()
+	{
+		var world = Lvl.World;
+		// Installing out of bounds will crash the program.
+		AssertThrow(() => world.InstallEmptyTile(Vector2I.One * 1000));
+	}
+
+	[ArTest.Test] public void TestInstallTile_INVALID_CASE_overriding_without_passing_flag()
+	{
+		var world = Lvl.World;
+		world.InstallEmptyTile(Vector2I.One);
+		AssertThrow(() => world.InstallEmptyTile(Vector2I.One));
+	}
+
+	[ArTest.Test] public void TestDeleteTile_vanilla()
 	{
 		// Items will not be tested here, as tile tests don't depend on item tests.
 
@@ -63,15 +79,28 @@ public class WorldPanelTests : ArTest.TestSuit
 		world.InstallEmptyTile(Vector2I.One);
 		world.DeleteTile(Vector2I.One);
 		AssertFalse(world.HasTile(Vector2I.One));
-		AssertNull(world[1, 1]);
+		AssertNull(world.GetTile(Vector2I.One));
+	}
+	
+	[ArTest.Test] public void TestDeleteTile_deleting_nothing_with_flag()
+	{
+		var world = Lvl.World;
+		world.DeleteTile(Vector2I.One, true); // Should just do nothing.
+	}
 
-		world.DeleteTile(Vector2I.One); // Should just do nothing
+	[ArTest.Test] public void TestDeleteTile_INVALID_CASE_deleting_nothing_without_flag()
+	{
+		var world = Lvl.World;
+		AssertThrow(() => world.DeleteTile(Vector2I.One));
+	}
 
-		// Deleting out of bounds will crash the program.
+	[ArTest.Test] public void TestDeleteTile_INVALID_CASE_deleting_out_of_bounds()
+	{
+		var world = Lvl.World;
 		AssertThrow(() => world.DeleteTile(Vector2I.One * 1000));
 	}
 
-	[ArTest.Test] public void TestMoveTile()
+	[ArTest.Test] public void TestMoveTile_vanilla()
 	{
 		var world = Lvl.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
@@ -80,32 +109,50 @@ public class WorldPanelTests : ArTest.TestSuit
 		AssertFalse(world.HasTile(Vector2I.Zero));
 		AssertTrue(world.HasTile(Vector2I.One));
 		AssertEq(tl.GLocation, Vector2I.One);
+	}
 
-		// Moving from and/or to out of bounds crashes the program
+	[ArTest.Test] public void TestMoveTile_INVALID_CASE_from_to_out_of_bounds()
+	{
+		var world = Lvl.World;
 		AssertThrow(() => world.MoveTile(Vector2I.One * 1000, Vector2I.One * 1001));
 	}
 
-	[ArTest.Test] public void TestExtractTile()
+	[ArTest.Test] public void TestExtractTile_vanilla()
 	{
 		var world = Lvl.World;
-		var installedTl = world.InstallEmptyTile(new(3, 4));
+		var installedTl = world.InstallEmptyTile(new Vector2I(3, 4));
 		var extractedTl = world.ExtractTile(installedTl.GLocation);
 		AssertRefEq(installedTl, extractedTl);
 		AssertFalse(world.HasTile(installedTl.GLocation));
+	}
 
-		extractedTl!.SetGridLocUnsafe(Vector2I.Zero); // Should be ignored and overriden.
-		var anotherTl = world.InstallTile(extractedTl, new(1, 2));
-		AssertTrue(world.HasTile(new(1, 2)));
-		AssertFalse(world.HasTile(new(3, 4))); // Ignore the tile's grid-loc
+	[ArTest.Test] public void TestExtractTile_floating_tile_gloc()
+	{
+		var world = Lvl.World;
+		var installedTl = world.InstallEmptyTile(new Vector2I(3, 4));
+		var extractedTl = world.ExtractTile(installedTl.GLocation)!;
+
+		extractedTl!._SetGLUnsafe(Vector2I.Zero); // Should be ignored and overriden.
+		var anotherTl = world.InstallTile(extractedTl, new Vector2I(1, 2));
+		AssertTrue(world.HasTile(new Vector2I(1, 2)));
+		AssertFalse(world.HasTile(new Vector2I(3, 4))); // Ignore the tile's grid-loc
 		AssertRefEq(anotherTl, extractedTl);
-
 		world.DeleteTile(anotherTl);
+	}
 
-		// Must pass bMaybeNull in debug.
-		AssertNull(world.ExtractTile(Vector2I.Zero));
-		AssertNull(world.ExtractTile(Vector2I.Zero));
+	[ArTest.Test] public void TestExtractTile_extracting_null_tile_with_flag()
+	{
+		var world = Lvl.World;
+		AssertNull(world.ExtractTile(Vector2I.Zero, true));
+		AssertNull(world.ExtractTile(Vector2I.Zero, true));
 
 		// Extracting out of bounds will crash the program.
+		AssertThrow(() => world.ExtractTile(Vector2I.One * 1000));
+	}
+
+	[ArTest.Test] public void TestExtractTile_INVALID_CASE_extracting_null_tile_without_flag()
+	{
+		var world = Lvl.World;
 		AssertThrow(() => world.ExtractTile(Vector2I.One * 1000));
 	}
 
@@ -119,7 +166,7 @@ public class WorldPanelTests : ArTest.TestSuit
 		AssertTrue(world.IsInstalled(tl));
 	}
 
-	[ArTest.Test] public void TestSpawnItem()
+	[ArTest.Test] public void TestSpawnItem_vanilla()
 	{
 		var world = Lvl.World;
 		var tl = world.InstallEmptyTile(Vector2I.Zero);
@@ -130,19 +177,32 @@ public class WorldPanelTests : ArTest.TestSuit
 		AssertRefEq(it, tl.Item);
 		AssertTrue(tl.HasItem());
 		AssertEq(tl.Item.Value, 7);
-		
-		AssertNull(world.SpawnItem(tl, 8)); // Should just give up in release.
-		AssertRefEq(it, tl.Item);
-		AssertEq(tl.Item.Value, 7);
-
-		world.DeleteTile(tl);
-		AssertTrue(it.IsQueuedForDeletion());
-
-		// Spawning out of bounds crashes the program
-		AssertThrow(() => world.SpawnItem(Vector2I.One * 1000, -1));
 	}
 
-	[ArTest.Test] public void TestInstallItem()
+	[ArTest.Test] public void TestSpawnItem_Deleting_a_tile_with_an_item_in_it()
+	{
+		var world = Lvl.World;
+		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		var it = world.SpawnItem(tl, 7)!;
+		world.DeleteTile(tl);
+		AssertTrue(it.IsQueuedForDeletion());
+	}
+	
+	[ArTest.Test] public void TestSpawnItem_INVALID_CASE_on_top_of_another_item()
+	{
+		var world = Lvl.World;
+		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		var it = world.SpawnItem(tl, 7)!;
+		AssertThrow(() => world.SpawnItem(tl, 8));
+	}
+
+	[ArTest.Test] public void TestSpawnItem_INVALID_CASE_out_of_bounds()
+	{
+		var world = Lvl.World;
+		AssertThrow(() => world.SpawnItem(Vector2I.One * 1000, -174));
+	}
+
+	[ArTest.Test] public void TestInstallItem_vanilla()
 	{
 		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
@@ -155,22 +215,31 @@ public class WorldPanelTests : ArTest.TestSuit
 		AssertRefEq(tl1.Item, installedIt);
 		AssertEq(installedIt!.Value, 7);
 		AssertFalse(tl0.HasItem());
+	}
 
-		// Installing null crashes the program.
-		// Though for now installing null in a non-existant tile just does nothing...
-		Item? some = null; // For the wrarning to disappear
-		AssertThrow(() => world.InstallItem(some!, tl0), typeof(NullReferenceException));
+	[ArTest.Test] public void TestInstallItem_INVALID_CASE_non_existant_tile()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl1 = world.InstallEmptyTile(Vector2I.One);
 
+		world.SpawnItem(tl1, 901);
 		var it1 = AddNode(tl1.ExtractItem()!);
+		AssertThrow(() => world.InstallItem(it1, new Vector2I(2, 3)));
+	}
+
+	[ArTest.Test] public void TestInstallItem_INVALID_CASE_out_of_bounds()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl1 = world.InstallEmptyTile(Vector2I.One);
 		
-		// Installing into a non-exitant IN-BOUNDS tile => noop
-		AssertNull(world.InstallItem(it1, new Vector2I(1, 0)));
-		
-		// Installing out of bounds crashes the program
+		world.SpawnItem(tl1, 577);
+		var it1 = AddNode(tl1.ExtractItem()!);
 		AssertThrow(() => world.InstallItem(it1, Vector2I.One * 1000));
 	}
 
-	[ArTest.Test] public void TestCloneItem()
+	[ArTest.Test] public void TestCloneItem_vanilla()
 	{
 		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(new(1, 2));
@@ -178,106 +247,170 @@ public class WorldPanelTests : ArTest.TestSuit
 		var it0 = world.SpawnItem(tl0, 5)!;
 		var cloneIt = world.CloneItem(tl0, tl1);
 		AssertTrue(tl0.HasItem());
-		AssertTrue(tl0.IsReserved());
 		AssertTrue(tl1.HasItem());
-		AssertTrue(tl1.IsReserved());
 		AssertRefEq(it0, tl0.Item);
 		AssertRefNotEq(it0, cloneIt);
 		AssertRefNotEq(tl1.Item, tl0.Item); // Must not be the same for obvious reasons...
 		AssertEq(tl1.Item.Value, tl0.Item.Value);
-
-		// Both have items, should just override the destination (requires bOverride in debug).
-		tl0.Item.SetValue(6); // Both items had the same value...
-		AssertNotEq(tl0.Item.Value, tl1.Item.Value);
-		cloneIt = world.CloneItem(tl0, tl1);
-		AssertTrue(tl0.HasItem());
-		AssertTrue(tl0.IsReserved());
-		AssertTrue(tl1.HasItem());
-		AssertTrue(tl1.IsReserved());
-		AssertRefEq(cloneIt, tl1.Item);
-		AssertRefNotEq(tl0.Item, tl1.Item);
-		AssertEq(tl1.Item.Value, tl0.Item.Value);
-		AssertEq(tl1.Item.Value, 6);
-
-		// Clone null into a tile with an item, should just do nothing.
-		tl0.DestroyItem();
-		cloneIt = world.CloneItem(tl0, tl1);
-		AssertNull(cloneIt);
-		AssertFalse(tl0.HasItem());
-		AssertFalse(tl0.IsReserved());
-		AssertTrue(tl1.HasItem());
-		AssertTrue(tl1.IsReserved());
-		AssertEq(tl1.Item.Value, 6);
-
-		// Cloning null into null, should just do nothing.
-		tl1.DestroyItem();
-		cloneIt = world.CloneItem(tl0, tl1);
-		AssertNull(cloneIt);
-		AssertFalse(tl0.HasItem());
-		AssertFalse(tl0.IsReserved());
-		AssertFalse(tl1.HasItem());
-		AssertFalse(tl1.IsReserved());
-
-		// To out of bounds => crash
-		AssertThrow(() => world.CloneItem(it0.GridLoc, Vector2I.One * 1000));
-
-		// From out of bounds => crash
-		AssertThrow(() => world.CloneItem(Vector2I.One * 1000, it0.GridLoc));
-
-		// When both are the same a crash is not required for now, that would require extra checks...
 	}
 
-	[ArTest.Test] public void TestTeleportItem()
+	[ArTest.Test] public void TestCloneItem_overriding_with_flag()
 	{
 		var world = Lvl.World;
 		var tl0 = world.InstallEmptyTile(new(1, 2));
 		var tl1 = world.InstallEmptyTile(new(3, 4));
-		var it0 = world.SpawnItem(tl0, 50)!;
+		var it0 = world.SpawnItem(tl0, 5)!;
+		var cloneIt = world.CloneItem(tl0, tl1)!;
+		tl0.Item.SetValue(6); // Both items had the same value...
+		AssertNotEq(tl0.Item.Value, tl1.Item.Value);
+		cloneIt = world.CloneItem(tl0, tl1, true);
+		AssertTrue(tl0.HasItem());
+		AssertTrue(tl1.HasItem());
+		AssertRefEq(cloneIt, tl1.Item);
+		AssertRefNotEq(tl0.Item, tl1.Item);
+		AssertEq(tl1.Item.Value, tl0.Item.Value);
+		AssertEq(tl1.Item.Value, 6);
+	}
+
+	[ArTest.Test] public void TestCloneItem_INVALID_CASE_cloning_null()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var tl1 = world.InstallEmptyTile(new(3, 4));
+		AssertThrow(() => world.CloneItem(tl0, tl1));
+	}
+
+	[ArTest.Test] public void TestCloneItem_INVALID_CASE_cloning_null_into_item()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var tl1 = world.InstallEmptyTile(new(3, 4));
+		world.SpawnItem(tl1, 235);
+		AssertThrow(() => world.CloneItem(tl0, tl1));
+	}
+
+	[ArTest.Test] public void TestCloneItem_INVALID_CASE_from_non_existant_tile()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var tl1 = world.InstallEmptyTile(new(3, 4));
+		var it0 = world.SpawnItem(tl0, 5)!;
+
+		AssertThrow(() => world.CloneItem(Vector2I.Zero, tl1.GLocation));
+	}
+
+	[ArTest.Test] public void TestCloneItem_INVALID_CASE_to_non_existant_tile()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(new(1, 2));
+		AssertThrow(() => world.CloneItem(tl0.GLocation, Vector2I.Zero));
+	}
+
+	[ArTest.Test] public void TestCloneItem_INVALID_CASE_from_out_of_bounds()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(new(1, 2));
+		AssertThrow(() => world.CloneItem(Vector2I.One * 1000, tl0.GLocation));
+	}
+
+	[ArTest.Test] public void TestCloneItem_INVALID_CASE_to_out_of_bounds()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var it0 = world.SpawnItem(tl0, 5)!;
+		AssertThrow(() => world.CloneItem(it0.GLocation, Vector2I.One * 1000));
+	}
+
+	[ArTest.Test] public void TestCloneItem_INVALID_CASE_into_self()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var it0 = world.SpawnItem(tl0, 5)!;
+		AssertThrow(() => world.CloneItem(tl0, tl0));
+	}
+
+	[ArTest.Test] public void TestTelportItem_vanilla()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var tl1 = world.InstallEmptyTile(new(3, 4));
+		var it0 = world.SpawnItem(tl0, 5)!;
 		var teleIt = world.TeleportItem(tl0, tl1);
-		AssertRefEq(it0, teleIt);
+		AssertFalse(tl0.HasItem());
+		AssertTrue(tl1.HasItem());
 		AssertRefEq(it0, tl1.Item);
-		AssertFalse(tl0.HasItem());
-		AssertFalse(tl0.IsReserved());
-		AssertTrue(tl1.HasItem());
-		AssertTrue(tl1.IsReserved());
-		AssertEq(tl1.Item.Value, 50);
-
-		// Both have items, should just override the destination (requires bOverride in debug).
-		it0 = world.SpawnItem(tl0, 85)!;
-		teleIt = world.TeleportItem(tl0, tl1);
 		AssertRefEq(it0, teleIt);
+	}
+
+	[ArTest.Test] public void TestTeleportItem_overriding_with_flag()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var tl1 = world.InstallEmptyTile(new(3, 4));
+		var it0 = world.SpawnItem(tl0, 5)!;
+		world.SpawnItem(tl1, 2);
+		var teleIt = world.TeleportItem(tl0, tl1, true);
+		AssertFalse(tl0.HasItem());
+		AssertTrue(tl1.HasItem());
 		AssertRefEq(it0, tl1.Item);
-		AssertEq(tl1.Item.Value, 85);
-		AssertFalse(tl0.HasItem());
-		AssertFalse(tl0.IsReserved());
-		AssertTrue(tl1.HasItem());
-		AssertTrue(tl1.IsReserved());
+		AssertRefEq(it0, teleIt);
+	}
 
-		// Teleport null into a tile with an item, should just do nothing.
-		teleIt = world.TeleportItem(tl0, tl1);
-		AssertNull(teleIt);
-		AssertEq(tl1.Item.Value, 85);
-		AssertFalse(tl0.HasItem());
-		AssertFalse(tl0.IsReserved());
-		AssertTrue(tl1.HasItem());
-		AssertTrue(tl1.IsReserved());
+	[ArTest.Test] public void TestTeleportItem_into_self()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var it0 = world.SpawnItem(tl0, 5)!;
+		world.TeleportItem(tl0, tl0);
+		AssertTrue(tl0.HasItem());
+		AssertRefEq(it0, tl0.Item);
+	}
 
-		// Cloning null into null, should just do nothing.
-		tl1.DestroyItem();
-		teleIt = world.TeleportItem(tl0, tl1);
-		AssertNull(teleIt);
-		AssertFalse(tl0.HasItem());
-		AssertFalse(tl0.IsReserved());
-		AssertFalse(tl0.HasItem());
-		AssertFalse(tl1.IsReserved());
+	[ArTest.Test] public void TestTeleportItem_INVALID_CASE_teleporting_null()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var tl1 = world.InstallEmptyTile(new(3, 4));
+		AssertThrow(() => world.TeleportItem(tl0, tl1));
+	}
 
-		// To out of bounds => crash
-		AssertThrow(() => world.TeleportItem(it0.GridLoc, Vector2I.One * 1000));
+	[ArTest.Test] public void TestTeleportItem_INVALID_CASE_null_into_item()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var tl1 = world.InstallEmptyTile(new(3, 4));
+		world.SpawnItem(tl1, 235);
+		AssertThrow(() => world.TeleportItem(tl0, tl1));
+	}
 
-		// From out of bounds => crash
-		AssertThrow(() => world.TeleportItem(Vector2I.One * 1000, it0.GridLoc));
+	[ArTest.Test] public void TestTeleportItem_INVALID_CASE_from_non_existant_tile()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(new(1, 2));
+		AssertThrow(() => world.TeleportItem(Vector2I.Zero, tl0.GLocation));
+	}
 
-		// When both are the same a crash is not required for now, that would require extra checks...
+	[ArTest.Test] public void TestTeleportItem_INVALID_CASE_to_non_existant_tile()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var it0 = world.SpawnItem(tl0, 5)!;
+		AssertThrow(() => world.CloneItem(tl0.GLocation, Vector2I.Zero));
+	}
+
+	[ArTest.Test] public void TestTeleportItem_INVALID_CASE_from_out_of_bounds()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(new(1, 2));
+		AssertThrow(() => world.CloneItem(Vector2I.One * 1000, tl0.GLocation));
+	}
+
+	[ArTest.Test] public void TestTeleportItem_INVALID_CASE_to_out_of_bounds()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var it0 = world.SpawnItem(tl0, 5)!;
+		AssertThrow(() => world.CloneItem(it0.GLocation, Vector2I.One * 1000));
 	}
 
 	// [ArTest.RunThisOnly]

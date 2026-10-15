@@ -3,23 +3,26 @@ using System;
 
 namespace ArFactory;
 
-public partial class MainMenu : Control
+public partial class MainMenu : Godot.Control
 {
-	public Button EditButt;
-	public Button PlayButt;
+	public Godot.Button EditButt => m_EditButt!;
+	public Godot.Button PlayButt => m_PlayButt!;
+
+	private Godot.Button? m_EditButt;
+	private Godot.Button? m_PlayButt;
 
 	public override void _Ready()
 	{
-		EditButt = GetNode<Button>("HBoxContainer/MarginContainer/Panel/CenterContainer/VBoxContainer/EditButt");
-		PlayButt = GetNode<Button>("HBoxContainer/MarginContainer/Panel/CenterContainer/VBoxContainer/PlayButt");
+		m_EditButt = GetNode<Godot.Button>("HBoxContainer/MarginContainer/Panel/CenterContainer/VBoxContainer/EditButt");
+		m_PlayButt = GetNode<Godot.Button>("HBoxContainer/MarginContainer/Panel/CenterContainer/VBoxContainer/PlayButt");
 
-		EditButt.Connect(Button.SignalName.Pressed, Callable.From(OnEditButt_Pressed));
-		PlayButt.Connect(Button.SignalName.Pressed, Callable.From(OnPlayButt_Pressed));
+		m_EditButt.Pressed += OnEditButt_Pressed;
+		m_PlayButt.Pressed += OnPlayButt_Pressed;
 	}
 
 	private void OnEditButt_Pressed()
 	{
-		GetTree().ChangeSceneToFile("res://scenes/editor_select_menu.tscn");
+		SceneManager.MoveToEditorSelectMenu(GetTree());
 	}
 
 	private void OnPlayButt_Pressed()

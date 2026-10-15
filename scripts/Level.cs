@@ -18,15 +18,12 @@ public partial class Level : Godot.Node2D
 		}
 	}
 
-	private record struct UnitPlacement(Godot.ButtonGroup ButtGroup, Godot.Button? Butt, Direction Dir);
-	private record ToolBoxButtInfo(Vector2I Dims, Action<Vector2I, Direction> PlacementFunc);
-
 	public const float MinTickRate = 0.1f;
 	public const float MaxTickRate = 1000.0f;
 
 
-	enum PlayMode 
-	{ 
+	private enum PlayMode
+	{
 		Off,
 		Placement,
 		Play,
@@ -51,17 +48,17 @@ public partial class Level : Godot.Node2D
 	public Godot.Label TicksLabel => m_TicksLabel!;
 	public Godot.HSlider SpeedSlider => m_SpeedSlider!;
 	public Godot.Label TickSpeedLabel => m_TickSpeedLabel!;
-
-	public Godot.Camera2D? m_Cam;
-	public WorldPanel? m_World;
-	public Godot.Button? m_PlayButt;
-	public Godot.Button? m_HaltButt;
-	public Godot.Button? m_DebugButt;
-	public Godot.HBoxContainer? m_ToolsHBox;
-	public Godot.HBoxContainer? m_PlayHBox;
-	public Godot.Label? m_TicksLabel;
-	public Godot.HSlider? m_SpeedSlider;
-	public Godot.Label? m_TickSpeedLabel;
+	
+	private Godot.Camera2D? m_Cam;
+	private WorldPanel? m_World;
+	private Godot.Button? m_PlayButt;
+	private Godot.Button? m_HaltButt;
+	private Godot.Button? m_DebugButt;
+	private Godot.HBoxContainer? m_ToolsHBox;
+	private Godot.HBoxContainer? m_PlayHBox;
+	private Godot.Label? m_TicksLabel;
+	private Godot.HSlider? m_SpeedSlider;
+	private Godot.Label? m_TickSpeedLabel;
 
 
 	// Publics
@@ -73,6 +70,13 @@ public partial class Level : Godot.Node2D
 	private Godot.Timer m_TickTimer = new();
 	private int m_TickCount = 0; // Number of ticks since the start.
 	private float m_TickMillis;
+
+	// Editor stuff
+	private record struct UnitPlacement(Godot.ButtonGroup ButtGroup, Godot.Button? Butt, Direction Dir);
+	private record ToolBoxButtInfo(Vector2I Dims, Action<Vector2I, Direction> PlacementFunc);
+
+	public Godot.Label PlacementDirLabel => m_PlacementDirLabel!;
+	private Godot.Label? m_PlacementDirLabel;
 
 	private UnitPlacement m_CurrUnitPlacement = new();
 	private readonly Dictionary<string, ToolBoxButtInfo> m_ToolboxButtInfos = [];
@@ -93,6 +97,7 @@ public partial class Level : Godot.Node2D
 		InitSimButts();
 		InitSimSpeedSlider();
 		InitTools();
+		InitDirPlacementLabel();
 	}
 
 	private void GetAllNodes()
@@ -143,6 +148,13 @@ public partial class Level : Godot.Node2D
 		AddTool("1>2", Vector2I.One, (l, d) => World.PlaceUpdater(l, d, 2, UNUpdater.UpdateType.Double));
 	}
 
+	private void InitDirPlacementLabel()
+	{
+		m_PlacementDirLabel = new Godot.Label();
+		AddChild(PlacementDirLabel);
+		PlacementDirLabel.Hide();
+	}
+
 	private void AddTool(string text, Vector2I dims, Action<Vector2I, Direction> placementFunc)
 	{
 		var butt = new Godot.Button
@@ -159,23 +171,24 @@ public partial class Level : Godot.Node2D
 	#endregion // Init
 
 
-	public override void _Input(InputEvent ev)
+	public override void _UnhandledInput(InputEvent ev)
 	{
 		switch (m_CurrPlayMode) {
 		case PlayMode.Placement:
 		{
 			if (ev is InputEventMouseButton mev)
 			{
-				switch (mev.ButtonIndex) {
-				case MouseButton.Right:
+				if (mev.ButtonIndex == MouseButton.Right)
+				{
 					if (mev.IsPressed())
 					{
 						SetPlayMode(PlayMode.Off);
 						m_CurrUnitPlacement.Butt!.ButtonPressed = false;	
+						PlacementDirLabel.Hide();
 					}
-					break;
-				
-				case MouseButton.Left:
+				}
+				else if (mev.ButtonIndex == MouseButton.Left)
+				{
 					if (mev.IsPressed())
 					{
 						var mousePos = GetLocalMousePosition();
@@ -193,29 +206,26 @@ public partial class Level : Godot.Node2D
 							}
 						}
 					}
-					break;
-				
-				default: break;
+				}
+			}
+			else if (ev is InputEventKey kev)
+			{
+				if (kev.Keycode == Key.E && kev.IsPressed())
+				{
+					m_CurrUnitPlacement.Dir = m_CurrUnitPlacement.Dir.Rotate90();
+					PlacementDirLabel.Text = m_CurrUnitPlacement.Dir.ToString();
 				}
 			}
 			break;
 		}
 		case PlayMode.Off:
 		{
-			if (ev is InputEventMouseButton mev)
+			if (Input.IsMouseButtonPressed(MouseButton.Right) && Input.IsKeyPressed(Key.Ctrl))
 			{
-				switch (mev.ButtonIndex) {
-				case MouseButton.Right:
-					if (!mev.IsReleased() && mev.CtrlPressed)
-					{
-						var mouseGL = World.PosToGrid(GetLocalMousePosition());
-						var u = World.GetUnit(mouseGL);
-						if (u is not null)
-						{
-							World.DeleteUnit(u);	
-						}
-					}
-					break;
+				var mouseGL = World.PosToGrid(GetLocalMousePosition());
+				if (World.GetUnit(mouseGL) is Unit u)
+				{
+					World.DeleteUnit(u);
 				}
 			}
 			break;
@@ -227,14 +237,16 @@ public partial class Level : Godot.Node2D
 		}
 	}
 
-	// Called every frame. 'delta' is the elapsed time since the previous frame.
-
 	public override void _Process(double dt)
 	{
 		switch (m_CurrPlayMode) {
-		case PlayMode.Off: 
+		case PlayMode.Off:
 			break;
 		
+		case PlayMode.Placement:
+			PlacementDirLabel.Position = GetLocalMousePosition() + new Vector2(-50, -50);
+			break;
+
 		case PlayMode.Debug:
 		case PlayMode.Play: 
 			World.DoPerFrame((float)dt, this);
@@ -520,6 +532,9 @@ public partial class Level : Godot.Node2D
 		SetPlayMode(PlayMode.Placement);
 		m_CurrUnitPlacement.Butt = butt;
 		m_CurrUnitPlacement.Dir = Direction.East;
+		
+		PlacementDirLabel.Show();
+		PlacementDirLabel.Text = m_CurrUnitPlacement.Dir.ToString();
 	}
 	
 	#endregion .Signal Handlers
