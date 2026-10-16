@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://klsj0xfb4qp2"]
 
-[ext_resource type="Script" uid="uid://b4jpngaeplurr" path="res://scripts/Level.cs" id="1_6vs76"]
+[ext_resource type="Script" uid="uid://b4jpngaeplurr" path="res://scripts/Editor.cs" id="1_6vs76"]
 [ext_resource type="Script" uid="uid://b32qsjvwapht7" path="res://scripts/WorldPanel.cs" id="2_kl8ac"]
 [ext_resource type="Script" uid="uid://dli18m8xc1m77" path="res://scripts/Cam.cs" id="3_qifjx"]
 

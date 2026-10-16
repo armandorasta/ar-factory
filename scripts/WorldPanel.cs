@@ -8,17 +8,6 @@ namespace ArFactory;
 
 public partial class WorldPanel : Godot.Panel
 {
-	public readonly struct PendProxy(Unit penderUnit, CommandRunner runner)
-	{
-		private readonly CommandRunner m_Runner = runner;
-		private readonly Unit m_PenderUnit = penderUnit;
-
-		public readonly void Pend(IEnumerable<IEnumerable<Command>> groups, int startIndex = 0)
-		{
-			m_Runner.PendFullSequence(m_PenderUnit, groups.Where(g => g.Any(_ => true)), startIndex);
-		}
-	}
-
 	public static readonly Vector2I MinDims = new(3, 3);
 	public static readonly Vector2I MaxDims = new(100, 100);
 
@@ -497,14 +486,14 @@ public partial class WorldPanel : Godot.Panel
 	#endregion // Essential Functions
 	#region .Simulation Related
 
-	public void DoPerFrame(float dt, Level lv)
+	public void DoPerFrame(float dt, Editor lv)
 	{
 		m_Runner.DoPerFrame(dt, lv);
 	}
 
-	public void OnTick(Level lv)
+	public void OnTick(Simulator.OnTickMediator ticker)
 	{
-		Debug.AssertRefEq(lv.World, this);
+		Debug.AssertRefEq(ticker.World, this);
 		foreach (var tl in m_Tiles)
 		{
 			tl?.GetItemMaybeNull()?.ResetMovementFlag();
@@ -524,7 +513,7 @@ public partial class WorldPanel : Godot.Panel
 		m_Runner.OnTick(lv);
 	}
 
-	public void OnEdge(Level lv)
+	public void OnEdge(Editor lv)
 	{
 		m_Runner.OnEdge(lv);
 	}

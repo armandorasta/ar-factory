@@ -12,7 +12,7 @@ public class CmdSlide : Command
 	public Direction Dir { get; private set; }
 	public WeakReference<Item>? TrackedItemRef { get; private set; }
 	
-	private Action<Level>? m_StateFunc;
+	private Action<Simulator.OnTickMediator>? m_StateFunc;
 
 	public CmdSlide(Vector2I gfrom, Direction dir) : base(1, true)
 	{
@@ -56,47 +56,46 @@ public class CmdSlide : Command
 		else return false;
 	}
 
-	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
+	protected override void OnTick(Simulator.OnTickMediator ticker)
 	{
-		m_StateFunc!.Invoke(lv);
+		m_StateFunc!.Invoke(ticker);
 	}
 
-	protected override void DoPerFrame(double dt, Level lv)
+	protected override void DoPerFrame(Simulator.PerFrameMediator ticker)
 	{
 		if (IsAwaitingAnim())
 		{
 			Debug.Assert(TrackedItemRef != null);
 			if (TrackedItemRef.TryGetTarget(out var trackedIt))
 			{
-				var srcLoc = lv.World.GridToPos(GridFrom);
-				var destLoc = lv.World.GridToPos(GetGridTo());
-				var weight = 0.001f * lv.GetTickElapsedMillis() * lv.GetTickRate();
-				trackedIt.Position = srcLoc.Lerp(destLoc, weight);
+				var srcLoc = ticker.World.GridToPos(GridFrom);
+				var destLoc = ticker.World.GridToPos(GetGridTo());
+				trackedIt.Position = srcLoc.Lerp(destLoc, (float)ticker.TickElapsedPercent);
 			}
 		}
 	}
 
-	protected override void OnEdge(Level lv)
+	protected override void OnEdge(Simulator.OnEdgeMediator ticker)
 	{
 		if (IsAwaitingAnim())
 		{
 			Debug.Assert(TrackedItemRef != null);
 			if (TrackedItemRef.TryGetTarget(out var trackedIt))
 			{
-				trackedIt.SyncPosWithGrid(lv.World);
+				trackedIt.SyncPosWithGrid(ticker.World);
 				trackedIt.SetMidAnimationFlag(false);
 				m_StateFunc = HandleDefault; // We have to do this because of IsAwaitingAnim
 			}
 		}
 	}
 
-	private void HandleDefault(Level lv)
+	private void HandleDefault(Simulator.OnTickMediator ticker)
 	{
 		Debug.Assert(TrackedItemRef is null);
-		Debug.Assert(HasTileWithItemNotMidAnim(lv.World, GridFrom));
+		Debug.Assert(HasTileWithItemNotMidAnim(ticker.World, GridFrom));
 
 		// Assume the destination tile exists.
-		var destTile = lv.World.GetTileNonNull(GetGridTo());
+		var destTile = ticker.World.GetTileNonNull(GetGridTo());
 		if (!destTile.CanItemEnter(Dir.Invert()))
 		{
 			PauseThisTick();
@@ -106,12 +105,12 @@ public class CmdSlide : Command
 		if (destTile.IsReserved())
 		{
 			// This here is why CanItemEnter must be called before...
-			lv.World.QueueBlockedSlideCmdByAnotherItem(this);
+			ticker.World.QueueBlockedSlideCmdByAnotherItem(this);
 			PauseThisTick();
 			return;
 		}
 
-		PrepTrackedItemForSlidingAnim(lv.World);
+		PrepTrackedItemForSlidingAnim(ticker.World);
 		// `DoPerFrame` animates until next tick.
 	}
 

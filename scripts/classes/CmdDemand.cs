@@ -20,9 +20,9 @@ public class CmdDemand : Command
 	public CmdDemand(Tile tl, int reqVal) : this(tl.GLocation, reqVal) { }
 
 
-	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
+	protected override void OnTick(Simulator.OnTickMediator ticker)
 	{
-		var targetTile = lv.World.GetTileNonNull(GridLoc);
+		var targetTile = ticker.World.GetTileNonNull(GridLoc);
 		var itVal = targetTile.Item.Value;
 		if (itVal == Value)
 		{

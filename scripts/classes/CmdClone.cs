@@ -27,12 +27,12 @@ public class CmdClone : Command
 	{ }
 
 
-	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
+	protected override void OnTick(Simulator.OnTickMediator ticker)
 	{
-		Debug.Assert(HasTileWithItemNotMidAnim(lv.World, SourceGL));
-		Debug.Assert(DestinationGLs.All( l => HasTileUnreserved(lv.World, l) ));
+		Debug.Assert(HasTileWithItemNotMidAnim(ticker.World, SourceGL));
+		Debug.Assert(DestinationGLs.All( l => HasTileUnreserved(ticker.World, l) ));
 
-		Item it = lv.World.GetTileNonNull(SourceGL).Item;
+		Item it = ticker.World.GetTileNonNull(SourceGL).Item;
 		if (it.IsMidAnimation())
 		{
 			throw new InvalidProgramException("Forgot to call CmdAwait before CmdClone");
@@ -40,7 +40,7 @@ public class CmdClone : Command
 
 		foreach (var dgloc in DestinationGLs)
 		{
-			if (lv.World.SpawnItem(dgloc, it.Value) is null)
+			if (ticker.World.SpawnItem(dgloc, it.Value) is null)
 			{
 				throw new InvalidProgramException($"CmdClone failed to spawn clone on {dgloc}");
 			}

@@ -24,14 +24,14 @@ public class CmdCombine(Vector2I glLeft, Vector2I glRight, Vector2I glDest, Bina
 	{ }
 
 
-	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
+	protected override void OnTick(Simulator.OnTickMediator ticker)
 	{
-		Debug.Assert(HasTileWithItemNotMidAnim(lv.World, LeftGL));
-		Debug.Assert(HasTileWithItemNotMidAnim(lv.World, RightGL));
-		Debug.Assert(ResultGL == LeftGL || ResultGL == RightGL || HasTileUnreserved(lv.World, ResultGL));
+		Debug.Assert(HasTileWithItemNotMidAnim(ticker.World, LeftGL));
+		Debug.Assert(HasTileWithItemNotMidAnim(ticker.World, RightGL));
+		Debug.Assert(ResultGL == LeftGL || ResultGL == RightGL || HasTileUnreserved(ticker.World, ResultGL));
 
-		Tile tlLeft = lv.World.GetTileNonNull(LeftGL);
-		Tile tlRight = lv.World.GetTileNonNull(RightGL);
+		Tile tlLeft = ticker.World.GetTileNonNull(LeftGL);
+		Tile tlRight = ticker.World.GetTileNonNull(RightGL);
 
 		if (tlLeft.Item.IsMidAnimation() || tlRight.Item.IsMidAnimation())
 		{
@@ -41,7 +41,7 @@ public class CmdCombine(Vector2I glLeft, Vector2I glRight, Vector2I glDest, Bina
 		var finalVal = Op.Apply(tlLeft.Item.Value, tlRight.Item.Value);
 		tlLeft.DestroyItem();
 		tlRight.DestroyItem();
-		if (lv.World.SpawnItem(ResultGL, finalVal) is null)
+		if (ticker.World.SpawnItem(ResultGL, finalVal) is null)
 		{
 			throw new InvalidProgramException();
 		}

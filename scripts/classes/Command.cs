@@ -70,16 +70,16 @@ public abstract class Command
 	/// <summary>
 	/// Executed at the very beginning of every tick.
 	/// </summary>
-	protected abstract void OnTick(Level lv, CommandRunner.OnTickPender pender);
+	protected abstract void OnTick(Simulator.OnTickMediator ticker);
 	/// <summary>
 	/// Executed every frame. So far only used by slide...
 	/// </summary>
-	protected virtual void DoPerFrame(double dt, Level lv) {}
+	protected virtual void DoPerFrame(Simulator.PerFrameMediator ticker) {}
 	/// <summary>
 	/// Executed at the very end of every tick; used for commands that take up the whole tick.
 	/// Must be implemented for smooth commands!
 	/// </summary>
-	protected virtual void OnEdge(Level lv) 
+	protected virtual void OnEdge(Simulator.OnEdgeMediator ticker)
 	{ 
 		throw new NotImplementedException("Smooth commands must override OnEdge"); 
 	}
@@ -138,24 +138,24 @@ public abstract class Command
 	/// Should be called inside a <see cref="OnTick"/> function of some sort when handling commands manually. 
 	/// Generally speaking tho, you should be using <see cref="CommandRunner"/> for that.
 	/// </summary>
-	public void HandleOnTick(Level lv, CommandRunner.OnTickPender pender)
+	public void HandleOnTick(Simulator.OnTickMediator ticker)
 	{
-		OnTick(lv, pender);
+		OnTick(ticker);
 	}
 
 	/// <summary>
 	/// Should be called inside a <see cref="OnEdge"/> function of some sort when handling commands 
 	/// manually. Generally speaking tho, you should be using <see cref="CommandRunner"/> for that.
 	/// </summary>
-	public void HandleOnEdge(Level lv)
+	public void HandleOnEdge(Simulator.OnEdgeMediator ticker)
 	{
 		Debug.Assert(m_bSmooth);
-		OnEdge(lv);
+		OnEdge(ticker);
 	}
 
-	public void HandleFrame(double dt, Level lv)
+	public void HandleFrame(Simulator.PerFrameMediator ticker)
 	{
-		DoPerFrame(dt, lv);
+		DoPerFrame(ticker);
 	}
 
 	/// <summary>

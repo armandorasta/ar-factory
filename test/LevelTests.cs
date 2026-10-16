@@ -7,26 +7,26 @@ using static ArTest.Asserts;
 
 public class LevelTests : ArTest.TestSuit
 {
-	public Level Lvl => m_Lv!;
-	private Level? m_Lv;
+	public Editor Lvl => m_Lv!;
+	private Editor? m_Lv;
 
 	public override void BeforeAll()
 	{
 		var levelScene = GD.Load<Godot.PackedScene>(SceneManager.LevelScenePath);
-		m_Lv = levelScene.Instantiate<Level>();
+		m_Lv = levelScene.Instantiate<Editor>();
 		AddNode(m_Lv);
-		m_Lv.SetTickRate(100);
+		m_Lv.Simy.SetTickRate(100);
 	}
 
 	public override void BeforeEach()
 	{
-		Lvl.World.Reset();
-		Lvl.World.SetDims(new(15, 10));
+		m_Lv!.World.Reset();
+		m_Lv!.World.SetDims(new(15, 10));
 	}
 
 	public override void AfterEach()
 	{
-		AssertFalse(Lvl.IsSimRunning());
+		AssertTrue(Lvl.Simy.IsHalted());
 	}
 
 	public override void AfterAll()
@@ -37,78 +37,80 @@ public class LevelTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestDebugMode()
 	{
-		using (Lvl.PlaySimulationInDebug())
+		var simy = Lvl.Simy;
+		using (simy.PlaySimulationInDebug())
 		{
-			await Lvl.TickOnceAsync();
-			AssertEq(Lvl.GetTicksSinceStart(), 1); 
-			await Lvl.TickNTimesAsync(5);
-			AssertEq(Lvl.GetTicksSinceStart(), 6);
-			await Lvl.TickNTimesAsync(5);
-			AssertEq(Lvl.GetTicksSinceStart(), 11);
+			await simy.TickOnceAsync();
+			AssertEq(simy.GetTicksSinceStart(), 1); 
+			await simy.TickNTimesAsync(5);
+			AssertEq(simy.GetTicksSinceStart(), 6);
+			await simy.TickNTimesAsync(5);
+			AssertEq(simy.GetTicksSinceStart(), 11);
 		}
 	}
 
 	[ArTest.Test] public async Task TestPausingAndResuming()
 	{
-		AssertFalse(Lvl.IsSimRunning());
+		var simy = Lvl.Simy;
+		AssertTrue(simy.IsHalted());
 
-		Lvl.PlaySimulation();
-		AssertTrue(Lvl.IsSimRunning());
-		AssertFalse(Lvl.IsPaused());
-		AssertFalse(Lvl.IsDebugging());
+		simy.PlaySimulation();
+		AssertFalse(simy.IsHalted());
+		AssertFalse(simy.IsPaused());
+		AssertFalse(simy.IsDebugging());
 
-		Lvl.PauseSimulation();
-		AssertTrue(Lvl.IsSimRunning());
-		AssertFalse(Lvl.IsPaused()); // Tick has to end first, then simulation actually pauses.
-		AssertTrue(Lvl.IsDebugging());
+		simy.PauseSimulation();
+		AssertFalse(simy.IsHalted());
+		AssertFalse(simy.IsPaused()); // Tick has to end first, then simulation actually pauses.
+		AssertTrue(simy.IsDebugging());
 		
-		await Lvl.EndTickAsync(); // NOW the simulation is paused for real.
-		AssertTrue(Lvl.IsSimRunning());
-		AssertTrue(Lvl.IsPaused());
-		AssertTrue(Lvl.IsDebugging());
+		await simy.EndTickAsync(); // NOW the simulation is paused for real.
+		AssertFalse(simy.IsHalted());
+		AssertTrue(simy.IsPaused());
+		AssertTrue(simy.IsDebugging());
 
-		var nTicksBefore = Lvl.GetTicksSinceStart();
-		Lvl.TickOnce();
-		AssertTrue(Lvl.IsSimRunning());
-		AssertFalse(Lvl.IsPaused());
-		AssertTrue(Lvl.IsDebugging());
-		AssertEq(Lvl.GetTicksSinceStart(), nTicksBefore + 1);
+		var nTicksBefore = simy.GetTicksSinceStart();
+		simy.TickOnce();
+		AssertFalse(simy.IsHalted());
+		AssertFalse(simy.IsPaused());
+		AssertTrue(simy.IsDebugging());
+		AssertEq(simy.GetTicksSinceStart(), nTicksBefore + 1);
 
-		nTicksBefore = Lvl.GetTicksSinceStart();
-		Lvl.ResumeSimulation();
-		await Lvl.WaitForNTicks(3);
-		AssertTrue(Lvl.IsSimRunning());
-		AssertFalse(Lvl.IsPaused());
-		AssertFalse(Lvl.IsDebugging());
-		AssertEq(Lvl.GetTicksSinceStart(), nTicksBefore + 3);
+		nTicksBefore = simy.GetTicksSinceStart();
+		simy.ResumeSimulation();
+		await simy.WaitForNTicks(3);
+		AssertFalse(simy.IsHalted());
+		AssertFalse(simy.IsPaused());
+		AssertFalse(simy.IsDebugging());
+		AssertEq(simy.GetTicksSinceStart(), nTicksBefore + 3);
 
-		Lvl.HaltSimulation();
-		AssertFalse(Lvl.IsSimRunning());
+		simy.HaltSimulation();
+		AssertTrue(simy.IsHalted());
 
-		Lvl.PlaySimulationInDebug();
-		AssertTrue(Lvl.IsSimRunning());
-		AssertTrue(Lvl.IsPaused());
-		AssertTrue(Lvl.IsDebugging());
-		AssertEq(Lvl.GetTicksSinceStart(), 0);
+		simy.PlaySimulationInDebug();
+		AssertFalse(simy.IsHalted());
+		AssertTrue(simy.IsPaused());
+		AssertTrue(simy.IsDebugging());
+		AssertEq(simy.GetTicksSinceStart(), 0);
 		
-		Lvl.TickOnce();
-		AssertTrue(Lvl.IsSimRunning());
-		AssertFalse(Lvl.IsPaused());
-		AssertTrue(Lvl.IsDebugging());
-		AssertEq(Lvl.GetTicksSinceStart(), 1);
+		simy.TickOnce();
+		AssertFalse(simy.IsHalted());
+		AssertFalse(simy.IsPaused());
+		AssertTrue(simy.IsDebugging());
+		AssertEq(simy.GetTicksSinceStart(), 1);
 
-		await Lvl.TickOnceAsync();
-		AssertTrue(Lvl.IsSimRunning());
-		AssertFalse(Lvl.IsPaused());
-		AssertTrue(Lvl.IsDebugging());
-		AssertEq(Lvl.GetTicksSinceStart(), 2);
+		await simy.TickOnceAsync();
+		AssertFalse(simy.IsHalted());
+		AssertFalse(simy.IsPaused());
+		AssertTrue(simy.IsDebugging());
+		AssertEq(simy.GetTicksSinceStart(), 2);
 
-		await Lvl.TickNTimesAsync(2);
-		AssertTrue(Lvl.IsSimRunning());
-		AssertFalse(Lvl.IsPaused());
-		AssertTrue(Lvl.IsDebugging());
-		AssertEq(Lvl.GetTicksSinceStart(), 4);
+		await simy.TickNTimesAsync(2);
+		AssertFalse(simy.IsHalted());
+		AssertFalse(simy.IsPaused());
+		AssertTrue(simy.IsDebugging());
+		AssertEq(simy.GetTicksSinceStart(), 4);
 
-		Lvl.HaltSimulation();
+		simy.HaltSimulation();
 	}
 }

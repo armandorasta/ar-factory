@@ -133,7 +133,7 @@ public abstract partial class Unit : Node2D
 	/// Checks like <see cref="IsWorkTick"/>, <see cref="HasPendingCmds"/> and <see cref="IsJustAwaitingOutSlideAnim"/> 
 	/// are used quite often here.
 	/// </summary>
-	public abstract void PendNewCommands(WorldPanel.PendProxy pender);
+	public abstract void PendNewCommands(Simulator.PendProxy pender);
 
 
 	#endregion // Abstract Interface
@@ -434,7 +434,7 @@ public abstract partial class Unit : Node2D
 	}
 
 
-	public void HandlePendingNewCommands(WorldPanel.PendProxy pender)
+	public void HandlePendingNewCommands(Simulator.PendProxy pender)
 	{
 		if (IsWorkTick())
 		{

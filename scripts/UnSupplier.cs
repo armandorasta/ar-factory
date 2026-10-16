@@ -23,7 +23,7 @@ public partial class UNSupplier : Unit
 		m_Out0 = AddOutput(Vector2I.Zero, Direction.East);
 	}
 
-	public override void PendNewCommands(WorldPanel.PendProxy pender)
+	public override void PendNewCommands(Simulator.PendProxy pender)
 	{
 		if (IsDoneWithInputSeq())
 		{

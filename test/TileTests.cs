@@ -5,15 +5,15 @@ using static ArTest.Asserts;
 
 public class TileTests : ArTest.TestSuit
 {
-	public Level Lvl => m_Lv!;
-	private Level? m_Lv;
+	public Editor Lvl => m_Lv!;
+	private Editor? m_Lv;
 
 	public override void BeforeAll()
 	{
 		var levelScene = GD.Load<Godot.PackedScene>(SceneManager.LevelScenePath);
-		m_Lv = levelScene.Instantiate<Level>();
+		m_Lv = levelScene.Instantiate<Editor>();
 		AddNode(Lvl);
-		Lvl.SetTickRate(50);
+		Lvl.Simy.SetTickRate(50);
 	}
 
 	public override void BeforeEach()
@@ -24,7 +24,7 @@ public class TileTests : ArTest.TestSuit
 
 	public override void AfterEach()
 	{
-		AssertFalse(Lvl.IsSimRunning());
+		AssertTrue(Lvl.Simy.IsHalted());
 	}
 
 	public override void AfterAll()

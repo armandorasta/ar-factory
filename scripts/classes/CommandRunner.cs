@@ -115,9 +115,12 @@ public readonly struct CommandRunner()
 	/// <summary>
 	/// Should be called on the beginning of the tick, this does nothing when no commands are left to be executed.
 	/// </summary>
-	public bool OnTick(Level lv)
+	public bool OnTick(Editor lv)
 	{
-		if (IsDone()) return true;
+		if (IsDone())
+		{
+			return true;
+		}
 		for (var gIndex = 0; gIndex < m_Groups.Count; ++gIndex)
 		{
 			var currGroup = m_Groups[gIndex];
@@ -169,11 +172,11 @@ public readonly struct CommandRunner()
 
 		m_Groups.RemoveAll(g => g.Count == 0);
 
-		HandleSlideCmdOverlapping(lv.World);
+		HandleSlideCmdOverlapping(ticker.World);
 		return IsDone();
 	}
 
-	public bool DoPerFrame(double dt, Level lv)
+	public bool DoPerFrame(Simulator.PerFrameMediator ticker)
 	{
 		if (IsDone())
 		{
@@ -203,7 +206,7 @@ public readonly struct CommandRunner()
 	/// <summary>
 	/// Should be called at the end of the tick, this does nothing when no commands are left to be executed.
 	/// </summary>
-	public bool OnEdge(Level lv)
+	public bool OnEdge(Editor lv)
 	{
 		foreach (var group in m_Groups)
 		{

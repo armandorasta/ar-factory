@@ -14,10 +14,10 @@ public class CmdSpawn(Vector2I gloc, int val) : Command(1)
 	public CmdSpawn(Tile tl, int val) : this(tl.GLocation, val) { }
 
 
-	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
+	protected override void OnTick(Simulator.OnTickMediator ticker)
 	{
-		Debug.Assert(HasTileUnreserved(lv.World, GLocation));
-		if (lv.World.SpawnItem(GLocation, Value) is null)
+		Debug.Assert(HasTileUnreserved(ticker.World, GLocation));
+		if (ticker.World.SpawnItem(GLocation, Value) is null)
 		{
 			throw new InvalidProgramException();
 		}

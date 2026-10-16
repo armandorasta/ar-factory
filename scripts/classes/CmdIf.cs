@@ -73,13 +73,13 @@ public class CmdIf : Command
 	{ }
 
 
-	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
+	protected override void OnTick(Simulator.OnTickMediator ticker)
 	{
-		var bCondMet = Apply(Check, lv.World.GetTileOrNull(GLocation), CmpValue);
+		var bCondMet = Apply(Check, ticker.World.GetTileOrNull(GLocation), CmpValue);
 		var winnerBranch = bCondMet ? TrueBranch : ElseBranch;
 		if (winnerBranch is not null)
 		{
-			pender.Pend(winnerBranch);
+			ticker.Pender.Pend(winnerBranch);
 		}
 	}
 

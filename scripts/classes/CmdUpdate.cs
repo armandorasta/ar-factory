@@ -23,10 +23,10 @@ public class CmdUpdate : Command
 	public CmdUpdate(Tile tl, UnaryOperation op, int val) : this(tl.GLocation, op, val) { }
 
 
-	protected override void OnTick(Level lv, CommandRunner.OnTickPender pender)
+	protected override void OnTick(Simulator.OnTickMediator ticker)
 	{
-		Debug.Assert(HasTileWithItemNotMidAnim(lv.World, GLocation));
-		var it = lv.World.GetTileNonNull(GLocation).Item;
+		Debug.Assert(HasTileWithItemNotMidAnim(ticker.World, GLocation));
+		var it = ticker.World.GetTileNonNull(GLocation).Item;
 		if (it.IsMidAnimation())
 		{
 			throw new InvalidProgramException();

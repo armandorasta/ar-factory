@@ -6,15 +6,15 @@ using static ArTest.Asserts;
 
 public class WorldPanelTests : ArTest.TestSuit
 {
-	public Level Lvl => m_Lv!;
-	private Level? m_Lv;
+	public Editor Lvl => m_Lv!;
+	private Editor? m_Lv;
 
 	public override void BeforeAll()
 	{
 		var levelScene = GD.Load<Godot.PackedScene>(SceneManager.LevelScenePath);
-		m_Lv = levelScene.Instantiate<Level>();
+		m_Lv = levelScene.Instantiate<Editor>();
 		AddNode(m_Lv);
-		m_Lv.SetTickRate(100);
+		m_Lv.Simy.SetTickRate(100);
 	}
 
 	public override void BeforeEach()
@@ -25,7 +25,7 @@ public class WorldPanelTests : ArTest.TestSuit
 
 	public override void AfterEach()
 	{
-		AssertFalse(Lvl.IsSimRunning());
+		AssertTrue(Lvl.Simy.IsHalted());
 	}
 
 	public override void AfterAll()
