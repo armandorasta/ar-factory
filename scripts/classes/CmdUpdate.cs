@@ -23,7 +23,7 @@ public class CmdUpdate : Command
 	public CmdUpdate(Tile tl, UnaryOperation op, int val) : this(tl.GLocation, op, val) { }
 
 
-	protected override void OnTick(Simulator.OnTickMediator ticker)
+	protected override void OnTick(Editor.OnTickMediator ticker)
 	{
 		Debug.Assert(HasTileWithItemNotMidAnim(ticker.World, GLocation));
 		var it = ticker.World.GetTileNonNull(GLocation).Item;

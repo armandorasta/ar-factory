@@ -15,7 +15,7 @@ public class LevelTests : ArTest.TestSuit
 		var levelScene = GD.Load<Godot.PackedScene>(SceneManager.LevelScenePath);
 		m_Lv = levelScene.Instantiate<Editor>();
 		AddNode(m_Lv);
-		m_Lv.Simy.SetTickRate(100);
+		m_Lv.Clock.SetTickRate(100);
 	}
 
 	public override void BeforeEach()
@@ -26,7 +26,7 @@ public class LevelTests : ArTest.TestSuit
 
 	public override void AfterEach()
 	{
-		AssertTrue(Lvl.Simy.IsHalted());
+		AssertTrue(Lvl.Clock.IsHalted());
 	}
 
 	public override void AfterAll()
@@ -37,7 +37,7 @@ public class LevelTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestDebugMode()
 	{
-		var simy = Lvl.Simy;
+		var simy = Lvl.Clock;
 		using (simy.PlaySimulationInDebug())
 		{
 			await simy.TickOnceAsync();
@@ -51,7 +51,7 @@ public class LevelTests : ArTest.TestSuit
 
 	[ArTest.Test] public async Task TestPausingAndResuming()
 	{
-		var simy = Lvl.Simy;
+		var simy = Lvl.Clock;
 		AssertTrue(simy.IsHalted());
 
 		simy.PlaySimulation();

@@ -24,7 +24,7 @@ public class CmdAwait : Command
 		: this(tls.Select(tl => tl.GLocation)) 
 	{ }
 
-	protected override void OnTick(Simulator.OnTickMediator ticker)
+	protected override void OnTick(Editor.OnTickMediator ticker)
 	{
 		var myTiles = GridLocs.Select(ticker.World.GetTileOrNull);
 		if (!myTiles.All(tl => tl is not null))

@@ -1,88 +1,14 @@
-using Godot;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace ArFactory;
 
-public partial class Simulator : Godot.Node
+public partial class SimulatorClock : Godot.Node
 {
-	public sealed class SimulationAutoEnder(Simulator sim) : IDisposable
+	public sealed class SimulationAutoEnder(SimulatorClock sim) : IDisposable
 	{
-		private readonly Simulator m_Sim = sim;
+		private readonly SimulatorClock m_Sim = sim;
 		void IDisposable.Dispose() => m_Sim.HaltSimulation();
-	}
-
-	public readonly struct PendProxy(Unit penderUnit, CommandRunner runner)
-	{
-		private readonly CommandRunner m_Runner = runner;
-		private readonly Unit m_PenderUnit = penderUnit;
-
-		public readonly void Pend(IEnumerable<IEnumerable<Command>> groups, int startIndex = 0)
-		{
-			m_Runner.PendFullSequence(m_PenderUnit, groups.Where(g => g.Any(_ => true)), startIndex);
-		}
-	}
-
-	public class TerminationState()
-	{
-		public enum Status
-		{
-			Success,
-			Manual,
-			IncorrectValue,
-		}
-		
-		public Status Stat;
-		public int ExpectedValue;
-		public int RecievedValue;
-
-		public static TerminationState MakeSuccess() => new()
-		{
-			Stat = Status.Success,
-			ExpectedValue = Item.MaxValue + 1,
-			RecievedValue = Item.MaxValue + 1,
-		};
-
-		public static TerminationState MakeManualHalt() => new()
-		{
-			Stat = Status.Manual,
-			ExpectedValue = Item.MaxValue + 1,
-			RecievedValue = Item.MaxValue + 1,
-		};
-
-		public static TerminationState MakeIncorrectVal(int expected, int found)
-		{
-			Debug.Assert(Item.IsValueWithinRange(expected));
-			Debug.Assert(Item.IsValueWithinRange(found));
-			return new()
-			{
-				Stat = Status.IncorrectValue,
-				ExpectedValue = expected,
-				RecievedValue = found,
-			};
-		}
-	}
-
-	public class OnTickMediator(Unit penderUnit, CommandRunner runner)
-	{
-		public PendProxy Pender = new(penderUnit, runner);
-		public WorldPanel World = penderUnit.World;
-		private TerminationState m_TState = TerminationState.MakeSuccess();
-	}
-
-	public class PerFrameMediator(WorldPanel world, Simulator simy, double dt)
-	{
-		public WorldPanel World = world;
-		public double FrameDelta = dt;
-		public double TickMillis = simy.m_TickMillis;
-		public double TickElapsedPercent = simy.GetTickElapsedMillis() / simy.m_TickMillis;
-	}
-
-	public class OnEdgeMediator(WorldPanel world)
-	{
-		public WorldPanel World = world;
 	}
 
 	private enum State
@@ -108,7 +34,7 @@ public partial class Simulator : Godot.Node
 	private int m_TickCount = 0; // Number of ticks since the start.
 	private float m_TickMillis;
 
-	public Simulator()
+	public SimulatorClock()
 	{
 		m_TickMillis = DefaultTickMillis;
 		InitTimer();
@@ -124,11 +50,12 @@ public partial class Simulator : Godot.Node
 
 	public float GetTickElapsedMillis() => m_TickMillis - 1000.0f * (float)m_TickTimer.TimeLeft;
 	public float GetTickRate() => 1000.0f / m_TickMillis;
+	public float GetMilliSecondsPerTick() => m_TickMillis;
 	public int GetTicksSinceStart() => m_TickCount;
+	
 	public void SetTickRate(float ratePerSec)
-	{
-		m_TickMillis = 1000.0f / float.Clamp(ratePerSec, MinTickRate, MaxTickRate);
-	}
+		=> m_TickMillis = 1000.0f / float.Clamp(ratePerSec, MinTickRate, MaxTickRate);
+	public void SetTickMillis(float millis) => SetTickRate(1000.0f / millis);
 
 	public bool IsHalted() => m_CurrState is State.Off;
 	/// <summary>
@@ -237,7 +164,6 @@ public partial class Simulator : Godot.Node
 		Debug.Assert(!m_TickTimer.Paused);
 		Debug.Assert(IsPausedRightAtTickStart());
 
-		// Start the timer so it progresses in parallel with the tick process.
 		m_TickTimer.Start(m_TickMillis * 0.001f);
 		m_TickCount += 1;
 	}

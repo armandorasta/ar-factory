@@ -9,7 +9,7 @@ public partial class UNBin : Unit
 		BaseInit(world, TickType.OnDemand, 1, gloc, Vector2I.One, Direction.East);
 	}
 
-	public override void PendNewCommands(Simulator.PendProxy pender)
+	public override void PendNewCommands(Editor.PendProxy pender)
 	{
 		if (HasPendingCmds())
 		{

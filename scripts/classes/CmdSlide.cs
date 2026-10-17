@@ -12,7 +12,7 @@ public class CmdSlide : Command
 	public Direction Dir { get; private set; }
 	public WeakReference<Item>? TrackedItemRef { get; private set; }
 	
-	private Action<Simulator.OnTickMediator>? m_StateFunc;
+	private Action<Editor.OnTickMediator>? m_StateFunc;
 
 	public CmdSlide(Vector2I gfrom, Direction dir) : base(1, true)
 	{
@@ -56,12 +56,12 @@ public class CmdSlide : Command
 		else return false;
 	}
 
-	protected override void OnTick(Simulator.OnTickMediator ticker)
+	protected override void OnTick(Editor.OnTickMediator ticker)
 	{
 		m_StateFunc!.Invoke(ticker);
 	}
 
-	protected override void DoPerFrame(Simulator.PerFrameMediator ticker)
+	protected override void DoPerFrame(Editor.PerFrameMediator ticker)
 	{
 		if (IsAwaitingAnim())
 		{
@@ -75,7 +75,7 @@ public class CmdSlide : Command
 		}
 	}
 
-	protected override void OnEdge(Simulator.OnEdgeMediator ticker)
+	protected override void OnEdge(Editor.OnEdgeMediator ticker)
 	{
 		if (IsAwaitingAnim())
 		{
@@ -89,7 +89,7 @@ public class CmdSlide : Command
 		}
 	}
 
-	private void HandleDefault(Simulator.OnTickMediator ticker)
+	private void HandleDefault(Editor.OnTickMediator ticker)
 	{
 		Debug.Assert(TrackedItemRef is null);
 		Debug.Assert(HasTileWithItemNotMidAnim(ticker.World, GridFrom));
@@ -105,7 +105,7 @@ public class CmdSlide : Command
 		if (destTile.IsReserved())
 		{
 			// This here is why CanItemEnter must be called before...
-			ticker.World.QueueBlockedSlideCmdByAnotherItem(this);
+			ticker.Pender.QueueBlockedSlideCmdByAnotherItem(ticker.World, this);
 			PauseThisTick();
 			return;
 		}

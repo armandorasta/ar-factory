@@ -17,10 +17,11 @@ public readonly struct CommandRunner()
 		public override string ToString() => Cmd.ToString();
 	}
 
-	public class OnTickPender()
+	public class OnTickPender(CommandRunner runner)
 	{
 		public readonly List<List<CmdWrapper>> Groups = [];
 		public Unit? PenderUnit;
+		private readonly CommandRunner m_Runner = runner;
 
 		public void Pend(IEnumerable<IEnumerable<Command>> newSequence, int startIndex = 0)
 		{
@@ -45,6 +46,9 @@ public readonly struct CommandRunner()
 
 			PenderUnit!.AddCommandsToWaitList(newSequence);
 		}
+
+		public void QueueBlockedSlideCmdByAnotherItem(WorldPanel world, CmdSlide cmd) 
+			=> m_Runner.QueueBlockedSlideCmdByAnotherItem(world, cmd);
 	}
 
 	private static readonly Type[] s_CmdPiorities =
@@ -115,7 +119,7 @@ public readonly struct CommandRunner()
 	/// <summary>
 	/// Should be called on the beginning of the tick, this does nothing when no commands are left to be executed.
 	/// </summary>
-	public bool OnTick(Editor lv)
+	public bool OnTick(Editor.OnTickMediator ticker)
 	{
 		if (IsDone())
 		{
@@ -125,15 +129,15 @@ public readonly struct CommandRunner()
 		{
 			var currGroup = m_Groups[gIndex];
 			var bGoingNextGroup = false;
-			for (var otPender = new OnTickPender();;)
+			for (;;)
 			{
 				currGroup.Sort((l, r) => GetCmdPiority(l.Cmd) - GetCmdPiority(r.Cmd));
 				foreach (var cw in currGroup)
 				{
 					if (cw.AllDepsDone() && !cw.bRanThisTick)
 					{
-						otPender.PenderUnit = cw.PenderUnit;
-						cw.Cmd.HandleOnTick(lv, otPender);
+						ticker.Pender.PenderUnit = cw.PenderUnit;
+						cw.Cmd.HandleOnTick(ticker);
 						cw.bRanThisTick = true;
 						if (!cw.Cmd.IsSmooth()) 
 						{
@@ -144,10 +148,10 @@ public readonly struct CommandRunner()
 					}
 				}
 				currGroup.RemoveAll(c => c.Cmd.IsDone());
-				if (otPender.Groups.Count > 0)
+				if (ticker.Pender.Groups.Count > 0)
 				{
 					var i = gIndex;
-					foreach (var ng in otPender.Groups)
+					foreach (var ng in ticker.Pender.Groups)
 					{
 						if (i < m_Groups.Count)
 						{
@@ -159,7 +163,7 @@ public readonly struct CommandRunner()
 						}
 						++i;
 					}
-					otPender.Groups.Clear();
+					ticker.Pender.Groups.Clear();
 				}
 				else break;
 			}
@@ -176,7 +180,7 @@ public readonly struct CommandRunner()
 		return IsDone();
 	}
 
-	public bool DoPerFrame(Simulator.PerFrameMediator ticker)
+	public bool DoPerFrame(Editor.PerFrameMediator ticker)
 	{
 		if (IsDone())
 		{
@@ -190,7 +194,7 @@ public readonly struct CommandRunner()
 			{
 				if (cw.bRanThisTick && cw.Cmd.IsSmooth())
 				{
-					cw.Cmd.HandleFrame(dt, lv);
+					cw.Cmd.HandleFrame(ticker);
 					bSomethingRan = true;
 				}
 			}
@@ -206,7 +210,7 @@ public readonly struct CommandRunner()
 	/// <summary>
 	/// Should be called at the end of the tick, this does nothing when no commands are left to be executed.
 	/// </summary>
-	public bool OnEdge(Editor lv)
+	public bool OnEdge(Editor.OnEdgeMediator ticker)
 	{
 		foreach (var group in m_Groups)
 		{
@@ -215,7 +219,7 @@ public readonly struct CommandRunner()
 			{
 				if (cw.bRanThisTick && cw.Cmd.IsSmooth())
 				{
-					cw.Cmd.HandleOnEdge(lv);
+					cw.Cmd.HandleOnEdge(ticker);
 					cw.Cmd.CountThisTick();
 					bSomethingRan = true;
 				}

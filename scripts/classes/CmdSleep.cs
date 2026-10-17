@@ -10,8 +10,8 @@ public class CmdSleep : Command
 		Debug.Assert(tickCount > 0);
 	}
 
-	protected override void OnTick(Simulator.OnTickMediator ticker) { }
-	protected override void OnEdge(Simulator.OnEdgeMediator ticker) { }
+	protected override void OnTick(Editor.OnTickMediator ticker) { }
+	protected override void OnEdge(Editor.OnEdgeMediator ticker) { }
 
 
 	public override string ToString() => Utilz.ReplaceBaseNameInToString(base.ToString(), "Sleep");

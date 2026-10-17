@@ -37,7 +37,6 @@ public partial class WorldPanel : Godot.Panel
 	private Vector2I m_Dims = new(10, 10);
 	private readonly List<Unit> m_Units = [];
 	private List<Tile?> m_Tiles = [];
-	private readonly CommandRunner m_Runner = new();
 
 
 	#region .Essential Functions
@@ -486,14 +485,8 @@ public partial class WorldPanel : Godot.Panel
 	#endregion // Essential Functions
 	#region .Simulation Related
 
-	public void DoPerFrame(float dt, Editor lv)
+	public void OnTick(Editor.PendProxy pender)
 	{
-		m_Runner.DoPerFrame(dt, lv);
-	}
-
-	public void OnTick(Simulator.OnTickMediator ticker)
-	{
-		Debug.AssertRefEq(ticker.World, this);
 		foreach (var tl in m_Tiles)
 		{
 			tl?.GetItemMaybeNull()?.ResetMovementFlag();
@@ -506,16 +499,9 @@ public partial class WorldPanel : Godot.Panel
 
 		foreach (var u in m_Units)
 		{
-			var pender = new PendProxy(u, m_Runner);
-			u.HandlePendingNewCommands(pender); // So when I press F11 it doesn't dive into the ctor.
+			pender.PenderUnit = u;
+			u.HandlePendingNewCommands(pender);
 		}
-
-		m_Runner.OnTick(lv);
-	}
-
-	public void OnEdge(Editor lv)
-	{
-		m_Runner.OnEdge(lv);
 	}
 
 	public void CleanUpAfterSim()
@@ -529,8 +515,6 @@ public partial class WorldPanel : Godot.Panel
 		{
 			tl?.DestroyItem(true);
 		}
-
-		m_Runner.Reset();
 	}
 
 	#endregion
@@ -727,15 +711,6 @@ public partial class WorldPanel : Godot.Panel
 		{
 			m_Tiles.Add(null);
 		}
-	}
-
-
-	/// <summary>
-	/// Adds a slide command blocked by another item in the way only, all other types crash the program in debug.
-	/// </summary>
-	public void QueueBlockedSlideCmdByAnotherItem(CmdSlide cmd)
-	{
-		m_Runner.QueueBlockedSlideCmdByAnotherItem(this, cmd);
 	}
 
 	/// <summary>

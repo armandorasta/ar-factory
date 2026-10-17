@@ -14,7 +14,7 @@ public class CmdSpawn(Vector2I gloc, int val) : Command(1)
 	public CmdSpawn(Tile tl, int val) : this(tl.GLocation, val) { }
 
 
-	protected override void OnTick(Simulator.OnTickMediator ticker)
+	protected override void OnTick(Editor.OnTickMediator ticker)
 	{
 		Debug.Assert(HasTileUnreserved(ticker.World, GLocation));
 		if (ticker.World.SpawnItem(GLocation, Value) is null)

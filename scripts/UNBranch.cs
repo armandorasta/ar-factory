@@ -30,7 +30,7 @@ public partial class UNBranch : Unit
 		m_tlOutFalse = AddOutput(new(0, 1), Direction.East);
 	}
 
-	public override void PendNewCommands(Simulator.PendProxy pender)
+	public override void PendNewCommands(Editor.PendProxy pender)
 	{
 		if (HasPendingCmds())
 		{
