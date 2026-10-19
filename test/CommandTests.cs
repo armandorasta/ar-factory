@@ -1037,8 +1037,7 @@ public class CommandTests : ArTest.TestSuit
 
 	[ArTest.Test] public void TestCmdIf_CheckType_Apply()
 	{
-		// Apply is a function that must be used by the implementation of CmdIf to check the
-		// condition.
+		// Apply is a function that must be used by the implementation of CmdIf to check the condition.
 
 		var world = Lvl.World;
 
@@ -1287,6 +1286,57 @@ public class CommandTests : ArTest.TestSuit
 			AssertEq(tl1.Item.Value, 6);
 
 			AssertFalse(injy.HasPendingCmds());
+		}
+	}
+
+	[ArTest.Test] public async Task TestCmdDemand_correct_value()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var injy = world.PlaceInjector();
+		
+		using (Lvl.Clock.PlaySimulationInDebug())
+		{
+			injy.PendFullSequence([[ new CmdDemand(tl0, -425) ]]);
+			world.SpawnItem(tl0, -425);
+
+			await Lvl.TickOnceForTestingAsync();
+			AssertFalse(Lvl.Clock.IsHalted());
+			AssertFalse(tl0.HasItem()); // Destory the item either way.
+		}
+	}
+
+	[ArTest.Test] public async Task TestCmdDemand_incorrect_value()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var injy = world.PlaceInjector();
+		
+		using (Lvl.Clock.PlaySimulationInDebug())
+		{
+			injy.PendFullSequence([[ new CmdDemand(tl0, -207) ]]);
+			world.SpawnItem(tl0, 361);
+
+			await Lvl.TickOnceForTestingAsync();
+			AssertTrue(Lvl.Clock.IsHalted()); // Should halt immediately
+		}
+	}
+
+	[ArTest.Test] public async Task TestCmdDemand_INVALID_CASE_item_mid_animation()
+	{
+		var world = Lvl.World;
+		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl1 = world.InstallEmptyTile(new Vector2I(1, 0));
+		var injy0 = world.PlaceInjector();
+		var injy1 = world.PlaceInjector();
+		
+		using (Lvl.Clock.PlaySimulationInDebug())
+		{
+			world.SpawnItem(tl0, 835);
+			injy0.PendFullSequence([[ new CmdSlide(tl0, Direction.East) ]]);
+			injy1.PendFullSequence([[ new CmdDemand(tl1, 835) ]]);
+			// Item just gets deleted mid-animation
+			await AssertThrow(Lvl.TickOnceForTestingAsync);
 		}
 	}
 }

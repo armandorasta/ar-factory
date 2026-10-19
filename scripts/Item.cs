@@ -7,6 +7,7 @@ public partial class Item : Node2D
 {
 	public const int MaxValue = 1000;
 	public const int MinValue = -MaxValue;
+	public const int InvalidValue = MaxValue + 1;
 
 	// Nodes
 	public Sprite2D Sprite => m_Sprite!;

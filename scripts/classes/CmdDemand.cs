@@ -7,13 +7,13 @@ namespace ArFactory;
 /// </summary>
 public class CmdDemand : Command
 {
-	public Vector2I GridLoc { get; private set; }
+	public Vector2I GLocation { get; private set; }
 	public int Value { get; private set; }
 
 	public CmdDemand(Vector2I gloc, int reqVal) : base(1)
 	{
 		Debug.Assert(Item.IsValueWithinRange(reqVal));
-		GridLoc = gloc;
+		GLocation = gloc;
 		Value = reqVal;
 	}
 
@@ -22,7 +22,9 @@ public class CmdDemand : Command
 
 	protected override void OnTick(Editor.OnTickMediator ticker)
 	{
-		var targetTile = ticker.World.GetTileNonNull(GridLoc);
+		Debug.Assert(HasTileWithItemNotMidAnim(ticker.World, GLocation));
+
+		var targetTile = ticker.World.GetTileNonNull(GLocation);
 		var itVal = targetTile.Item.Value;
 		if (itVal == Value)
 		{
@@ -33,10 +35,10 @@ public class CmdDemand : Command
 		{
 			GD.Print($"Expected {Value}, but got {itVal} instead...");
 			targetTile.DestroyItem();
-			targetTile.Reserve(); // Forever until I implement halt.
+			ticker.CrashSimulation(Value, itVal, GLocation);
 		}
 	}
 
 	public override string ToString()
-		=> Utilz.AppendToBaseToString(base.ToString(), $"Demand[at {GridLoc} demand val {Value}]");
+		=> Utilz.AppendToBaseToString(base.ToString(), $"Demand[at {GLocation} demand val {Value}]");
 }

@@ -23,35 +23,32 @@ public partial class Editor : Godot.Node2D
 	{
 		public enum Status
 		{
-			StillGoing,
-			SuccessfulRun,
-			ManualHalt,
-			RecievedIncorrectValue,
+			NothingSus,
+			IncorrectValue,
 		}
 		
-		public Status Stat = Status.StillGoing;
-		public int ExpectedValue = Item.MaxValue + 1;
-		public int RecievedValue = Item.MaxValue + 1;
-
-		public void Succeed() => Stat = Status.SuccessfulRun;	
-		public void ManuallyHalt() => Stat = Status.ManualHalt;	
-		public void Crash(int expected, int found)
-		{
-			Debug.Assert(Item.IsValueWithinRange(expected));
-			Debug.Assert(Item.IsValueWithinRange(found));
-			Stat = Status.RecievedIncorrectValue;
-			ExpectedValue = expected;
-			RecievedValue = found;
-		}
+		public Status Stat = Status.NothingSus;
+		public int ExpectedValue = Item.InvalidValue;
+		public int RecievedValue = Item.InvalidValue;
+		public Vector2I GLocation = new(-1, -1);
 	}
 
 	public class OnTickMediator(WorldPanel world, CommandRunner runner)
 	{
 		public CommandRunner.OnTickPender Pender = new(runner);
 		public WorldPanel World = world;
-		private ExecState m_TState;
-		
-		public void CrashSimulation(int expected, int found) => m_TState.Crash(expected, found);
+		public ExecState m_TState;
+
+		public void CrashSimulation(int expected, int found, Vector2I where)
+		{
+			m_TState = new()
+			{
+				Stat = ExecState.Status.IncorrectValue,
+				ExpectedValue = expected,
+				RecievedValue = found,
+				GLocation = where,
+			};
+		}
 	}
 
 	public class PerFrameMediator(WorldPanel world, SimulatorClock clock, double dt)
@@ -187,6 +184,7 @@ public partial class Editor : Godot.Node2D
 		AddTool("xX", Vector2I.One, (l, d) => World.PlaceBin(l));
 		AddTool("?:", new Vector2I(1, 2), (l, d) => World.PlaceBranch(l, d, CmdIf.CheckType.Greater, 3));
 		AddTool("1>2", Vector2I.One, (l, d) => World.PlaceUpdater(l, d, 2, UNUpdater.UpdateType.Double));
+		AddTool(">||", Vector2I.One, (l, d) => World.PlaceDemander(l, d, [2, 4, 6, 8, 10, 12]));
 	}
 
 	private void InitDirPlacementLabel()
@@ -317,13 +315,43 @@ public partial class Editor : Godot.Node2D
 	{
 		Debug.Assert(m_CurrState is State.Play or State.Debug);
 
-		World.OnTick(new PendProxy(m_Runner));
 		var ticker = new OnTickMediator(World, m_Runner);
+		World.OnTick(new PendProxy(m_Runner));
+		
 		m_Runner.OnTick(ticker);
+		switch (ticker.m_TState.Stat) {
+		case ExecState.Status.NothingSus:
+			break;
+		
+		case ExecState.Status.IncorrectValue:
+			m_Clock.HaltSimulation();
+			GD.PrintErr($"Expected {ticker.m_TState.ExpectedValue} but found {ticker.m_TState.RecievedValue} on {ticker.m_TState.GLocation}");
+			break;
 
-		// TODO: CHECK FOR HALTS and PAUSES
+		default:
+			throw new NotImplementedException("New ExecState.Status?");
+		}
+
+		switch (World.CheckForErrorsThisTick()) {
+		case WorldPanel.TickState.NothingSus:
+			break;
+
+		case WorldPanel.TickState.RanOutOfItems:
+			m_Clock.HaltSimulation();
+			GD.PrintErr("RAN OUT OF ITEMS!!");
+			break;
+		
+		case WorldPanel.TickState.SuccessfulRun:
+			m_Clock.HaltSimulation();
+			GD.PrintErr("WIN!");
+			break;
+
+		default:
+			throw new NotImplementedException("New WorldPanel.TickState?");
+		}
 
 		UpdateTickCountLabel();
+
 	}
 
 	public void DoPerFrame(double dt)

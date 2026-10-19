@@ -8,7 +8,14 @@ public partial class SimulatorClock : Godot.Node
 	public sealed class SimulationAutoEnder(SimulatorClock sim) : IDisposable
 	{
 		private readonly SimulatorClock m_Sim = sim;
-		void IDisposable.Dispose() => m_Sim.HaltSimulation();
+		void IDisposable.Dispose()
+		{
+			if (!m_Sim.IsHalted())
+			{
+				m_Sim.HaltSimulation();
+			}
+		}
+
 	}
 
 	private enum State

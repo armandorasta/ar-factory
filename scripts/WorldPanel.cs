@@ -504,6 +504,36 @@ public partial class WorldPanel : Godot.Panel
 		}
 	}
 
+	public enum TickState
+	{
+		NothingSus,
+		RanOutOfItems,
+		SuccessfulRun,
+	}
+
+	public TickState CheckForErrorsThisTick()
+	{
+		var suppliers = m_Units.Where(u => u is UNSupplier).Select(u => (u as UNSupplier)!);
+		var demanders = m_Units.Where(u => u is UNDemander).Select(u => (u as UNDemander)!);
+
+		if (demanders.Any(_ => true) // No success ever if there are no demanders obviously...
+			&& demanders.All(d => d.IsDoneWithOutputSeq() && !d.HasPendingCmds()))
+		{
+			return TickState.SuccessfulRun;
+		}
+		
+		// We will check if there are any suppliers in the first place, because we don't want to crash the  simulation 
+		// for invalid levels, aka the ones constructed in tests...
+		if (suppliers.Any(_ => true) 
+			&& suppliers.All(s => s.IsDoneWithInputSeq()) 
+			&& m_Tiles.All(tl => tl is null || !tl.HasItem()))
+		{
+			return TickState.RanOutOfItems;
+		}
+
+		return TickState.NothingSus;
+	}
+
 	public void CleanUpAfterSim()
 	{
 		foreach (var u in m_Units)
@@ -622,12 +652,13 @@ public partial class WorldPanel : Godot.Panel
 		return bra;
 	}
 
-	// public void PlaceDemander(Vector2I gloc, Direction dir, int[] seq)
-	// {
-	// 	var dem = UNDemanderScene.Instantiate<UnDemander>();
-	// 	AddUnit(dem);
-	// 	dem.("setup", this, gloc, dir, seq);		
-	// }
+	public UNDemander PlaceDemander(Vector2I gloc, Direction dir, IEnumerable<int> seq)
+	{
+		var dem = UNDemanderScene.Instantiate<UNDemander>();
+		AddUnit(dem);
+		dem.Setup(this, gloc, dir, seq);
+		return dem;
+	}
 
 	// // TODO: int to UNCombiner.Operation
 	// public void PlaceCombiner(Vector2I gloc, Direction dir, int rate, int op)
