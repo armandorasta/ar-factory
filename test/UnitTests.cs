@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using System.Threading.Tasks.Sources;
 using Godot;
 
 namespace ArFactory.Tests;
@@ -11,7 +12,7 @@ public class UnitTests : ArTest.TestSuit
 
 	public override void BeforeAll()
 	{
-		var levelScene = GD.Load<Godot.PackedScene>(SceneManager.LevelScenePath);
+		var levelScene = GD.Load<Godot.PackedScene>(SceneManager.EditorScenePath);
 		m_Lv = levelScene.Instantiate<Editor>();
 		AddNode(Lvl);
 		Lvl.Clock.SetTickRate(100);
@@ -391,7 +392,6 @@ public class UnitTests : ArTest.TestSuit
 	{
 		var world = Lvl.World;
 		var slid = world.PlaceSlider(new Vector2I(3, 4), Direction.West, 3);
-		var injy = world.PlaceInjector();
 
 		var tlSlid = slid.GetTile(Vector2I.Zero);
 		var tlDest = world.InstallEmptyTile(tlSlid.GLocation + Direction.West.ToGrid());
@@ -447,10 +447,7 @@ public class UnitTests : ArTest.TestSuit
 	{
 		var world = Lvl.World;
 		var slid = world.PlaceSlider(new Vector2I(3, 4), Direction.West, 3);
-		var injy = world.PlaceInjector();
-
 		var tlSlid = slid.GetTile(Vector2I.Zero);
-		var tlDest = world.InstallEmptyTile(tlSlid.GLocation + Direction.West.ToGrid());
 
 		using (Lvl.Clock.PlaySimulationInDebug())
 		{
@@ -459,6 +456,50 @@ public class UnitTests : ArTest.TestSuit
 			AssertTrue(tlSlid.HasItem());
 			AssertFalse(tlSlid.Item.IsMidAnimation());
 			AssertEq(tlSlid.Item.Value, 261);
+		}
+	}
+
+	[ArTest.Test] public async Task TestLocking_using_slider()
+	{
+		// Semantics for the time being:
+		// - Locked units still allow items in.
+		// - Locking a unit will reset the counter, so it acts like a reset kind of. I made it this way because of the
+		//   on-demand units, and all their complications, solved by just adding a `m_Count = 0`.
+
+		var world = Lvl.World;
+		var slid = world.PlaceSlider(new Vector2I(2, 1), Direction.East, 2);
+		var injy = world.PlaceInjector();
+		
+		var tlIn = world.InstallEmptyTile(slid.GLocation + slid.Dir.Invert().ToGrid());
+		var tlSlid = slid.GetTile(Vector2I.Zero);
+		var tlOut = world.InstallEmptyTile(slid.GLocation + slid.Dir.ToGrid());
+
+		using (Lvl.Clock.PlaySimulationInDebug())
+		{
+			world.SpawnItem(tlIn, -103);
+			injy.PendFullSequence([[ new CmdSlide(tlIn, slid.Dir) ]]);
+			slid.Lock(); // Should not crash
+			AssertTrue(slid.IsLocked());
+			await Lvl.TickOnceForTestingAsync(); // Item slides in
+			await Lvl.TickOnceForTestingAsync(); // 1
+			await Lvl.TickOnceForTestingAsync(); // 2, here with locking the item would slide out, but it shouldn't
+			AssertTrue(tlSlid.HasItem());
+			AssertFalse(tlOut.HasItem());
+			await Lvl.TickOnceForTestingAsync(); // Locked
+			AssertTrue(tlSlid.HasItem());
+			AssertFalse(tlOut.HasItem());
+			await Lvl.TickOnceForTestingAsync(); // Locked
+			AssertTrue(tlSlid.HasItem());
+			AssertFalse(tlOut.HasItem());
+
+			slid.Unlock();
+			AssertFalse(slid.IsLocked());
+			await Lvl.TickOnceForTestingAsync(); // 1 (counter resets when locking)
+			AssertTrue(tlSlid.HasItem());
+			AssertFalse(tlOut.HasItem());
+			await Lvl.TickOnceForTestingAsync(); // 2, item slides out yay!
+			AssertFalse(tlSlid.HasItem());
+			AssertTrue(tlOut.HasItem());
 		}
 	}
 
@@ -581,7 +622,7 @@ public class UnitTests : ArTest.TestSuit
 	{
 		var world = Lvl.World;
 		// For now I am only planning on allowing the value zero.
-		var bra = world.PlaceBranch(new Vector2I(1, 2), Direction.East, CmdIf.CheckType.Greater, 0);
+		var bra = world.PlaceBranch(new Vector2I(1, 2), Direction.East, 1, CmdIf.CheckType.Greater, 0);
 		var injy = world.PlaceInjector();
 
 		var tlIn = world.InstallEmptyTile(bra.GLocation + bra.Dir.Invert().ToGrid());
@@ -634,7 +675,7 @@ public class UnitTests : ArTest.TestSuit
 	{
 		var world = Lvl.World;
 		// For now I am only planning on allowing the value zero.
-		var bra = world.PlaceBranch(new Vector2I(1, 2), Direction.East, CmdIf.CheckType.Greater, 0);
+		var bra = world.PlaceBranch(new Vector2I(1, 2), Direction.East, 1, CmdIf.CheckType.Greater, 0);
 		var injy = world.PlaceInjector();
 
 		var tlIn = world.InstallEmptyTile(bra.GLocation + bra.Dir.Invert().ToGrid());
@@ -775,6 +816,219 @@ public class UnitTests : ArTest.TestSuit
 
 			await Lvl.TickOnceForTestingAsync(); // Item gets consumed
 			AssertTrue(Lvl.Clock.IsHalted()); // Last item, so simulation should succeed.
+		}
+	}
+
+	[ArTest.Test] public async Task TestCombiner_vanilla()
+	{
+		var world = Lvl.World;
+		var combi = world.PlaceCombiner(new Vector2I(2, 4), Direction.East, 2, BinaryOperation.Add);
+		var injy = world.PlaceInjector();
+		var tl0 = world.InstallEmptyTile(combi.InLeftTile.GLocation + combi.Dir.Invert().ToGrid());
+		var tl1 = world.InstallEmptyTile(combi.InRightTile.GLocation + combi.Dir.Invert().ToGrid());
+		var tlOut = world.InstallEmptyTile(combi.OutTile.GLocation + combi.Dir.ToGrid());
+
+		using (Lvl.Clock.PlaySimulationInDebug())
+		{
+			world.SpawnItem(tl0, 774);
+			world.SpawnItem(tl1, -539);
+			injy.PendFullSequence([[
+				new CmdSlide(tl0, combi.Dir),
+				new CmdSlide(tl1, combi.Dir),
+			]]);
+
+			await Lvl.TickOnceForTestingAsync(); // Items slide in
+			await Lvl.TickOnceForTestingAsync(); // Nothing happens
+			await Lvl.TickOnceForTestingAsync(); // Result slides out
+			AssertTrue(tlOut.HasItem());
+			AssertEq(tlOut.Item.Value, 774 + -539);
+		}
+	}
+
+	[ArTest.Test] public async Task TestCombiner_clogged()
+	{
+		var world = Lvl.World;
+		var combi = world.PlaceCombiner(new Vector2I(2, 4), Direction.East, 2, BinaryOperation.Add);
+		var injy = world.PlaceInjector();
+		var tl0 = world.InstallEmptyTile(combi.InLeftTile.GLocation + combi.Dir.Invert().ToGrid());
+		var tl1 = world.InstallEmptyTile(combi.InRightTile.GLocation + combi.Dir.Invert().ToGrid());
+		var tlOut = world.InstallEmptyTile(combi.OutTile.GLocation + combi.Dir.ToGrid());
+
+		using (Lvl.Clock.PlaySimulationInDebug())
+		{
+			world.SpawnItem(tl0, 774);
+			world.SpawnItem(tl1, -539);
+			world.SpawnItem(tlOut, -195); // In the way
+			injy.PendFullSequence([[
+				new CmdSlide(tl0, combi.Dir),
+				new CmdSlide(tl1, combi.Dir),
+			]]);
+
+			await Lvl.TickOnceForTestingAsync(); // Items slide in
+			await Lvl.TickOnceForTestingAsync(); // Nothing happens
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			tlOut.DestroyItem();
+			await Lvl.TickOnceForTestingAsync(); // Result slides out immediately
+			AssertTrue(tlOut.HasItem());
+			AssertEq(tlOut.Item.Value, 774 + -539);
+		}
+	}
+
+	[ArTest.Test] public async Task TestCombiner_missing_output_connection()
+	{
+		var world = Lvl.World;
+		var combi = world.PlaceCombiner(new Vector2I(2, 4), Direction.East, 2, BinaryOperation.Add);
+		var injy = world.PlaceInjector();
+		var tl0 = world.InstallEmptyTile(combi.InLeftTile.GLocation + combi.Dir.Invert().ToGrid());
+		var tl1 = world.InstallEmptyTile(combi.InRightTile.GLocation + combi.Dir.Invert().ToGrid());
+
+		using (Lvl.Clock.PlaySimulationInDebug())
+		{
+			world.SpawnItem(tl0, 774);
+			world.SpawnItem(tl1, -539);
+			injy.PendFullSequence([[
+				new CmdSlide(tl0, combi.Dir),
+				new CmdSlide(tl1, combi.Dir),
+			]]);
+
+			await Lvl.TickOnceForTestingAsync(); // Items slide in
+			await Lvl.TickOnceForTestingAsync(); // Nothing happens
+			await Lvl.TickOnceForTestingAsync(); // Nothing happens
+			await Lvl.TickOnceForTestingAsync(); // Nothing happens
+			await Lvl.TickOnceForTestingAsync(); // Nothing happens
+			await Lvl.TickOnceForTestingAsync(); // Nothing happens
+			await Lvl.TickOnceForTestingAsync(); // Nothing happens
+		}
+	}
+
+	[ArTest.Test] public async Task TestCloner_vanilla()
+	{
+		var world = Lvl.World;
+		var clo = world.PlaceCloner(new Vector2I(1, 4), Direction.East, 2);
+		var injy = world.PlaceInjector();
+
+		var tlIn = world.InstallEmptyTile(clo.InTile.GLocation + clo.Dir.Invert().ToGrid());
+		var tlOut0 = world.InstallEmptyTile(clo.OutTile0.GLocation + clo.Dir.ToGrid());
+		var tlOut1 = world.InstallEmptyTile(clo.OutTile1.GLocation + clo.Dir.ToGrid());
+
+		using (Lvl.Clock.PlaySimulationInDebug())
+		{
+			world.SpawnItem(tlIn, 508);
+			injy.PendFullSequence([[ new CmdSlide(tlIn, clo.Dir) ]]);
+			await Lvl.TickOnceForTestingAsync(); // Item slides in
+			await Lvl.TickOnceForTestingAsync(); // Nothing happens
+			await Lvl.TickOnceForTestingAsync(); // Two items slide out \_(0_0)_/
+			AssertTrue(tlOut0.HasItem());
+			AssertEq(tlOut0.Item.Value, 508);
+			AssertTrue(tlOut1.HasItem());
+			AssertEq(tlOut0.Item.Value, 508);
+		}
+	}
+
+	[ArTest.Test] public async Task TestCloner_clogged()
+	{
+		var world = Lvl.World;
+		var clo = world.PlaceCloner(new Vector2I(1, 4), Direction.East, 2);
+		var injy = world.PlaceInjector();
+
+		var tlIn = world.InstallEmptyTile(clo.InTile.GLocation + clo.Dir.Invert().ToGrid());
+		var tlOut0 = world.InstallEmptyTile(clo.OutTile0.GLocation + clo.Dir.ToGrid());
+		var tlOut1 = world.InstallEmptyTile(clo.OutTile1.GLocation + clo.Dir.ToGrid());
+
+		using (Lvl.Clock.PlaySimulationInDebug())
+		{
+			world.SpawnItem(tlIn, 508);
+			world.SpawnItem(tlOut0, 964); // In the way
+			world.SpawnItem(tlOut1, 212); // In the way
+			injy.PendFullSequence([[ new CmdSlide(tlIn, clo.Dir) ]]);
+			await Lvl.TickOnceForTestingAsync(); // Item slides in
+			await Lvl.TickOnceForTestingAsync(); // Nothing happens
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			
+			tlOut0.DestroyItem();
+			await Lvl.TickOnceForTestingAsync(); // Item slides out of out0
+			AssertTrue(tlOut0.HasItem());
+			AssertEq(tlOut0.Item.Value, 508);
+
+			tlOut1.DestroyItem();
+			await Lvl.TickOnceForTestingAsync(); // Item slides out of out1
+			AssertTrue(tlOut1.HasItem());
+			AssertEq(tlOut0.Item.Value, 508);
+			
+			await Lvl.Clock.EndTickAsync();
+			tlOut0.DestroyItem();
+			tlOut1.DestroyItem();
+			world.SpawnItem(tlIn, -900);
+			injy.PendFullSequence([[ new CmdSlide(tlIn, clo.Dir) ]]);
+			
+			await Lvl.TickOnceForTestingAsync(); // Item slides in
+			await Lvl.TickOnceForTestingAsync(); // Nothing happens
+			await Lvl.TickOnceForTestingAsync(); // 2 pop out baby
+			AssertTrue(tlOut0.HasItem());
+			AssertEq(tlOut0.Item.Value, -900);
+			AssertTrue(tlOut1.HasItem());
+			AssertEq(tlOut0.Item.Value, -900);
+		}
+	}
+
+	[ArTest.Test] public async Task TestCloner_missing_output_connections()
+	{
+		var world = Lvl.World;
+		var clo = world.PlaceCloner(new Vector2I(1, 4), Direction.East, 2);
+		var injy = world.PlaceInjector();
+
+		var tlIn = world.InstallEmptyTile(clo.InTile.GLocation + clo.Dir.Invert().ToGrid());
+		using (Lvl.Clock.PlaySimulationInDebug())
+		{
+			world.SpawnItem(tlIn, 508);
+			injy.PendFullSequence([[ new CmdSlide(tlIn, clo.Dir) ]]);
+			await Lvl.TickOnceForTestingAsync(); // Item slides in
+			await Lvl.TickOnceForTestingAsync(); // Nothing happens
+			await Lvl.TickOnceForTestingAsync(); // Clogged, or straight up disabled.
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+		}
+
+		var tlOut1 = world.InstallEmptyTile(clo.OutTile1.GLocation + clo.Dir.ToGrid());
+		using (Lvl.Clock.PlaySimulationInDebug()) // One output connected, other one missing
+		{
+			world.SpawnItem(tlIn, 508);
+			injy.PendFullSequence([[ new CmdSlide(tlIn, clo.Dir) ]]);
+			await Lvl.TickOnceForTestingAsync(); // Item slides in
+			await Lvl.TickOnceForTestingAsync(); // Nothing happens
+			await Lvl.TickOnceForTestingAsync(); // Nothing should slide out as normal!
+			AssertFalse(tlOut1.HasItem());
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			AssertFalse(tlOut1.HasItem());
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			AssertFalse(tlOut1.HasItem());
+		}
+
+		var tlOut0 = world.InstallEmptyTile(clo.OutTile0.GLocation + clo.Dir.ToGrid());
+		world.DeleteTile(tlOut1.GLocation);
+		using (Lvl.Clock.PlaySimulationInDebug()) // The other output this time.
+		{
+			world.SpawnItem(tlIn, 508);
+			injy.PendFullSequence([[ new CmdSlide(tlIn, clo.Dir) ]]);
+			await Lvl.TickOnceForTestingAsync(); // Item slides in
+			await Lvl.TickOnceForTestingAsync(); // Nothing happens
+			await Lvl.TickOnceForTestingAsync(); // Nothing should slide out as normal!
+			AssertFalse(tlOut0.HasItem());
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			AssertFalse(tlOut0.HasItem());
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			AssertFalse(tlOut0.HasItem());
 		}
 	}
 }

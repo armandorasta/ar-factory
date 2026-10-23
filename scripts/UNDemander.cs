@@ -3,9 +3,13 @@ using Godot;
 
 namespace ArFactory;
 
+/// <summary>
+/// Acts as the output for the current level. Needs to be fed a certain sequence of items to pass the level.
+/// </summary>
 public partial class UNDemander : Unit
 {
 	public Tile Input => m_In0!;
+	public int[] Sequence => m_Sequence!;
 
 	private int[]? m_Sequence;
 	private int m_Index = -1;
@@ -42,11 +46,11 @@ public partial class UNDemander : Unit
 		]);
 	}
 
-	public bool IsDoneWithOutputSeq() => m_Index >= m_Sequence!.Length - 1;
+	public bool IsDoneWithOutputSeq() => m_Index >= Sequence.Length - 1;
 
 	public override string ToString()
 	{
-		var seqStr = string.Join(", ", m_Sequence!);
+		var seqStr = string.Join(", ", Sequence);
 		return Utilz.AppendToBaseToString(base.ToString(), $"Demander[i: {m_Index}, [{seqStr}]]");
 	}
 
@@ -60,6 +64,6 @@ public partial class UNDemander : Unit
 	{
 		Debug.Assert(!IsDoneWithOutputSeq());
 		m_Index += 1;
-		return m_Sequence![m_Index];
+		return Sequence[m_Index];
 	}
 }

@@ -12,7 +12,7 @@ public class LevelTests : ArTest.TestSuit
 
 	public override void BeforeAll()
 	{
-		var levelScene = GD.Load<Godot.PackedScene>(SceneManager.LevelScenePath);
+		var levelScene = GD.Load<Godot.PackedScene>(SceneManager.EditorScenePath);
 		m_Lv = levelScene.Instantiate<Editor>();
 		AddNode(m_Lv);
 		m_Lv.Clock.SetTickRate(100);

@@ -75,7 +75,7 @@ public partial class Editor : Godot.Node2D
 	}
 
 	// Nodes
-	public Godot.Camera2D Cam => m_Cam!;
+	public Cam WorldCam => m_Cam!;
 	public WorldPanel World => m_World!;
 	public Godot.Button PlayButt => m_PlayButt!;
 	public Godot.Button HaltButt => m_HaltButt!;
@@ -87,7 +87,7 @@ public partial class Editor : Godot.Node2D
 	public Godot.Label TickSpeedLabel => m_TickSpeedLabel!;
 
 	#region
-	private Godot.Camera2D? m_Cam;
+	private Cam? m_Cam;
 	private WorldPanel? m_World;
 	private Godot.Button? m_PlayButt;
 	private Godot.Button? m_HaltButt;
@@ -111,7 +111,7 @@ public partial class Editor : Godot.Node2D
 
 	// Editor stuff
 	private record struct UnitPlacement(Godot.ButtonGroup ButtGroup, Godot.Button? Butt, Direction Dir);
-	private record ToolBoxButtInfo(Vector2I Dims, Action<Vector2I, Direction> PlacementFunc);
+	private record ToolBoxButtInfo(Vector2I Dims, Func<Vector2I, Direction, Unit> PlacementFunc);
 
 	public Godot.Label PlacementDirLabel => m_PlacementDirLabel!;
 	private Godot.Label? m_PlacementDirLabel;
@@ -130,7 +130,9 @@ public partial class Editor : Godot.Node2D
 	public override void _Ready()
 	{
 		GetAllNodes();
-		Cam!.Position = World!.Size * 0.5f;
+		WorldCam.Position = World!.Size * 0.5f;
+		WorldCam.MaxZoom = 1.0f;
+		WorldCam.MinZoom = 0.3f;
 		InitSimy();
 		InitSimButts();
 		InitSimSpeedSlider();
@@ -140,7 +142,7 @@ public partial class Editor : Godot.Node2D
 
 	private void GetAllNodes()
 	{
-		m_Cam = GetNode<Godot.Camera2D>("WorldPanel/Cam");
+		m_Cam = GetNode<Cam>("WorldPanel/Cam");
 		m_World = GetNode<WorldPanel>("WorldPanel");
 		m_PlayButt = GetNode<Godot.Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PlayButt");
 		m_HaltButt = GetNode<Godot.Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PauseButt");
@@ -182,9 +184,11 @@ public partial class Editor : Godot.Node2D
 		AddTool("||>", Vector2I.One, (l, d) => World.PlaceSupplier(l, d, 1, [1, 2, 3, 4, 5, 6]));
 		AddTool(">>>", Vector2I.One, (l, d) => World.PlaceSlider(l, d, 1));
 		AddTool("xX", Vector2I.One, (l, d) => World.PlaceBin(l));
-		AddTool("?:", new Vector2I(1, 2), (l, d) => World.PlaceBranch(l, d, CmdIf.CheckType.Greater, 3));
+		AddTool("?:", new Vector2I(1, 2), (l, d) => World.PlaceBranch(l, d, 2, CmdIf.CheckType.Greater, 0));
 		AddTool("1>2", Vector2I.One, (l, d) => World.PlaceUpdater(l, d, 2, UNUpdater.UpdateType.Double));
 		AddTool(">||", Vector2I.One, (l, d) => World.PlaceDemander(l, d, [2, 4, 6, 8, 10, 12]));
+		AddTool(">^<", new Vector2I(1, 2), (l, d) => World.PlaceCombiner(l, d, 2, BinaryOperation.Add));
+		AddTool("1>11", new Vector2I(1, 2), (l, d) => World.PlaceCloner(l, d, 2));
 	}
 
 	private void InitDirPlacementLabel()
@@ -194,7 +198,7 @@ public partial class Editor : Godot.Node2D
 		PlacementDirLabel.Hide();
 	}
 
-	private void AddTool(string text, Vector2I dims, Action<Vector2I, Direction> placementFunc)
+	private void AddTool(string text, Vector2I dims, Func<Vector2I, Direction, Unit> placementFunc)
 	{
 		var butt = new Godot.Button
 		{
@@ -213,6 +217,52 @@ public partial class Editor : Godot.Node2D
 	public override void _UnhandledInput(InputEvent ev)
 	{
 		switch (m_CurrState) {
+		case State.Off:
+		{
+			if (ev is InputEventMouseButton mev)
+			{
+				if (mev.IsPressed() && mev.ButtonMask == MouseButtonMask.Right && !mev.CtrlPressed && !mev.ShiftPressed)
+				{
+					var mgloc = World.PosToGrid(World.GetLocalMousePosition());
+					GD.Print(mgloc);
+					switch (World.GetUnit(mgloc)) {
+					case UNUpdater updater:
+						MakePopup(mev, ["2x", "x+1", "-x"], id =>
+						{
+							updater.UpType = id switch
+							{
+								0 => UNUpdater.UpdateType.Double,
+								1 => UNUpdater.UpdateType.Increment,
+								2 => UNUpdater.UpdateType.Negate,
+								_ => throw new NotImplementedException(),
+							};
+						});
+						break;
+					case UNCombiner combi:
+						MakePopup(mev, ["x + x + ...", "x * x * x..."], id =>
+						{
+							combi.Operation = id switch
+							{
+								0 => BinaryOperation.Add,
+								1 => BinaryOperation.Mul,
+								_ => throw new NotImplementedException(),
+							};
+						});
+						break;
+					}
+				}
+			}
+			
+			if (Input.GetMouseButtonMask() == MouseButtonMask.Right && Input.IsKeyPressed(Key.Ctrl))
+			{
+				var mouseGL = World.PosToGrid(GetLocalMousePosition());
+				if (World.GetUnit(mouseGL) is Unit u)
+				{
+					World.DeleteUnit(u);
+				}
+			}
+			break;
+		}
 		case State.Placement:
 		{
 			if (ev is InputEventMouseButton mev)
@@ -239,10 +289,6 @@ public partial class Editor : Godot.Node2D
 							{
 								info.PlacementFunc.Invoke(World.PosToGrid(mousePos), m_CurrUnitPlacement.Dir);
 							}
-							else
-							{
-								GD.Print($"Nope, a {info.Dims.X}x{info.Dims.Y} unit can't fit on {gloc} buddy");
-							}
 						}
 					}
 				}
@@ -257,23 +303,29 @@ public partial class Editor : Godot.Node2D
 			}
 			break;
 		}
-		case State.Off:
-		{
-			if (Input.IsMouseButtonPressed(MouseButton.Right) && Input.IsKeyPressed(Key.Ctrl))
-			{
-				var mouseGL = World.PosToGrid(GetLocalMousePosition());
-				if (World.GetUnit(mouseGL) is Unit u)
-				{
-					World.DeleteUnit(u);
-				}
-			}
-			break;
-		}
 		case State.Play:
 		case State.Debug:
 		default:
 			break;
 		}
+	}
+
+	private void MakePopup(Godot.InputEventMouse mev, IEnumerable<string> items, Action<int> pressFunc)
+	{
+		var men = new Godot.PopupMenu();
+		foreach (var item in items)
+		{
+			men.AddItem(item);
+		}
+		men.IdPressed += id => pressFunc.Invoke((int)id);
+		men.PopupHide += () =>
+		{
+			RemoveChild(men);
+			men.QueueFree();
+		};
+		AddChild(men);
+		men.Position = (Vector2I)mev.GlobalPosition;
+		men.Popup();
 	}
 
 	public override void _Process(double dt)
@@ -441,6 +493,7 @@ public partial class Editor : Godot.Node2D
 	}
 
 	#endregion .Signal Handlers
+
 
 	private void Reset()
 	{

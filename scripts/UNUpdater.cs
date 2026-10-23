@@ -27,9 +27,9 @@ public partial class UNUpdater : Unit
 
 
 	public Label UpTypeLabel => m_UpTypeLabel!;
-	public Label? m_UpTypeLabel;
-
-	public UpdateType m_UpType { get; private set; }
+	private Label? m_UpTypeLabel;
+	
+	public UpdateType UpType;
 
 	public Tile Output => GetTile(Vector2I.Zero);
 	public Tile Input => GetTile(Vector2I.Zero);
@@ -44,7 +44,7 @@ public partial class UNUpdater : Unit
 		Debug.Assert(Enum.IsDefined(upT));
 		BaseInit(world, TickType.OnDemand, workRate, gloc, Vector2I.One, dir);
 
-		m_UpType = upT;
+		UpType = upT;
 		UpTypeLabel.Text = upT switch
 		{
 			UpdateType.Double => "2x",
@@ -73,7 +73,7 @@ public partial class UNUpdater : Unit
 		if (World.HasTile(destLoc))
 		{
 			pender.Pend([
-				[ Apply(m_UpType, tl) ],
+				[ Apply(UpType, tl) ],
 				[ new CmdSlide(tl, Dir) ],
 			]);
 		}
@@ -81,6 +81,6 @@ public partial class UNUpdater : Unit
 
 	public override string ToString()
 	{
-		return Utilz.AppendToBaseToString(base.ToString(), $"Updater[{m_UpType}]");
+		return Utilz.AppendToBaseToString(base.ToString(), $"Updater[{UpType}]");
 	}
 }

@@ -15,6 +15,9 @@ public abstract partial class Unit : Node2D
 	}
 
 
+	[Godot.Signal] delegate void MouseInputEventHandler(Godot.InputEventMouse ev);
+
+
 	// Nodes
 	public Sprite2D? Sprite;
 
@@ -26,13 +29,14 @@ public abstract partial class Unit : Node2D
 	public int Rate => m_Rate; // Ticks per work
 	public WorldPanel World => m_World!;
 
-
 	// Privates
 	private TickType m_TickType;
 	private Vector2I m_GL;
 	private Direction m_Dir = Direction.East;
 	private Vector2I m_Dims;
 	private int m_Rate;
+	private bool m_bLocked = false;
+	private bool m_bCanBeLocked = false;
 	private readonly List<Command> m_PendingCmds = [];
 
 	/// <summary>
@@ -74,9 +78,18 @@ public abstract partial class Unit : Node2D
 		this.Sprite = GetNodeOrNull<Sprite2D>("Sprite2D");
 	}
 
+	public override void _Input(Godot.InputEvent ev)
+	{
+		if (ev is InputEventMouse mev)
+		{
+			EmitSignal(SignalName.MouseInput, mev);
+		}
+	}
+
 	// This function is called on the `_Ready` function of sub-classes.
 	protected void BaseInit(
-		WorldPanel world, TickType tickType, int workRate, Vector2I gloc, Vector2I dims, Direction dir)
+		WorldPanel world, TickType tickType, int workRate, Vector2I gloc, Vector2I dims, Direction dir, 
+		bool bLockable = false)
 	{
 		Debug.Assert(Unit.CanFitIn(world, gloc, dims, dir));
 		Debug.Assert(CanFaceDir(dir));
@@ -88,6 +101,7 @@ public abstract partial class Unit : Node2D
 		this.m_GL = gloc;
 		this.m_Dims = dims;
 		this.m_TickType = tickType;
+		this.m_bCanBeLocked = bLockable;
 
 		Position = world.GridToPos(gloc);
 
@@ -150,6 +164,21 @@ public abstract partial class Unit : Node2D
 		]));
 		return bui.Append(']').ToString();
 	}
+
+	public bool IsLocked() => m_bLocked;
+	public bool CanBeLocked() => m_bCanBeLocked;
+
+	public void Lock()
+	{
+		Debug.Assert(m_bCanBeLocked);
+		m_bLocked = true;
+	}
+
+	public void Unlock()
+	{
+		m_bLocked = false;
+	}
+
 
 	/// <summary>
 	/// Returns enclosing Rect2I in grid-space.
@@ -396,31 +425,34 @@ public abstract partial class Unit : Node2D
 	/// </summary>
 	public void PreprocessTick()
 	{
-		switch (m_TickType)
+		if (m_bLocked)
 		{
-			case TickType.Steady:
+			m_Count = 0;
+		}
+		else switch (m_TickType) {
+		case TickType.Steady:
+			m_Count += 1;
+			break;
+
+		case TickType.OnDemand:
+			if (IsWorkTick()) // Checking last tick btw.
+			{
+				// Reset after work tick.
+				m_Count = 0;
+			}
+
+			if (AreAllTickTilesFilled())
+			{
 				m_Count += 1;
-				break;
+			}
+			else
+			{
+				m_Count = 0;
+			}
+			break;
 
-			case TickType.OnDemand:
-				if (IsWorkTick()) // Checking last tick btw.
-				{
-					// Reset after work tick.
-					m_Count = 0;
-				}
-
-				if (AreAllTickTilesFilled())
-				{
-					m_Count += 1;
-				}
-				else
-				{
-					m_Count = 0;
-				}
-				break;
-
-			default:
-				throw new NotImplementedException("New tick type?");
+		default:
+			throw new NotImplementedException("New tick type?");
 		}
 
 		m_PendingCmds.RemoveAll(c => c.IsDone());
@@ -428,9 +460,7 @@ public abstract partial class Unit : Node2D
 
 	private bool AreAllTickTilesFilled()
 	{
-		// Any returns false for empty containers, this means an on-demand container with no tick tiles won't function 
-		// ever.
-		return !m_TickTiles.Any(tl => !tl.HasItem() || tl.Item.IsMidAnimation());
+		return m_TickTiles.Count > 0 && m_TickTiles.All(tl => tl.HasItem() && !tl.Item.IsMidAnimation());
 	}
 
 

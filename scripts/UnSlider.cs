@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace ArFactory;
@@ -6,7 +7,7 @@ public partial class UNSlider : Unit
 {
 	public void Setup(WorldPanel world, Vector2I gloc, int workRate, Direction dir)
 	{
-		BaseInit(world, TickType.Steady, workRate, gloc, Vector2I.One, dir);
+		BaseInit(world, TickType.Steady, workRate, gloc, Vector2I.One, dir, true);
 	}
 
 	protected override void BuildTilesAsIfFacingEast()

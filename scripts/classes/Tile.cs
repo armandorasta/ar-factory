@@ -206,11 +206,12 @@ public class Tile
 	/// <see langword="true"/> if there was an item and it was destroyed, 
 	/// <see langword="false"/> if the tile was empty in the first place.
 	/// </returns>
-	public void DestroyItem(bool bMaybeNull = false)
+	public void DestroyItem(bool bMaybeNull = false, bool bMaybeMidAnim = false)
 	{
 		Debug.Assert(bMaybeNull || HasItem());
 		if (m_Item is not null)
 		{
+			Debug.Assert(bMaybeMidAnim || !m_Item.IsMidAnimation());
 			m_Item.QueueFree();
 			m_Item.GetParent().RemoveChild(m_Item);
 			m_Item = null;

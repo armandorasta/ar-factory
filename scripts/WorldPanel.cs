@@ -8,11 +8,12 @@ namespace ArFactory;
 
 public partial class WorldPanel : Godot.Panel
 {
+	// Constants
 	public static readonly Vector2I MinDims = new(3, 3);
 	public static readonly Vector2I MaxDims = new(100, 100);
 
 
-	// Nodes
+	// Scenes
 	public static readonly Godot.PackedScene ItemScene = GD.Load<Godot.PackedScene>("res://scenes/Item.tscn");
 	public static readonly Godot.PackedScene UNSupplierScene = GD.Load<Godot.PackedScene>("res://scenes/UNSupplier.tscn");
 	public static readonly Godot.PackedScene UNSliderScene = GD.Load<Godot.PackedScene>("res://scenes/UNSlider.tscn");
@@ -22,6 +23,7 @@ public partial class WorldPanel : Godot.Panel
 	public static readonly Godot.PackedScene UNCombinerScene = GD.Load<Godot.PackedScene>("res://scenes/UNCombiner.tscn");
 	public static readonly Godot.PackedScene UNClonerScene = GD.Load<Godot.PackedScene>("res://scenes/UNCloner.tscn");
 	public static readonly Godot.PackedScene UNBranchScene = GD.Load<Godot.PackedScene>("res://scenes/UNBranch.tscn");
+
 
 	// Other statics
 	public static readonly Godot.Font DebugFont = GD.Load<Godot.Font>("res://resources/fonts/AnonymousPro-Regular.ttf");
@@ -34,7 +36,7 @@ public partial class WorldPanel : Godot.Panel
 
 
 	// Privates
-	private Vector2I m_Dims = new(10, 10);
+	private Vector2I m_Dims = new(50, 50);
 	private readonly List<Unit> m_Units = [];
 	private List<Tile?> m_Tiles = [];
 
@@ -543,7 +545,7 @@ public partial class WorldPanel : Godot.Panel
 		
 		foreach (var tl in m_Tiles)
 		{
-			tl?.DestroyItem(true);
+			tl?.DestroyItem(true, true);
 		}
 	}
 
@@ -554,7 +556,7 @@ public partial class WorldPanel : Godot.Panel
 	{
 		Reset();
 		SetDims(m_Dims, true);
-		PlaceSomeUnits();
+		// PlaceSomeUnits();
 	}
 
 	public override void _Draw()
@@ -592,7 +594,7 @@ public partial class WorldPanel : Godot.Panel
 		PlaceSlider(new Vector2I(3, 6), Direction.East);
 		PlaceSlider(new Vector2I(4, 6), Direction.East);
 		PlaceSlider(new Vector2I(5, 6), Direction.East);
-		PlaceBranch(new Vector2I(6, 6), Direction.East, CmdIf.CheckType.Greater, 100);
+		PlaceBranch(new Vector2I(6, 6), Direction.East, 2, CmdIf.CheckType.Greater, 100);
 		PlaceSlider(new Vector2I(7, 6), Direction.East);
 		PlaceBin(new Vector2I(8, 6));
 		PlaceSlider(new Vector2I(7, 7), Direction.South);
@@ -644,11 +646,11 @@ public partial class WorldPanel : Godot.Panel
 		return bin;
 	}
 
-	public UNBranch PlaceBranch(Vector2I gloc, Direction dir, CmdIf.CheckType check, int value)
+	public UNBranch PlaceBranch(Vector2I gloc, Direction dir, int rate, CmdIf.CheckType check, int value)
 	{
 		var bra = UNBranchScene.Instantiate<UNBranch>();
 		AddUnit(bra);
-		bra.Setup(this, gloc, dir, check, value);
+		bra.Setup(this, gloc, dir, rate, check, value);
 		return bra;
 	}
 
@@ -660,27 +662,21 @@ public partial class WorldPanel : Godot.Panel
 		return dem;
 	}
 
-	// // TODO: int to UNCombiner.Operation
-	// public void PlaceCombiner(Vector2I gloc, Direction dir, int rate, int op)
-	// {
-	// 	var bus = UNCombinerScene.Instantiate<UnCombiner>();
-	// 	AddUnit(bus);
-	// 	bus.("setup", this, gloc, rate, dir, op);		
-	// }
+	public UNCombiner PlaceCombiner(Vector2I gloc, Direction dir, int rate, BinaryOperation op)
+	{
+		var com = UNCombinerScene.Instantiate<UNCombiner>();
+		AddUnit(com);
+		com.Setup(this, gloc, dir, rate, op);
+		return com;
+	}
 
-	// public void PlaceCloner(Vector2I gloc, Direction dir, int rate)
-	// {
-	// 	var cloner = UNClonerScene.Instantiate<UnCloner>();
-	// 	AddUnit(cloner);
-	// 	cloner.("setup", this, gloc, rate, dir);	
-	// }
-
-	// public void PlaceBranch(Vector2I gloc, Direction dir, int rate, int minVal)
-	// {
-	// 	var branch = UNBranchScene.Instantiate<UnBranch>();
-	// 	AddUnit(branch);
-	// 	branch.("setup", this, gloc, rate, dir, minVal);
-	// }
+	public UNCloner PlaceCloner(Vector2I gloc, Direction dir, int rate)
+	{
+		var cloner = UNClonerScene.Instantiate<UNCloner>();
+		AddUnit(cloner);
+		cloner.Setup(this, gloc, dir, rate);
+		return cloner;
+	}
 
 	#endregion // Placement Functions
 	#region .Other Methods
@@ -691,7 +687,7 @@ public partial class WorldPanel : Godot.Panel
 		var newDims = toWhat.Clamp(MinDims, MaxDims);
 		if (!bForce && oldDims == newDims)
 		{
-			return;		
+			return;
 		}
 		
 		m_Dims = newDims;

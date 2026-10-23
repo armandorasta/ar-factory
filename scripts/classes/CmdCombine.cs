@@ -1,7 +1,4 @@
 using Godot;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace ArFactory;
 
@@ -32,19 +29,10 @@ public class CmdCombine(Vector2I glLeft, Vector2I glRight, Vector2I glDest, Bina
 
 		Tile tlLeft = ticker.World.GetTileNonNull(LeftGL);
 		Tile tlRight = ticker.World.GetTileNonNull(RightGL);
-
-		if (tlLeft.Item.IsMidAnimation() || tlRight.Item.IsMidAnimation())
-		{
-			throw new InvalidProgramException();
-		}
-
 		var finalVal = Op.Apply(tlLeft.Item.Value, tlRight.Item.Value);
 		tlLeft.DestroyItem();
 		tlRight.DestroyItem();
-		if (ticker.World.SpawnItem(ResultGL, finalVal) is null)
-		{
-			throw new InvalidProgramException();
-		}
+		ticker.World.SpawnItem(ResultGL, finalVal);
 	}
 
 	public override string ToString()

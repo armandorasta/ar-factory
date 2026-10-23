@@ -1,12 +1,11 @@
 using Godot;
-using System;
 
 namespace ArFactory;
 
 public partial class UNBranch : Unit
 {
-	public CmdIf.CheckType Check { get; private set; }
-	public int CmpValue { get; private set; }
+	public CmdIf.CheckType Check;
+	public int CmpValue;
 
 	public Tile InTile => m_tlInput!;
 	public Tile OutTrueTile => m_tlOutTrue!;
@@ -16,9 +15,9 @@ public partial class UNBranch : Unit
 	private Tile? m_tlOutTrue;
 	private Tile? m_tlOutFalse;
 
-	public void Setup(WorldPanel world, Vector2I gloc, Direction dir, CmdIf.CheckType check, int value)
+	public void Setup(WorldPanel world, Vector2I gloc, Direction dir, int workRate, CmdIf.CheckType check, int value)
 	{
-		BaseInit(world, TickType.OnDemand, 1, gloc, new Vector2I(1, 2), dir);
+		BaseInit(world, TickType.OnDemand, workRate, gloc, new Vector2I(1, 2), dir);
 		Check = check;
 		CmpValue = value;
 	}

@@ -6,7 +6,7 @@ namespace ArFactory;
 
 public static class SceneManager
 {
-	public const string LevelScenePath = "res://scenes/Level.tscn";
+	public const string EditorScenePath = "res://scenes/Editor.tscn";
 	public const string MainMenuScenePath = "res://scenes/MainMenu.tscn";
 	public const string EditorSelectMenuScenePath = "res://scenes/EditorSelectMenu.tscn";
 
@@ -22,6 +22,6 @@ public static class SceneManager
 
 	public static void MoveToLevel(SceneTree tree)
 	{
-		tree.ChangeSceneToFile(LevelScenePath);
+		tree.ChangeSceneToFile(EditorScenePath);
 	}
 }

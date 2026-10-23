@@ -3,9 +3,13 @@ using Godot;
 
 namespace ArFactory;
 
+/// <summary>
+/// Acts as the input for the level. Supplies the player with values to work with.
+/// </summary>
 public partial class UNSupplier : Unit
 {
 	public Tile Output => m_Out0!;
+	public int[] Sequence => m_Sequence!;
 
 	private int[]? m_Sequence;
 	private int m_Index = -1;
@@ -46,11 +50,11 @@ public partial class UNSupplier : Unit
 		}
 	}
 
-	public bool IsDoneWithInputSeq() => m_Index >= m_Sequence!.Length - 1;
+	public bool IsDoneWithInputSeq() => m_Index >= Sequence.Length - 1;
 
 	public override string ToString()
 	{
-		var seqStr = string.Join(", ", m_Sequence!);
+		var seqStr = string.Join(", ", Sequence);
 		return Utilz.AppendToBaseToString(base.ToString(), $"Supplier[i: {m_Index}, [{seqStr}]]");
 	}
 
@@ -64,6 +68,6 @@ public partial class UNSupplier : Unit
 	{
 		Debug.Assert(!IsDoneWithInputSeq());
 		m_Index += 1;
-		return m_Sequence![m_Index];
+		return Sequence[m_Index];
 	}
 }
