@@ -1,28 +1,29 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 
 namespace ArFactory;
 
-public class Key(Vector2I gloc, UNSlider tgt)
+public class Key(UNSlider tgt)
 {
-	public Vector2I GLocation = gloc;
-	public UNSlider Target = tgt;
+	private readonly WeakReference<UNSlider> m_Target = new(tgt);
 
-
-	public void OnTick(Editor.OnTickMediator ticker)
+	public void OnItemLeave(UNSlider parent)
 	{
-		if (HasPendingCmds())
-		{
-			return;
-		}
+		Debug.Assert(m_Target!.TryGetTarget(out var tgt));
+		tgt.Unlock();
+	}
 
-		ticker.Pender.Pend([
-			[ new CmdAwait([GLocation]) ],
-			[ new CmdAwait([Target.GLocation]) ],
-			[ new CmdSetLocked(Target.GLocation, false) ],
-			[ new CmdVacate([Target.GLocation]) ],
-			[ new CmdSetLocked(Target.GLocation, true) ],
-		]);
+	public void DebugDraw(UNSlider parent)
+	{
+		Debug.AssertNotNull(m_Target);
+		Debug.Assert(m_Target!.TryGetTarget(out var tgt));
+		var world = parent.World;
+		var cellSize = world.GetCellSize();
+
+		parent.DrawLine(
+			0.5f*cellSize, world.GridToPos(tgt.GLocation) - parent.Position + 0.5f*cellSize, Godot.Colors.Pink);
+		parent.DrawRect(new Rect2(tgt.Position - parent.Position + 0.4f*cellSize, 0.2f*cellSize), Godot.Colors.Pink);
 	}
 }

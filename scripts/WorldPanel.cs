@@ -57,6 +57,8 @@ public partial class WorldPanel : Godot.Panel
 	/// Returns enclosing Rect2 in world-space.
 	/// </summary>
 	public Godot.Rect2 GetWorldRect() => new(Vector2I.Zero, CellWidth * (Vector2)m_Dims);
+
+	public Vector2 GetCellSize() => new(CellWidth, CellWidth);
 	
 	/// <summary>
 	/// Converts from grid-space to world-space. 
@@ -81,6 +83,8 @@ public partial class WorldPanel : Godot.Panel
 	/// This function does not bounds checking whatsoever.
 	/// </summary>
 	public Vector2I IndexToGrid(int index) => new(index % m_Dims.X, index / m_Dims.X);
+
+	public Vector2I GetMouseGridLocation() => PosToGrid(GetLocalMousePosition());
 
 	/// <summary>
 	/// Same as <seealso cref="IsWithin"/>, but also checks if a tile is allocated in that spot.
@@ -576,9 +580,7 @@ public partial class WorldPanel : Godot.Panel
 		}
 		foreach (var u in m_Units)
 		{
-			DrawRect(new(GridToPos(u.GLocation), CellWidth*(Vector2)u.Dimensions), Godot.Colors.Black, false, -2.0f);
-			DrawString(DebugFont, u.Position + new Vector2(0.0f, 15.0f), u.GetType().Name,
-				Godot.HorizontalAlignment.Left, CellWidth, 16, Godot.Colors.Black);
+			u.QueueRedraw();
 		}
 	}
 

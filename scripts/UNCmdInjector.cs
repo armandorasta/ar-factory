@@ -4,11 +4,11 @@ namespace ArFactory;
 
 public partial class UNCmdInjector : Unit
 {
-	private List<List<Command>> m_CmdSequenceNextTick = [];
+	private readonly List<List<Command>> m_CmdSequenceNextTick = [];
 
 	public void Setup(WorldPanel world)
 	{
-		InjectorBaseInit(world);
+		InjectorBaseInit(world, 1);
 	}
 
 	protected override void BuildTilesAsIfFacingEast() { }
@@ -16,7 +16,7 @@ public partial class UNCmdInjector : Unit
 	public override void PendNewCommands(Editor.PendProxy pender)
 	{
 		pender.Pend(m_CmdSequenceNextTick);
-		m_CmdSequenceNextTick = [];
+		m_CmdSequenceNextTick.Clear();
 	}
 
 	// Breaks everything if called after OnTick and before OnEdge...

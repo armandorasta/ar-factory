@@ -70,6 +70,8 @@ public partial class Editor : Godot.Node2D
 	{
 		Off,
 		Placement,
+		ConnectingLock,
+
 		Play,
 		Debug,
 	}
@@ -119,6 +121,8 @@ public partial class Editor : Godot.Node2D
 	private UnitPlacement m_CurrUnitPlacement = new();
 	private readonly Dictionary<string, ToolBoxButtInfo> m_ToolboxButtInfos = [];
 
+	private UNSlider? m_ConnecterSlider;
+
 
 	#region .Init
 
@@ -138,6 +142,7 @@ public partial class Editor : Godot.Node2D
 		InitSimSpeedSlider();
 		InitTools();
 		InitDirPlacementLabel();
+		SetState(State.Off, true);
 	}
 
 	private void GetAllNodes()
@@ -168,7 +173,6 @@ public partial class Editor : Godot.Node2D
 		PlayButt.Pressed += OnPlayButt_Pressed;
 		DebugButt.Pressed += OnDebugButt_Pressed;
 		HaltButt.Pressed += OnHaltButt_Pressed;
-		SyncButtStates();
 	}
 
 	private void InitSimSpeedSlider()
@@ -195,7 +199,6 @@ public partial class Editor : Godot.Node2D
 	{
 		m_PlacementDirLabel = new Godot.Label();
 		AddChild(PlacementDirLabel);
-		PlacementDirLabel.Hide();
 	}
 
 	private void AddTool(string text, Vector2I dims, Func<Vector2I, Direction, Unit> placementFunc)
@@ -224,7 +227,6 @@ public partial class Editor : Godot.Node2D
 				if (mev.IsPressed() && mev.ButtonMask == MouseButtonMask.Right && !mev.CtrlPressed && !mev.ShiftPressed)
 				{
 					var mgloc = World.PosToGrid(World.GetLocalMousePosition());
-					GD.Print(mgloc);
 					switch (World.GetUnit(mgloc)) {
 					case UNUpdater updater:
 						MakePopup(mev, ["2x", "x+1", "-x"], id =>
@@ -238,6 +240,7 @@ public partial class Editor : Godot.Node2D
 							};
 						});
 						break;
+					
 					case UNCombiner combi:
 						MakePopup(mev, ["x + x + ...", "x * x * x..."], id =>
 						{
@@ -249,11 +252,47 @@ public partial class Editor : Godot.Node2D
 							};
 						});
 						break;
+					
+					case UNSlider slid:
+						MakePopup(mev, [
+							slid.IsLocked()    ? "Unlock"     : "Lock", 
+							"Connect",
+							slid.HasSyncPirimInstalled() ? "Disconnect" : null
+						], id =>
+						{
+							switch (id) {
+							case 0:
+								if (slid.IsLocked())
+								{
+									slid.Unlock();
+								}
+								else
+								{
+									slid.Lock();
+								}
+								break;
+							
+							case 1:
+								GD.Print("Connecting lock...");
+								m_ConnecterSlider = slid;
+								PlacementDirLabel.Text = "Connecting lock...";
+								SetState(State.ConnectingLock);
+								break;
+							
+							case 2:
+								slid.DisconnectSyncPirim(bBothWays: true);
+								break;
+							
+							default:
+								throw new NotImplementedException();
+							}
+						});
+						break;
 					}
 				}
 			}
 			
-			if (Input.GetMouseButtonMask() == MouseButtonMask.Right && Input.IsKeyPressed(Key.Ctrl))
+			if (Input.GetMouseButtonMask() == MouseButtonMask.Right && Input.IsKeyPressed(Godot.Key.Ctrl))
 			{
 				var mouseGL = World.PosToGrid(GetLocalMousePosition());
 				if (World.GetUnit(mouseGL) is Unit u)
@@ -273,7 +312,6 @@ public partial class Editor : Godot.Node2D
 					{
 						SetState(State.Off);
 						m_CurrUnitPlacement.Butt!.ButtonPressed = false;
-						PlacementDirLabel.Hide();
 					}
 				}
 				else if (mev.ButtonIndex == MouseButton.Left)
@@ -295,7 +333,7 @@ public partial class Editor : Godot.Node2D
 			}
 			else if (ev is InputEventKey kev)
 			{
-				if (kev.Keycode == Key.E && kev.IsPressed())
+				if (kev.Keycode == Godot.Key.E && kev.IsPressed())
 				{
 					m_CurrUnitPlacement.Dir = m_CurrUnitPlacement.Dir.Rotate90();
 					PlacementDirLabel.Text = m_CurrUnitPlacement.Dir.ToString();
@@ -303,6 +341,45 @@ public partial class Editor : Godot.Node2D
 			}
 			break;
 		}
+		case State.ConnectingLock:
+		{
+			if (ev is InputEventMouse mev && mev.IsPressed() && !mev.CtrlPressed && !mev.ShiftPressed)
+			{
+				if (mev.ButtonMask == MouseButtonMask.Left)
+				{
+					if (World.GetUnit(World.GetMouseGridLocation()) is UNSlider tgtSlid)
+					{
+						if (tgtSlid == m_ConnecterSlider)
+						{
+							GD.Print("Hit the connecting slider bruh...");
+						}
+						else
+						{
+							if (m_ConnecterSlider!.HasSyncPirimInstalled())
+							{
+								m_ConnecterSlider.DisconnectSyncPirim(bBothWays: true);
+							}
+							tgtSlid.InstallLock(m_ConnecterSlider!);
+							m_ConnecterSlider.InstallKey(tgtSlid);
+							GD.Print($"Connected slider on {m_ConnecterSlider!.GLocation} to the one on {tgtSlid.GLocation}");
+							SetState(State.Off);
+						}
+					}
+					else
+					{
+						GD.Print("Hit nothing and cancelled anyway");
+						SetState(State.Off);
+					}
+				}
+				else if (mev.ButtonMask == MouseButtonMask.Right)
+				{
+					GD.Print("Lock cancelled");
+					SetState(State.Off);
+				}
+			}
+			break;
+		}
+
 		case State.Play:
 		case State.Debug:
 		default:
@@ -310,10 +387,10 @@ public partial class Editor : Godot.Node2D
 		}
 	}
 
-	private void MakePopup(Godot.InputEventMouse mev, IEnumerable<string> items, Action<int> pressFunc)
+	private void MakePopup(Godot.InputEventMouse mev, IEnumerable<string?> items, Action<int> pressFunc)
 	{
 		var men = new Godot.PopupMenu();
-		foreach (var item in items)
+		foreach (var item in items.Where(it => it is not null))
 		{
 			men.AddItem(item);
 		}
@@ -335,7 +412,8 @@ public partial class Editor : Godot.Node2D
 			break;
 
 		case State.Placement:
-			PlacementDirLabel.Position = GetLocalMousePosition() + new Vector2(-50, -50);
+		case State.ConnectingLock:
+			PlacementDirLabel.Position = GetLocalMousePosition() + Vector2.One * 50;
 			break;
 
 		case State.Debug:
@@ -345,7 +423,6 @@ public partial class Editor : Godot.Node2D
 		}
 	}
 
-#if TEST
 	/// <summary>
 	/// Used for testing for exceptions. Otherwise I just use the method inside of <see cref="SimulatorClock"/> directly.
 	/// This does the same exact thing as the Simulator method, but kinda bloats this class with simulation code.
@@ -361,7 +438,6 @@ public partial class Editor : Godot.Node2D
 		Clock.TickOnceNoSignal();
 		OnTick();
 	}
-#endif
 
 	public void OnTick()
 	{
@@ -488,7 +564,6 @@ public partial class Editor : Godot.Node2D
 		m_CurrUnitPlacement.Butt = butt;
 		m_CurrUnitPlacement.Dir = Direction.East;
 
-		PlacementDirLabel.Show();
 		PlacementDirLabel.Text = m_CurrUnitPlacement.Dir.ToString();
 	}
 
@@ -510,14 +585,17 @@ public partial class Editor : Godot.Node2D
 			DebugButt.Disabled = false;
 			PlayHBox.Hide();
 			ToolsHBox.Show();
+			PlacementDirLabel.Hide();
 			break;
 
 		case State.Placement:
+		case State.ConnectingLock:
 			PlayButt.Disabled = true;
 			HaltButt.Disabled = true;
 			DebugButt.Disabled = true;
 			PlayHBox.Hide();
 			ToolsHBox.Show();
+			PlacementDirLabel.Show();
 			break;
 
 		case State.Play:
@@ -564,9 +642,9 @@ public partial class Editor : Godot.Node2D
 		SetState(State.Off);
 	}
 
-	private void SetState(State newPlayMode)
+	private void SetState(State newPlayMode, bool bForce = false)
 	{
-		if (newPlayMode == m_CurrState) // Avoid unecessary marshaling
+		if (!bForce && newPlayMode == m_CurrState) // Avoid unecessary marshaling
 		{
 			return;
 		}

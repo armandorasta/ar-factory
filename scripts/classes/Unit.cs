@@ -72,7 +72,7 @@ public abstract partial class Unit : Node2D
 		return true;
 	}
 
-
+	#region .Godot Overrides
 	public override void _Ready()
 	{
 		this.Sprite = GetNodeOrNull<Sprite2D>("Sprite2D");
@@ -85,6 +85,24 @@ public abstract partial class Unit : Node2D
 			EmitSignal(SignalName.MouseInput, mev);
 		}
 	}
+
+	/// <summary>
+	/// Called by WorldPanel.
+	/// </summary>
+	public override void _Draw()
+	{
+		DrawRect(new(Vector2.Zero, World.CellWidth*(Vector2)Dimensions), Godot.Colors.Black, false, -2.0f);
+		DrawString(WorldPanel.DebugFont, new Vector2(0.0f, 15.0f), GetType().Name,
+			Godot.HorizontalAlignment.Left, World.CellWidth, 16, Godot.Colors.Black);
+		if (m_bLocked)
+		{
+			DrawString(WorldPanel.DebugFont, 0.5f*World.CellWidth * Vector2.One, "L", HorizontalAlignment.Center, -1, 30,
+				Godot.Colors.Red);
+		}
+	}
+
+	#endregion // .Godot Overrides
+
 
 	// This function is called on the `_Ready` function of sub-classes.
 	protected void BaseInit(
@@ -125,11 +143,12 @@ public abstract partial class Unit : Node2D
 		SetDir(dir);
 	}
 
-	protected void InjectorBaseInit(WorldPanel world)
+	protected void InjectorBaseInit(WorldPanel world, int workRate)
 	{
+		Debug.Assert(workRate > 0);
 		m_World = world;
 		m_TickType = TickType.Steady;
-		m_Rate = 1;
+		m_Rate = workRate;
 	}
 
 	#region Abstract Interface
@@ -172,11 +191,13 @@ public abstract partial class Unit : Node2D
 	{
 		Debug.Assert(m_bCanBeLocked);
 		m_bLocked = true;
+		QueueRedraw();
 	}
 
 	public void Unlock()
 	{
 		m_bLocked = false;
+		QueueRedraw();
 	}
 
 
