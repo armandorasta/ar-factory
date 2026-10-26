@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://d0nvm22iv5qxi"]
+
+[ext_resource type="Script" uid="uid://d0dmnwa2wgsio" path="res://scripts/UNTeleInput.cs" id="1_unrqo"]
+[ext_resource type="Texture2D" uid="uid://b34och1pif20w" path="res://resources/belt.png" id="2_lr6g3"]
+
+[node name="UNTeleInput" type="Node2D" unique_id=2081016730]
+script = ExtResource("1_unrqo")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=172897121]
+texture = ExtResource("2_lr6g3")

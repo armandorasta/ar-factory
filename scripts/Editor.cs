@@ -71,6 +71,7 @@ public partial class Editor : Godot.Node2D
 		Off,
 		Placement,
 		ConnectingLock,
+		ConnectingTeleporter,
 
 		Play,
 		Debug,
@@ -113,7 +114,7 @@ public partial class Editor : Godot.Node2D
 
 	// Editor stuff
 	private record struct UnitPlacement(Godot.ButtonGroup ButtGroup, Godot.Button? Butt, Direction Dir);
-	private record ToolBoxButtInfo(Vector2I Dims, Func<Vector2I, Direction, Unit> PlacementFunc);
+	private record ToolBoxButtInfo(Vector2I Dims, bool bEastWest, Func<Vector2I, Direction, Unit> PlacementFunc);
 
 	public Godot.Label PlacementDirLabel => m_PlacementDirLabel!;
 	private Godot.Label? m_PlacementDirLabel;
@@ -121,7 +122,7 @@ public partial class Editor : Godot.Node2D
 	private UnitPlacement m_CurrUnitPlacement = new();
 	private readonly Dictionary<string, ToolBoxButtInfo> m_ToolboxButtInfos = [];
 
-	private UNSlider? m_ConnecterSlider;
+	private Unit? m_ConnecterUnit;
 
 
 	#region .Init
@@ -185,14 +186,22 @@ public partial class Editor : Godot.Node2D
 	{
 		m_CurrUnitPlacement.ButtGroup = new() { AllowUnpress = true };
 		m_CurrUnitPlacement.ButtGroup.Pressed += OnToolsHBox_Pressed;
-		AddTool("||>", Vector2I.One, (l, d) => World.PlaceSupplier(l, d, 1, [1, 2, 3, 4, 5, 6]));
-		AddTool(">>>", Vector2I.One, (l, d) => World.PlaceSlider(l, d, 1));
-		AddTool("xX", Vector2I.One, (l, d) => World.PlaceBin(l));
-		AddTool("?:", new Vector2I(1, 2), (l, d) => World.PlaceBranch(l, d, 2, CmdIf.CheckType.Greater, 0));
-		AddTool("1>2", Vector2I.One, (l, d) => World.PlaceUpdater(l, d, 2, UNUpdater.UpdateType.Double));
-		AddTool(">||", Vector2I.One, (l, d) => World.PlaceDemander(l, d, [2, 4, 6, 8, 10, 12]));
-		AddTool(">^<", new Vector2I(1, 2), (l, d) => World.PlaceCombiner(l, d, 2, BinaryOperation.Add));
-		AddTool("1>11", new Vector2I(1, 2), (l, d) => World.PlaceCloner(l, d, 2));
+		AddTool("||>", Vector2I.One, true, (l, d) => World.PlaceSupplier(l, d, 1, [1, 2, 3, 4, 5, 6]));
+		AddTool(">>>", Vector2I.One, false, (l, d) => World.PlaceSlider(l, d, 1));
+		AddTool("xX", Vector2I.One, true, (l, d) => World.PlaceBin(l));
+		AddTool("?:", new Vector2I(1, 2), true, (l, d) => World.PlaceBranch(l, d, 2, CmdIf.CheckType.Greater, 0));
+		AddTool("1>2", Vector2I.One, true, (l, d) => World.PlaceUpdater(l, d, 2, UNUpdater.UpdateType.Double));
+		AddTool(">||", Vector2I.One, true, (l, d) => World.PlaceDemander(l, d, [2, 4, 6, 8, 10, 12]));
+		AddTool(">^<", new Vector2I(1, 2), true, (l, d) => World.PlaceCombiner(l, d, 2, BinaryOperation.Add));
+		AddTool("1>11", new Vector2I(1, 2), true, (l, d) => World.PlaceCloner(l, d, 2));
+		
+		AddTool("1>>", Vector2I.One, false, (l, d) => 
+		{
+			m_ConnecterUnit = World.PlaceTeleInput(l, d, 1);
+			PlacementDirLabel.Text = $"Out: {m_CurrUnitPlacement.Dir}";
+			SetState(State.ConnectingTeleporter);
+			return m_ConnecterUnit;
+		});
 	}
 
 	private void InitDirPlacementLabel()
@@ -201,17 +210,17 @@ public partial class Editor : Godot.Node2D
 		AddChild(PlacementDirLabel);
 	}
 
-	private void AddTool(string text, Vector2I dims, Func<Vector2I, Direction, Unit> placementFunc)
+	private void AddTool(string text, Vector2I dims, bool bEastWest, Func<Vector2I, Direction, Unit> placementFunc)
 	{
 		var butt = new Godot.Button
 		{
 			Text = text,
-			CustomMinimumSize = new Vector2I(80, 0),
+			CustomMinimumSize = new Vector2I(60, 0),
 			ButtonGroup = m_CurrUnitPlacement.ButtGroup,
 			ToggleMode = true,
 		};
 		ToolsHBox.AddChild(butt);
-		m_ToolboxButtInfos.Add(butt.Name, new(dims, placementFunc));
+		m_ToolboxButtInfos.Add(butt.Name, new(dims, bEastWest, placementFunc));
 	}
 
 	#endregion // Init
@@ -255,7 +264,7 @@ public partial class Editor : Godot.Node2D
 					
 					case UNSlider slid:
 						MakePopup(mev, [
-							slid.IsLocked()    ? "Unlock"     : "Lock", 
+							slid.IsLocked()    ? "Unlock" : "Lock", 
 							"Connect",
 							slid.HasSyncPirimInstalled() ? "Disconnect" : null
 						], id =>
@@ -274,7 +283,7 @@ public partial class Editor : Godot.Node2D
 							
 							case 1:
 								GD.Print("Connecting lock...");
-								m_ConnecterSlider = slid;
+								m_ConnecterUnit = slid;
 								PlacementDirLabel.Text = "Connecting lock...";
 								SetState(State.ConnectingLock);
 								break;
@@ -283,6 +292,30 @@ public partial class Editor : Godot.Node2D
 								slid.DisconnectSyncPirim(bBothWays: true);
 								break;
 							
+							default:
+								throw new NotImplementedException();
+							}
+						});
+						break;
+					
+					case UNTeleInput teleIn:
+						MakePopup(mev, [
+							"Connect to output", 
+							teleIn.HasMatchingOutput() ? "Disconnect" : null
+						], id =>
+						{
+							switch (id) {
+							case 0:
+								GD.Print("Connecting to output...");
+								m_ConnecterUnit = teleIn;
+								PlacementDirLabel.Text = "Connecting to output...";
+								SetState(State.ConnectingTeleporter);
+								break;
+
+							case 1:
+								teleIn.DisconnectOutput(bBothWays: true);
+								break;
+
 							default:
 								throw new NotImplementedException();
 							}
@@ -316,16 +349,16 @@ public partial class Editor : Godot.Node2D
 				}
 				else if (mev.ButtonIndex == MouseButton.Left)
 				{
-					if (mev.IsPressed())
+					if (mev.IsPressed() && !mev.CtrlPressed && !mev.ShiftPressed)
 					{
 						var mousePos = GetLocalMousePosition();
 						if (World.GetWorldRect().HasPoint(mousePos))
 						{
 							var info = m_ToolboxButtInfos[m_CurrUnitPlacement.Butt!.Name];
-							Vector2I gloc = World.PosToGrid(mousePos);
-							if (Unit.CanFitIn(World, gloc, info.Dims, m_CurrUnitPlacement.Dir))
+							Vector2I mgloc = World.GetMouseGridLocation();
+							if (Unit.CanFitIn(World, mgloc, info.Dims, m_CurrUnitPlacement.Dir))
 							{
-								info.PlacementFunc.Invoke(World.PosToGrid(mousePos), m_CurrUnitPlacement.Dir);
+								info.PlacementFunc.Invoke(mgloc, m_CurrUnitPlacement.Dir);
 							}
 						}
 					}
@@ -333,9 +366,21 @@ public partial class Editor : Godot.Node2D
 			}
 			else if (ev is InputEventKey kev)
 			{
-				if (kev.Keycode == Godot.Key.E && kev.IsPressed())
+				if (kev.Keycode == Godot.Key.R && kev.IsPressed() && !kev.CtrlPressed && !kev.ShiftPressed)
 				{
-					m_CurrUnitPlacement.Dir = m_CurrUnitPlacement.Dir.Rotate90();
+					var info = m_ToolboxButtInfos[m_CurrUnitPlacement.Butt!.Name];
+					if (info.bEastWest)
+					{
+						m_CurrUnitPlacement.Dir = m_CurrUnitPlacement.Dir switch
+						{
+							Direction.East => Direction.West,
+							Direction.West or _ => Direction.East,
+						};
+					}
+					else
+					{
+						m_CurrUnitPlacement.Dir = m_CurrUnitPlacement.Dir.Rotate90();
+					}
 					PlacementDirLabel.Text = m_CurrUnitPlacement.Dir.ToString();
 				}
 			}
@@ -349,20 +394,22 @@ public partial class Editor : Godot.Node2D
 				{
 					if (World.GetUnit(World.GetMouseGridLocation()) is UNSlider tgtSlid)
 					{
-						if (tgtSlid == m_ConnecterSlider)
+						if (tgtSlid == m_ConnecterUnit)
 						{
 							GD.Print("Hit the connecting slider bruh...");
 						}
 						else
 						{
-							if (m_ConnecterSlider!.HasSyncPirimInstalled())
+							var connSlid = (m_ConnecterUnit as UNSlider)!;
+							if (connSlid.HasSyncPirimInstalled())
 							{
-								m_ConnecterSlider.DisconnectSyncPirim(bBothWays: true);
+								connSlid.DisconnectSyncPirim(bBothWays: true);
 							}
-							tgtSlid.InstallLock(m_ConnecterSlider!);
-							m_ConnecterSlider.InstallKey(tgtSlid);
-							GD.Print($"Connected slider on {m_ConnecterSlider!.GLocation} to the one on {tgtSlid.GLocation}");
+							tgtSlid.InstallLock(connSlid!);
+							connSlid.InstallKey(tgtSlid);
+							GD.Print($"Connected slider on {connSlid!.GLocation} to the one on {tgtSlid.GLocation}");
 							SetState(State.Off);
+							m_ConnecterUnit = null;
 						}
 					}
 					else
@@ -375,11 +422,51 @@ public partial class Editor : Godot.Node2D
 				{
 					GD.Print("Lock cancelled");
 					SetState(State.Off);
+					m_ConnecterUnit = null;
 				}
 			}
 			break;
 		}
-
+		case State.ConnectingTeleporter:
+		{
+			if (ev is InputEventMouse mev && mev.IsPressed() && !mev.CtrlPressed && !mev.ShiftPressed)
+			{
+				if (mev.ButtonMask == MouseButtonMask.Left)
+				{
+					var mgloc = World.GetMouseGridLocation();
+					if (Unit.CanFitIn(World, mgloc, Vector2I.One, Direction.East))
+					{
+						var teleIn = (m_ConnecterUnit as UNTeleInput)!;
+						var teleOut = World.PlaceTeleOutput(mgloc, m_CurrUnitPlacement.Dir, 0);
+						teleIn.DisconnectOutput(bBothWays: true);
+						teleIn.AssignOutput(teleOut);
+						teleOut.AssignInput(teleIn);
+						m_ConnecterUnit = null;
+						SetState(State.Placement);
+					}
+					else
+					{
+						GD.Print("Nope, doesn't fit");
+					}
+				}
+				else if (mev.ButtonMask == MouseButtonMask.Right)
+				{
+					World.DeleteUnit(m_ConnecterUnit!);
+					GD.Print("Cancelled");
+					m_ConnecterUnit = null;
+					SetState(State.Placement);
+				}
+			}
+			else if (ev is InputEventKey kev)
+			{
+				if (kev.Keycode == Godot.Key.R && kev.IsPressed() && !kev.CtrlPressed && !kev.ShiftPressed)
+				{
+					m_CurrUnitPlacement.Dir = m_CurrUnitPlacement.Dir.Rotate90();
+					PlacementDirLabel.Text = $"Out: {m_CurrUnitPlacement.Dir}";
+				}
+			}
+			break;
+		}
 		case State.Play:
 		case State.Debug:
 		default:
@@ -413,6 +500,7 @@ public partial class Editor : Godot.Node2D
 
 		case State.Placement:
 		case State.ConnectingLock:
+		case State.ConnectingTeleporter:
 			PlacementDirLabel.Position = GetLocalMousePosition() + Vector2.One * 50;
 			break;
 
@@ -590,6 +678,7 @@ public partial class Editor : Godot.Node2D
 
 		case State.Placement:
 		case State.ConnectingLock:
+		case State.ConnectingTeleporter:
 			PlayButt.Disabled = true;
 			HaltButt.Disabled = true;
 			DebugButt.Disabled = true;

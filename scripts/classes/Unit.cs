@@ -424,16 +424,23 @@ public abstract partial class Unit : Node2D
 	/// <param name="bKeepTrack">
 	/// All tiles kept track of must be filled before the tick counter starts counting for on-demand units.
 	/// </param>
-	public Tile AddOutput(Vector2I gloc, Direction dir)
+	public Tile AddOutput(Vector2I gloc, Direction dir, bool bKeepTrack = false)
 	{
 		Debug.Assert(IsWithin(m_GL + gloc));
 		Debug.Assert(GetTile(gloc).IsSolid(dir));
+		Debug.Assert(m_TickType == TickType.OnDemand || !bKeepTrack);
 
 		// Must be facing out of the unit.
 		Debug.Assert(!IsWithin(m_GL + gloc + dir.ToGrid()));
 
 		var tl = GetTile(gloc);
 		tl.MakeOutput(dir, true);
+		if (bKeepTrack)
+		{
+			// For now dubs are not allowed.
+			Debug.Assert(!m_TickTiles.Contains(tl));
+			m_TickTiles.Add(tl);
+		}
 		return tl;
 	}
 

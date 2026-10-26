@@ -23,6 +23,8 @@ public partial class WorldPanel : Godot.Panel
 	public static readonly Godot.PackedScene UNCombinerScene = GD.Load<Godot.PackedScene>("res://scenes/UNCombiner.tscn");
 	public static readonly Godot.PackedScene UNClonerScene = GD.Load<Godot.PackedScene>("res://scenes/UNCloner.tscn");
 	public static readonly Godot.PackedScene UNBranchScene = GD.Load<Godot.PackedScene>("res://scenes/UNBranch.tscn");
+	public static readonly Godot.PackedScene UNTeleInputScene = GD.Load<Godot.PackedScene>("res://scenes/UNTeleInput.tscn");
+	public static readonly Godot.PackedScene UNTeleOutputScene = GD.Load<Godot.PackedScene>("res://scenes/UNTeleOutput.tscn");
 
 
 	// Other statics
@@ -678,6 +680,22 @@ public partial class WorldPanel : Godot.Panel
 		AddUnit(cloner);
 		cloner.Setup(this, gloc, dir, rate);
 		return cloner;
+	}
+
+	public UNTeleInput PlaceTeleInput(Vector2I gloc, Direction dir, int rate)
+	{
+		var teleIn = UNTeleInputScene.Instantiate<UNTeleInput>();
+		AddUnit(teleIn);
+		teleIn.Setup(this, gloc, rate, dir);
+		return teleIn;
+	}
+
+	public UNTeleOutput PlaceTeleOutput(Vector2I gloc, Direction dir, int delay)
+	{
+		var teleIn = UNTeleOutputScene.Instantiate<UNTeleOutput>();
+		AddUnit(teleIn);
+		teleIn.Setup(this, gloc, dir, delay);
+		return teleIn;
 	}
 
 	#endregion // Placement Functions
