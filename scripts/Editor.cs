@@ -70,7 +70,7 @@ public partial class Editor : Godot.Node2D
 	{
 		Off,
 		Placement,
-		ConnectingLock,
+		ConnectingSliders,
 		ConnectingTeleporter,
 
 		Play,
@@ -238,7 +238,7 @@ public partial class Editor : Godot.Node2D
 					var mgloc = World.PosToGrid(World.GetLocalMousePosition());
 					switch (World.GetUnit(mgloc)) {
 					case UNUpdater updater:
-						MakePopup(mev, ["2x", "x+1", "-x"], id =>
+						MakePopup(mev, [("2x", 0), ("x+1", 1), ("-x", 2)], id =>
 						{
 							updater.UpType = id switch
 							{
@@ -251,7 +251,7 @@ public partial class Editor : Godot.Node2D
 						break;
 					
 					case UNCombiner combi:
-						MakePopup(mev, ["x + x + ...", "x * x * x..."], id =>
+						MakePopup(mev, [("x + x + ...", 0), ("x * x * x...", 1)], id =>
 						{
 							combi.Operation = id switch
 							{
@@ -264,13 +264,15 @@ public partial class Editor : Godot.Node2D
 					
 					case UNSlider slid:
 						MakePopup(mev, [
-							slid.IsLocked()    ? "Unlock" : "Lock", 
-							"Connect",
-							slid.HasSyncPirimInstalled() ? "Disconnect" : null
+							(slid.IsLocked() ? "Unlock" : "Lock", 0), 
+							("Connect", 1),
+							(!slid.IsToggle() ? "Make toggle" : null, 2),
+							(!slid.IsLock() ? "Make lock" : null, 3),
+							(!slid.IsNormal() ? slid.IsKey() ? "Disconnect" : "Make normal" : null, 4),
 						], id =>
 						{
 							switch (id) {
-							case 0:
+							case 0: // Lock
 								if (slid.IsLocked())
 								{
 									slid.Unlock();
@@ -281,15 +283,25 @@ public partial class Editor : Godot.Node2D
 								}
 								break;
 							
-							case 1:
-								GD.Print("Connecting lock...");
+							case 1: // Connect to lock
+								GD.Print("Connecting...");
 								m_ConnecterUnit = slid;
-								PlacementDirLabel.Text = "Connecting lock...";
-								SetState(State.ConnectingLock);
+								PlacementDirLabel.Text = "Connecting...";
+								SetState(State.ConnectingSliders);
 								break;
 							
-							case 2:
-								slid.DisconnectSyncPirim(bBothWays: true);
+							case 2: // Toggle
+								slid.RemoveExtension();
+								slid.InstallDirectionToggle(UNSlider.SliderExtensionDirectionToggle.Kind._90);
+								break;
+							
+							case 3: // Lock
+								slid.RemoveExtension();
+								slid.InstallRuntimeLock();
+								break;
+
+							case 4: // Normal
+								slid.RemoveExtension();
 								break;
 							
 							default:
@@ -300,8 +312,8 @@ public partial class Editor : Godot.Node2D
 					
 					case UNTeleInput teleIn:
 						MakePopup(mev, [
-							"Connect to output", 
-							teleIn.HasMatchingOutput() ? "Disconnect" : null
+							("Connect to output", 0), 
+							(teleIn.HasMatchingOutput() ? "Disconnect" : null, 1)
 						], id =>
 						{
 							switch (id) {
@@ -386,7 +398,7 @@ public partial class Editor : Godot.Node2D
 			}
 			break;
 		}
-		case State.ConnectingLock:
+		case State.ConnectingSliders:
 		{
 			if (ev is InputEventMouse mev && mev.IsPressed() && !mev.CtrlPressed && !mev.ShiftPressed)
 			{
@@ -401,12 +413,8 @@ public partial class Editor : Godot.Node2D
 						else
 						{
 							var connSlid = (m_ConnecterUnit as UNSlider)!;
-							if (connSlid.HasSyncPirimInstalled())
-							{
-								connSlid.DisconnectSyncPirim(bBothWays: true);
-							}
-							tgtSlid.InstallLock(connSlid!);
-							connSlid.InstallKey(tgtSlid);
+							connSlid.RemoveExtension();
+							connSlid.MakeKey(tgtSlid);
 							GD.Print($"Connected slider on {connSlid!.GLocation} to the one on {tgtSlid.GLocation}");
 							SetState(State.Off);
 							m_ConnecterUnit = null;
@@ -474,12 +482,12 @@ public partial class Editor : Godot.Node2D
 		}
 	}
 
-	private void MakePopup(Godot.InputEventMouse mev, IEnumerable<string?> items, Action<int> pressFunc)
+	private void MakePopup(Godot.InputEventMouse mev, IEnumerable<(string? Name, int id)> items, Action<int> pressFunc)
 	{
 		var men = new Godot.PopupMenu();
-		foreach (var item in items.Where(it => it is not null))
+		foreach (var (name, id) in items.Where(it => !string.IsNullOrEmpty(it.Name)))
 		{
-			men.AddItem(item);
+			men.AddItem(name, id);
 		}
 		men.IdPressed += id => pressFunc.Invoke((int)id);
 		men.PopupHide += () =>
@@ -499,7 +507,7 @@ public partial class Editor : Godot.Node2D
 			break;
 
 		case State.Placement:
-		case State.ConnectingLock:
+		case State.ConnectingSliders:
 		case State.ConnectingTeleporter:
 			PlacementDirLabel.Position = GetLocalMousePosition() + Vector2.One * 50;
 			break;
@@ -677,7 +685,7 @@ public partial class Editor : Godot.Node2D
 			break;
 
 		case State.Placement:
-		case State.ConnectingLock:
+		case State.ConnectingSliders:
 		case State.ConnectingTeleporter:
 			PlayButt.Disabled = true;
 			HaltButt.Disabled = true;

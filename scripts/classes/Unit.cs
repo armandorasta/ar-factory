@@ -35,9 +35,10 @@ public abstract partial class Unit : Node2D
 	private Direction m_Dir = Direction.East;
 	private Vector2I m_Dims;
 	private int m_Rate;
+	private readonly List<Command> m_PendingCmds = [];
+	
 	private bool m_bLocked = false;
 	private bool m_bCanBeLocked = false;
-	private readonly List<Command> m_PendingCmds = [];
 
 	/// <summary>
 	/// Keeps track of <see cref="Rate"/> every tick.
@@ -197,6 +198,12 @@ public abstract partial class Unit : Node2D
 	public void Unlock()
 	{
 		m_bLocked = false;
+		QueueRedraw();
+	}
+
+	public void ToggleLock()
+	{
+		m_bLocked ^= true;
 		QueueRedraw();
 	}
 
