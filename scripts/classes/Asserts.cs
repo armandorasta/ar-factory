@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -18,7 +19,7 @@ public static class Asserts
 
 	[StackTraceHidden]
 	[DebuggerStepThrough]
-	public static void AssertTrue(bool cond, string? msg = null)
+	public static void AssertTrue([DoesNotReturnIf(false)] bool cond, string? msg = null)
 	{
 		HandleImpl(cond, $"Expected {Green}'true'{Reset} but got {Red}'false'{Reset}", msg);
 	}
@@ -26,7 +27,7 @@ public static class Asserts
 
 	[StackTraceHidden]
 	[DebuggerStepThrough]
-	public static void AssertFalse(bool cond, string? msg = null)
+	public static void AssertFalse([DoesNotReturnIf(true)] bool cond, string? msg = null)
 	{
 		HandleImpl(!cond, $"Expected {Green}'false'{Reset} but got {Red}'true'{Reset}", msg);
 	}
@@ -106,7 +107,7 @@ public static class Asserts
 	[DebuggerStepThrough]
 	public static void AssertThrow(Action whatToDo, Type? exType = null, string? msg = null)
 	{
-		if (exType != null && !exType.IsAssignableTo( typeof(Exception) ))
+		if (exType is not null && !exType.IsAssignableTo( typeof(Exception) ))
 		{
 			throw new InvalidOperationException($"AssertThrow: Expected an exception type but got {exType}");
 		}
@@ -127,7 +128,7 @@ public static class Asserts
 	[DebuggerStepThrough]
 	public static async Task AssertThrow(Func<Task> whatToDo, Type? exType = null, string? msg = null)
 	{
-		if (exType != null && !exType.IsAssignableTo( typeof(Exception) ))
+		if (exType is not null && !exType.IsAssignableTo( typeof(Exception) ))
 		{
 			throw new InvalidOperationException($"AssertThrow: Expected an exception type but got {exType}");
 		}

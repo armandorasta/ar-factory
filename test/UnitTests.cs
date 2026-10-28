@@ -1031,4 +1031,9 @@ public class UnitTests : ArTest.TestSuit
 			AssertFalse(tlOut0.HasItem());
 		}
 	}
+
+	[ArTest.Test] public async Task TestTeleporter_vanilla()
+	{
+		AssertFalse(true);
+	}
 }

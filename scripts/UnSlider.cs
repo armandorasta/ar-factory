@@ -81,7 +81,7 @@ public partial class UNSlider : Unit
 				Kind._180 => parent.Dir.Invert().ToGrid(),
 				_ => throw new NotImplementedException(),
 			};
-			parent.DrawLine(0.5f*cellSize, 0.5f*cellSize + 0.4f*parent.World.CellWidth*(Vector2)dirVec, 
+			parent.DrawLine(0.5f*cellSize, 0.5f*cellSize + 0.4f*parent.World.CellWidth*(Vector2)dirVec,
 				Godot.Colors.Pink, 5.0f);
 		}
 
@@ -101,18 +101,43 @@ public partial class UNSlider : Unit
 		private void ToggleParentDir(UNSlider parent)
 		{
 			switch (m_ToggleType) {
-			case Kind._90: if (m_bIsToggled) { parent.Rotate90(); } else { parent.Rotate270(); } break;
-			case Kind._270: if (m_bIsToggled) { parent.Rotate270(); } else { parent.Rotate90(); } break;
-			case Kind._180: parent.Rotate180(); break;
+			case Kind._90:
+				if (m_bIsToggled)
+				{
+					parent.Rotate90();
+				}
+				else
+				{
+					parent.Rotate270();
+				}
+				break;
+			
+			case Kind._270:
+				if (m_bIsToggled)
+				{
+					parent.Rotate270();
+				}
+				else
+				{
+					parent.Rotate90();
+				}
+				break;
+			
+			case Kind._180:
+				parent.Rotate180();
+				break;
+
 			default:
 				throw new NotImplementedException();
 			}
+			
 			m_bIsToggled ^= true;
 		}
 
 		public override void OnSignal(UNSlider parent)
 		{
 			ToggleParentDir(parent);
+			parent.ClearPendingCmds();
 		}
 	}
 
@@ -123,17 +148,19 @@ public partial class UNSlider : Unit
 		public override void OnDraw(UNSlider parent)
 		{
 			Debug.AssertNotNull(m_Partner);
-			bool cond = m_Partner!.TryGetTarget(out var tgt);
-			Debug.Assert(cond);
-			var cellSize = parent.World.GetCellSize();
-			parent.DrawLine(0.5f*cellSize, tgt!.Position - parent.Position + 0.5f*cellSize, Godot.Colors.Pink);
+			if (m_Partner.TryGetTarget(out var tgt) && GodotObject.IsInstanceValid(tgt))
+			{
+				var cellSize = parent.World.GetCellSize();
+				parent.DrawLine(0.5f*cellSize, tgt!.Position - parent.Position + 0.5f*cellSize, Godot.Colors.Pink);
+			}
 		}
 
 		public override void OnItemLeave(UNSlider parent)
 		{
-			bool cond = m_Partner.TryGetTarget(out var tgt);
-			Debug.Assert(cond);
-			tgt!.m_Ext?.OnSignal(parent);
+			if (m_Partner.TryGetTarget(out var tgt) && GodotObject.IsInstanceValid(tgt))
+			{
+				tgt.m_Ext?.OnSignal(tgt);
+			}
 		}
 
 		public override void OnRemoval(UNSlider parent)
@@ -177,16 +204,16 @@ public partial class UNSlider : Unit
 			return;
 		}
 
-		if (World.HasTile(GLocation + Dir.ToGrid()))
+		var tl = GetTile(Vector2I.Zero);
+		// We have to do it manually like this, this way the slider is synced with the clock at all times.
+		// I could also just add a third type, but I learned the hard way that simple is always the way to go.
+		if (tl.HasItem())
 		{
-			var tl = GetTile(Vector2I.Zero);
-			// We have to do it manually like this, this way the slider is synced with the clock at all times.
-			// I could also just add a third type, but I learned the hard way that simple is always the way to go.
-			if (tl.HasItem())
+			if (World.HasTile(GLocation + Dir.ToGrid()))
 			{
-				m_Ext?.OnItemLeave(this);
 				pender.Pend([ [new CmdSlide(tl, Dir)] ]);
 			}
+			m_Ext?.OnItemLeave(this);
 		}
 	}
 
@@ -210,7 +237,7 @@ public partial class UNSlider : Unit
 		base._Draw();
 		m_Ext?.OnDraw(this);
 	}
-	
+
 	public void MakeKey(UNSlider target)
 	{
 		Debug.Assert(m_Ext is null);

@@ -358,6 +358,11 @@ public class CommandTests : ArTest.TestSuit
 		tl1.DestroyItem();
 	}
 
+	[ArTest.Test] public async Task TestCmdSlide_ForceStop()
+	{
+		AssertFalse(true);
+	}
+
 	[ArTest.Test] public async Task TestCmdSlide_INVALID_CASES()
 	{
 		var world = Lvl.World;

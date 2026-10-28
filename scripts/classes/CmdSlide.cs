@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using System.Runtime.Serialization;
 
 namespace ArFactory;
 
@@ -86,6 +87,16 @@ public class CmdSlide : Command
 				trackedIt.SetMidAnimationFlag(false);
 				m_StateFunc = HandleDefault; // We have to do this because of IsAwaitingAnim
 			}
+		}
+	}
+
+	public override void ForceFinish()
+	{
+		if (TrackedItemRef is not null && TrackedItemRef.TryGetTarget(out var trackedIt))
+		{
+			// This resets the animation flag since the command was forced to stop mid-animation; this will cause a
+			// visual glitch since I can't sync the position of the item with its grid position like OnEdge does.
+			trackedIt.SetMidAnimationFlag(false);
 		}
 	}
 

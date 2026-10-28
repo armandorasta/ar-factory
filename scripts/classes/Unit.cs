@@ -521,6 +521,15 @@ public abstract partial class Unit : Node2D
 		m_PendingCmds.AddRange(sequence.SelectMany(c => c));
 	}
 
+	public void ClearPendingCmds()
+	{
+		foreach (var cmd in m_PendingCmds)
+		{
+			cmd.ForceFinish();
+		}
+		m_PendingCmds.Clear();
+	}
+
 	/// <summary>
 	/// This only resets the unit state, it does not destroy any items located within the unit. <br/>
 	/// <b>Don't forget to override this function whenever you have extra fields the need to be reset
@@ -529,7 +538,7 @@ public abstract partial class Unit : Node2D
 	public virtual void Reset()
 	{
 		m_Count = 1;
-		m_PendingCmds.Clear();
+		ClearPendingCmds();
 	}
 
 

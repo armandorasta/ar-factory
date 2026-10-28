@@ -76,11 +76,15 @@ public class CmdIf : Command
 	protected override void OnTick(Editor.OnTickMediator ticker)
 	{
 		var bCondMet = Apply(Check, ticker.World.GetTileOrNull(GLocation), CmpValue);
-		var winnerBranch = bCondMet ? TrueBranch : ElseBranch;
-		if (winnerBranch is not null)
+		if ((bCondMet ? TrueBranch : ElseBranch) is { } winnerBranch)
 		{
 			ticker.Pender.Pend(winnerBranch);
 		}
+	}
+
+	public override void ForceFinish()
+	{
+		
 	}
 
 	public override string ToString()

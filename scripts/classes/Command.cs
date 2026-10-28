@@ -132,7 +132,7 @@ public abstract class Command
 	/// <summary>
 	/// Forces the command to be deleted right after <see cref="OnTick"/> or <see cref="OnEdge"/>.
 	/// </summary>
-	public void ForceFinish() => m_Count = m_Ticks;
+	public virtual void ForceFinish() => m_Count = m_Ticks;
 
 	/// <summary>
 	/// Should be called inside a <see cref="OnTick"/> function of some sort when handling commands manually. 
