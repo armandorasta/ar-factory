@@ -11,6 +11,7 @@ public partial class UNUpdater : Unit
 		Double,
 		Negate,
 		Increment,
+		Decrement,
 	}
 
 	public static CmdUpdate Apply(UpdateType upT, Tile tl) 
@@ -21,6 +22,7 @@ public partial class UNUpdater : Unit
 			UpdateType.Double => new(tl, UnaryOperation.Mul, 2),
 			UpdateType.Negate => new(tl, UnaryOperation.Mul, -1),
 			UpdateType.Increment => new(tl, UnaryOperation.Add, 1),
+			UpdateType.Decrement => new(tl, UnaryOperation.Add, -1),
 			_ => throw new UnreachableException(),
 		};
 	}
@@ -50,6 +52,7 @@ public partial class UNUpdater : Unit
 			UpdateType.Double => "2x",
 			UpdateType.Negate => "-x",
 			UpdateType.Increment => "x+1",
+			UpdateType.Decrement => "x-1",
 			_ => throw new NotImplementedException(),
 		};
 	}
@@ -69,14 +72,10 @@ public partial class UNUpdater : Unit
 		}
 
 		var tl = Output;
-		var destLoc = tl.GLocation + Dir.ToGrid();
-		if (World.HasTile(destLoc))
-		{
-			pender.Pend([
-				[ Apply(UpType, tl) ],
-				[ new CmdSlide(tl, Dir) ],
-			]);
-		}
+		pender.Pend([
+			[ Apply(UpType, tl) ],
+			[ new CmdSlide(tl, Dir) ],
+		]);
 	}
 
 	public override string ToString()

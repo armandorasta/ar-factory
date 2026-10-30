@@ -32,18 +32,13 @@ public partial class UNCloner : Unit
 			return;
 		}
 
-		Vector2I dgloc0 = OutTile0.GLocation + Dir.ToGrid();
-		Vector2I dgloc1 = OutTile1.GLocation + Dir.ToGrid();
-		if (World.HasTile(dgloc0) && World.HasTile(dgloc1))
-		{
-			pender.Pend([
-				[ new CmdAwait([InTile]) ],
-				[ new CmdClone(InTile, [OutTile1]) ],
-				[
-					new CmdSlide(OutTile0, Dir),
-					new CmdSlide(OutTile1, Dir),
-				]
-			]);
-		}
+		pender.Pend([
+			[ new CmdAwait([InTile]) ],
+			[ new CmdClone(InTile, [OutTile1]) ],
+			[
+				new CmdSlide(OutTile0, Dir),
+				new CmdSlide(OutTile1, Dir),
+			]
+		]);
 	}
 }

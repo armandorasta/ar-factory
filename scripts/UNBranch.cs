@@ -50,7 +50,7 @@ public partial class UNBranch : Unit
 				[ new CmdAwait([InTile]) ],
 				[ new CmdVacate([OutFalseTile]) ],
 				[ new CmdTeleport(InTile, OutFalseTile) ],
-				[ new CmdSlide(OutFalseTile, Dir) ],		
+				[ new CmdSlide(OutFalseTile, Dir) ],
 			]);
 		}
 	}

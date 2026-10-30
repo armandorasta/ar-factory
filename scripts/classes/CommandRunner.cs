@@ -134,7 +134,8 @@ public readonly struct CommandRunner()
 				currGroup.Sort((l, r) => GetCmdPiority(l.Cmd) - GetCmdPiority(r.Cmd));
 				foreach (var cw in currGroup)
 				{
-					if (cw.AllDepsDone() && !cw.bRanThisTick)
+					// Commands that were forced to end can be done before first tick so...
+					if (!cw.Cmd.IsDone() && !cw.bRanThisTick && cw.AllDepsDone())
 					{
 						ticker.Pender.PenderUnit = cw.PenderUnit;
 						cw.Cmd.HandleOnTick(ticker);
@@ -217,7 +218,8 @@ public readonly struct CommandRunner()
 			var bSomethingRan = false;
 			foreach (var cw in group)
 			{
-				if (cw.bRanThisTick && cw.Cmd.IsSmooth())
+				// Smooth commands that were forced to finish after OnTick was called can be done by this point.
+				if (!cw.Cmd.IsDone() && cw.bRanThisTick && cw.Cmd.IsSmooth())
 				{
 					cw.Cmd.HandleOnEdge(ticker);
 					cw.Cmd.CountThisTick();

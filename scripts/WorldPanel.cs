@@ -136,12 +136,9 @@ public partial class WorldPanel : Godot.Panel
 	public void DeleteUnit(Unit u)
 	{
 		u.Reset();
-		RemoveChild(u);
-		u.QueueFree();
-		m_Units.Remove(u);
-
-		var limVec = u.Dir is Direction.East or Direction.West 
-			? u.Dimensions 
+		
+		var limVec = u.Dir is Direction.East or Direction.West
+			? u.Dimensions
 			: new Vector2I(u.Dimensions.Y, u.Dimensions.X);
 		for (int y = 0; y < limVec.Y; ++y)
 		{
@@ -150,6 +147,10 @@ public partial class WorldPanel : Godot.Panel
 				DeleteTile(u.GLocation + new Vector2I(x, y));
 			}
 		}
+
+		RemoveChild(u);
+		u.QueueFree();
+		m_Units.Remove(u);
 	}
 
 
@@ -334,6 +335,21 @@ public partial class WorldPanel : Godot.Panel
 	{
 		Debug.Assert(IsInstalled(tl));
 		return SpawnItem(tl.GLocation, value);
+	}
+
+	public void DestroyItem(Vector2I gloc, bool bTileMaybeNull = false, bool bItemMaybeNull = false, bool bMaybeMidAnim = false)
+	{
+		Debug.Assert(bTileMaybeNull || HasTile(gloc));
+		if (GetTile(gloc) is { } tl)
+		{
+			tl.DestroyItem(bItemMaybeNull, bMaybeMidAnim);
+		}
+	}
+
+	public void DestroyItem(Tile tl, bool bMaybeNull = false, bool bMaybeMidAnim = false)
+	{
+		Debug.Assert(IsInstalled(tl));
+		tl.DestroyItem(bMaybeNull, bMaybeMidAnim);
 	}
 
 	/// <summary>

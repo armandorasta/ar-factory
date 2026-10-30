@@ -16,7 +16,7 @@ public partial class UNTeleInput : Unit
 
 	public override void _ExitTree()
 	{
-		DisconnectOutput(bBothWays: true);
+		UnassignOutput();
 	}
 
 	protected override void BuildTilesAsIfFacingEast()
@@ -42,7 +42,9 @@ public partial class UNTeleInput : Unit
 	}
 
 	public override bool CanFaceDir(Direction dir) => true;
-	public bool HasMatchingOutput() => m_MatchingOut is not null;
+	public bool IsConnectedToSomething() => m_MatchingOut is not null;
+	public bool IsConnectedTo(UNTeleOutput what)
+		=> m_MatchingOut is not null && m_MatchingOut.TryGetTarget(out var tgt) && tgt == what;
 
 	public override string ToString()
 		=> Utilz.ReplaceBaseNameInToString(base.ToString(), "TeleIn");
@@ -56,27 +58,33 @@ public partial class UNTeleInput : Unit
 			DrawLine(0.5f*World.GetCellSize(), tgt.Position - Position + 0.5f*World.GetCellSize(), Godot.Colors.Cyan);
 		}
 	}
+
+	public UNTeleOutput? GetConnectedOutput()
+	{
+		if (m_MatchingOut is not null && m_MatchingOut.TryGetTarget(out var tgt))
+		{
+			return tgt;
+		}
+		else return null;
+	}
 	
+	/// <summary>
+	/// This automatically calls AssignOutput on ass
+	/// </summary>
 	public void AssignOutput(UNTeleOutput ass)
 	{
-		DisconnectOutput();
+		UnassignOutput();
 		m_MatchingOut = new(ass);
+		ass.AssignInput(this);
 		QueueRedraw();
 	}
 
-	public void DisconnectOutput(bool bBothWays = true)
+	public void UnassignOutput()
 	{
-		if (m_MatchingOut is not null)
+		if (m_MatchingOut is not null && m_MatchingOut.TryGetTarget(out var tgt))
 		{
-			var par = m_MatchingOut;
 			m_MatchingOut = null;
-			
-			if (bBothWays)
-			{
-				Debug.Assert(par.TryGetTarget(out var tgt));
-				tgt.DisconnectInput(false);
-			}
-			
+			tgt.UnassignInput();
 			QueueRedraw();
 		}
 	}

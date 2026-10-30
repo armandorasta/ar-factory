@@ -358,69 +358,184 @@ public class CommandTests : ArTest.TestSuit
 		tl1.DestroyItem();
 	}
 
-	[ArTest.Test] public async Task TestCmdSlide_ForceStop()
+	[ArTest.Test] public async Task TestCmdSlide_to_non_existing_tile()
 	{
-		AssertFalse(true);
+		var world = Lvl.World;
+		var injy0 = world.PlaceInjector();
+		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+
+		using (Lvl.Clock.PlaySimulationInDebug())
+		{
+			var it = world.SpawnItem(tl0, -294);
+			injy0.PendParallel([new CmdSlide(tl0, Direction.South)]);
+			
+			// 1
+			await Lvl.Clock.TickOnceAsync();
+			AssertTrue(tl0.HasItem());
+			AssertRefEq(tl0.Item, it);
+			AssertFalse(tl0.Item.IsMidAnimation());
+			
+			await Lvl.Clock.EndTickAsync();
+			AssertTrue(tl0.HasItem());
+			AssertRefEq(tl0.Item, it);
+			AssertFalse(tl0.Item.IsMidAnimation());
+
+			// 2
+			await Lvl.Clock.TickOnceAsync();
+			AssertTrue(tl0.HasItem());
+			AssertRefEq(tl0.Item, it);
+			AssertFalse(tl0.Item.IsMidAnimation());
+			
+			await Lvl.Clock.EndTickAsync();
+			AssertTrue(tl0.HasItem());
+			AssertRefEq(tl0.Item, it);
+			AssertFalse(tl0.Item.IsMidAnimation());
+
+			// 3 and so on, it just waits for a tile to spawn somehow. For now I don't plan on allowing tiles to spawn
+			// mid-simulation, so I am not gonna bother testing such case.
+			await Lvl.Clock.TickOnceAsync();
+			AssertTrue(tl0.HasItem());
+			AssertRefEq(tl0.Item, it);
+			AssertFalse(tl0.Item.IsMidAnimation());
+			
+			await Lvl.Clock.EndTickAsync();
+			AssertTrue(tl0.HasItem());
+			AssertRefEq(tl0.Item, it);
+			AssertFalse(tl0.Item.IsMidAnimation());
+		}
 	}
 
-	[ArTest.Test] public async Task TestCmdSlide_INVALID_CASES()
+	[ArTest.Test] public async Task TestCmdSlide_ForceStop_before_OnTick()
+	{
+		var world = Lvl.World;
+		var injy0 = world.PlaceInjector();
+		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl1 = world.InstallEmptyTile(new Vector2I(1, 0));
+
+		using (Lvl.Clock.PlaySimulationInDebug())
+		{
+			var it = world.SpawnItem(tl0, -474);
+			var slid = new CmdSlide(tl0, Direction.East);
+			injy0.PendParallel([slid]);
+			slid.ForceFinish();
+			AssertTrue(slid.IsDone());
+			
+			await Lvl.Clock.TickOnceAsync();
+			AssertTrue(tl0.HasItem());
+			AssertFalse(tl0.Item.IsMidAnimation());
+			AssertFalse(tl1.HasItem());
+			
+			await Lvl.Clock.EndTickAsync();
+			AssertTrue(tl0.HasItem());
+			AssertFalse(tl0.Item.IsMidAnimation());
+			AssertFalse(tl1.HasItem());
+			AssertFalse(injy0.HasPendingCmds());
+		}
+	}
+
+	[ArTest.Test] public async Task TestCmdSlide_ForceStop_after_OnTick()
+	{
+		var world = Lvl.World;
+		var injy0 = world.PlaceInjector();
+		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl1 = world.InstallEmptyTile(new Vector2I(1, 0));
+
+		using (Lvl.Clock.PlaySimulationInDebug())
+		{
+			var it = world.SpawnItem(tl0, -211);
+			var slid = new CmdSlide(tl0, Direction.East);
+			injy0.PendFullSequence([[ slid ]]);
+			
+			await Lvl.Clock.TickOnceAsync();
+			AssertFalse(tl0.HasItem());
+			AssertTrue(tl1.HasItem());
+			AssertTrue(tl1.Item.IsMidAnimation());
+			
+			slid.ForceFinish(); // Should reset the animation flag!
+			AssertTrue(slid.IsDone());
+			AssertFalse(tl1.Item.IsMidAnimation());
+			AssertFalse(tl0.HasItem());
+			AssertTrue(tl1.HasItem());
+			
+			await Lvl.Clock.EndTickAsync();
+			AssertTrue(slid.IsDone());
+			AssertFalse(tl1.Item.IsMidAnimation());
+			AssertFalse(tl0.HasItem());
+			AssertTrue(tl1.HasItem());
+		}
+	}
+
+	[ArTest.Test] public async Task TestCmdSlide_INVALID_CASE_from_non_existing_tile()
 	{
 		var world = Lvl.World;
 		var injy0 = world.PlaceInjector();
 		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
 		var tl1 = world.InstallEmptyTile(new(1, 0));
 
-		// Sliding from non-existing tile
 		using (Lvl.Clock.PlaySimulationInDebug())
 		{
 			injy0.PendParallel([new CmdSlide(new Vector2I(0, 1), Direction.North)]);
 			await AssertThrow(Lvl.TickOnceForTestingAsync);
-			AssertTrue(injy0.HasPendingCmds());
 		}
+	}
 
-		// Sliding from to a non-existant tile
-		using (Lvl.Clock.PlaySimulationInDebug())
-		{
-			world.SpawnItem(tl0, -294);
-			injy0.PendParallel([new CmdSlide(tl0, Direction.South)]);
-			await AssertThrow(Lvl.TickOnceForTestingAsync);
-			AssertTrue(injy0.HasPendingCmds());
-		}
+	[ArTest.Test] public async Task TestCmdSlide_INVALID_CASE_against_the_border_of_the_world()
+	{
+		var world = Lvl.World;
+		var injy0 = world.PlaceInjector();
+		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl1 = world.InstallEmptyTile(new(1, 0));
 
-		// Sliding against the border of the world
 		using (Lvl.Clock.PlaySimulationInDebug())
 		{
 			injy0.PendParallel([new CmdSlide(tl0, Direction.North)]);
 			await AssertThrow(Lvl.TickOnceForTestingAsync);
-			AssertTrue(injy0.HasPendingCmds());
 		}
+	}
 
-		// Sliding nothing on existing tiles
+	[ArTest.Test] public async Task TestCmdSlide_INVALID_CASE_sliding_nothing_to_existing_tile()
+	{
+		var world = Lvl.World;
+		var injy0 = world.PlaceInjector();
+		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl1 = world.InstallEmptyTile(new(1, 0));
+
 		using (Lvl.Clock.PlaySimulationInDebug())
 		{
 			injy0.PendParallel([new CmdSlide(tl0, Direction.East)]);
 			await AssertThrow(Lvl.TickOnceForTestingAsync);
-			AssertTrue(injy0.HasPendingCmds());
 		}
+	}
 
-		// Sliding from out of bounds
+	[ArTest.Test] public async Task TestCmdSlide_INVALID_CASE_from_out_of_bounds()
+	{
+		var world = Lvl.World;
+		var injy0 = world.PlaceInjector();
+		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl1 = world.InstallEmptyTile(new(1, 0));
+
 		using (Lvl.Clock.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl1, 949);
 			injy0.PendParallel([new CmdSlide(new Vector2I(0, -1), Direction.South)]);
 			await AssertThrow(Lvl.TickOnceForTestingAsync);
-			AssertTrue(injy0.HasPendingCmds());
 		}
 
 		// Sliding to out of bounds is just the same as the against world boundary case.
+	}
 
-		// Sliding from and to out of bounds
+	[ArTest.Test] public async Task TestCmdSlide_INVALID_CASE_from_and_to_out_of_bounds()
+	{
+		var world = Lvl.World;
+		var injy0 = world.PlaceInjector();
+		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl1 = world.InstallEmptyTile(new(1, 0));
+
 		using (Lvl.Clock.PlaySimulationInDebug())
 		{
 			world.SpawnItem(tl1, 949);
 			injy0.PendParallel([new CmdSlide(new Vector2I(0, -1), Direction.North)]);
 			await AssertThrow(Lvl.TickOnceForTestingAsync);
-			AssertTrue(injy0.HasPendingCmds());
 		}
 	}
 

@@ -40,14 +40,11 @@ public partial class UNSupplier : Unit
 			return;
 		}
 
-		if (World.HasTile(Output.GLocation + Dir.ToGrid()))
-		{
-			pender.Pend([
-				[ new CmdVacate([Output]) ],
-				[ new CmdSpawn(Output, PopNextValue()) ],
-				[ new CmdSlide(Output, Dir) ],
-			]);
-		}
+		pender.Pend([
+			[ new CmdVacate([Output]) ],
+			[ new CmdSpawn(Output, PopNextValue()) ],
+			[ new CmdSlide(Output, Dir) ],
+		]);
 	}
 
 	public bool IsDoneWithInputSeq() => m_Index >= Sequence.Length - 1;

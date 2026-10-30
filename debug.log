@@ -1,9 +1,0 @@
-Godot Engine v3.4.2.stable.custom_build - https://godotengine.org
-OpenGL ES 3.0 Renderer: NVIDIA GeForce GTX 1050 Ti with Max-Q Design/PCIe/SSE2
-OpenGL ES Batching: ON
- 
-Turing Complete 0.1059 Beta on Windows
-ERROR: getaddrinfo failed! Cannot resolve hostname.
-   at: IP_Unix::_resolve_hostname (drivers\unix\ip_unix.cpp:98) - getaddrinfo failed! Cannot resolve hostname.
-ERROR: Condition "_first != nullptr" is true.
-   at: SelfList<class DynamicFont>::List::~List (.\core/self_list.h:108) - Condition "_first != nullptr" is true.

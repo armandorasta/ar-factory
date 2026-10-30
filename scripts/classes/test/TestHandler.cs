@@ -232,8 +232,11 @@ public partial class TestHandler : Godot.Node
 					GD.Print($"    {FormatTestName(tmeth)} {Green}passes!{Reset}");
 				}
 			}
-			catch (TargetInvocationException ex)
+			catch (Exception ex)
 			{
+				// The thrown exception is always TargetInvocationException when the test itself throws it, but 
+				// sometimes the test awaits external stuff, that's where the exception is not that.
+				var targetEx = ex is TargetInvocationException ? ex.InnerException : ex;
 				if (bPrintClassIntro)
 				{
 					GD.Print("========================================================");
@@ -241,24 +244,20 @@ public partial class TestHandler : Godot.Node
 					bPrintClassIntro = false;
 				}
 
-				if (ex.InnerException is TestAssertFailedException)
+				if (targetEx is TestAssertFailedException)
 				{
-					GD.Print(ex.InnerException.Message.Indent(sc_IndentationStr));
+					GD.Print(targetEx.Message.Indent(sc_IndentationStr));
 				}
 				else
 				{
 					var errMsg = $"{FormatTestName(tmeth)} {Red}failed{Reset}" + 
-						$" because of Unexpected {Red}'{ex.InnerException!.GetType()}'{Reset}:\n" +
-						$"{ex.InnerException.Message}";
+						$" because of Unexpected {Red}'{targetEx!.GetType()}'{Reset}:\n" +
+						$"{targetEx.Message}";
 					GD.Print(errMsg.Indent(sc_IndentationStr));
-					GD.Print(ex.InnerException.StackTrace);
+					GD.Print(targetEx.StackTrace);
 				}
 
 				bSkipFromNowOn = IsStopOnFirstFail;
-			}
-			catch (Exception)
-			{
-				throw new InvalidProgramException("WTF??");
 			}
 		}
 		tclass.GetMethod("AfterAll")?.Invoke(instance, []);

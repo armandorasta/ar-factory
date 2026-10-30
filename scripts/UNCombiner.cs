@@ -35,14 +35,10 @@ public partial class UNCombiner : Unit
 			return;
 		}
 
-		Vector2I dgloc = OutTile.GLocation + Dir.ToGrid();
-		if (World.HasTile(dgloc))
-		{
-			pender.Pend([
-				[ new CmdAwait([InLeftTile, InRightTile]) ],
-				[ new CmdCombine(InLeftTile, InRightTile, OutTile, Operation) ],
-				[ new CmdSlide(OutTile, Dir) ],
-			]);
-		}
+		pender.Pend([
+			[ new CmdAwait([InLeftTile, InRightTile]) ],
+			[ new CmdCombine(InLeftTile, InRightTile, OutTile, Operation) ],
+			[ new CmdSlide(OutTile, Dir) ],
+		]);
 	}
 }

@@ -92,6 +92,7 @@ public class CmdSlide : Command
 
 	public override void ForceFinish()
 	{
+		base.ForceFinish();
 		if (TrackedItemRef is not null && TrackedItemRef.TryGetTarget(out var trackedIt))
 		{
 			// This resets the animation flag since the command was forced to stop mid-animation; this will cause a
@@ -105,8 +106,13 @@ public class CmdSlide : Command
 		Debug.Assert(TrackedItemRef is null);
 		Debug.Assert(HasTileWithItemNotMidAnim(ticker.World, GridFrom));
 
-		// Assume the destination tile exists.
-		var destTile = ticker.World.GetTileNonNull(GetGridTo());
+		var destTile = ticker.World.GetTile(GetGridTo());
+		if (destTile is null)
+		{
+			PauseThisTick();
+			return; // Forever and ever probably...
+		}
+
 		if (!destTile.CanItemEnter(Dir.Invert()))
 		{
 			PauseThisTick();

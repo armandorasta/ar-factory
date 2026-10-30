@@ -71,7 +71,7 @@ public partial class Editor : Godot.Node2D
 		Off,
 		Placement,
 		ConnectingSliders,
-		ConnectingTeleporter,
+		PlacingMatchingTeleOutput,
 
 		Play,
 		Debug,
@@ -199,7 +199,7 @@ public partial class Editor : Godot.Node2D
 		{
 			m_ConnecterUnit = World.PlaceTeleInput(l, d, 1);
 			PlacementDirLabel.Text = $"Out: {m_CurrUnitPlacement.Dir}";
-			SetState(State.ConnectingTeleporter);
+			SetState(State.PlacingMatchingTeleOutput);
 			return m_ConnecterUnit;
 		});
 	}
@@ -238,13 +238,14 @@ public partial class Editor : Godot.Node2D
 					var mgloc = World.PosToGrid(World.GetLocalMousePosition());
 					switch (World.GetUnit(mgloc)) {
 					case UNUpdater updater:
-						MakePopup(mev, [("2x", 0), ("x+1", 1), ("-x", 2)], id =>
+						MakePopup(mev, [("2x", 0), ("x+1", 1), ("x-1", 2), ("-x", 3)], id =>
 						{
 							updater.UpType = id switch
 							{
 								0 => UNUpdater.UpdateType.Double,
 								1 => UNUpdater.UpdateType.Increment,
-								2 => UNUpdater.UpdateType.Negate,
+								2 => UNUpdater.UpdateType.Decrement,
+								3 => UNUpdater.UpdateType.Negate,
 								_ => throw new NotImplementedException(),
 							};
 						});
@@ -309,40 +310,37 @@ public partial class Editor : Godot.Node2D
 							}
 						});
 						break;
-					
-					case UNTeleInput teleIn:
-						MakePopup(mev, [
-							("Connect to output", 0), 
-							(teleIn.HasMatchingOutput() ? "Disconnect" : null, 1)
-						], id =>
-						{
-							switch (id) {
-							case 0:
-								GD.Print("Connecting to output...");
-								m_ConnecterUnit = teleIn;
-								PlacementDirLabel.Text = "Connecting to output...";
-								SetState(State.ConnectingTeleporter);
-								break;
-
-							case 1:
-								teleIn.DisconnectOutput(bBothWays: true);
-								break;
-
-							default:
-								throw new NotImplementedException();
-							}
-						});
-						break;
 					}
 				}
 			}
-			
 			if (Input.GetMouseButtonMask() == MouseButtonMask.Right && Input.IsKeyPressed(Godot.Key.Ctrl))
 			{
 				var mouseGL = World.PosToGrid(GetLocalMousePosition());
-				if (World.GetUnit(mouseGL) is Unit u)
+				if (World.GetUnit(mouseGL) is { } u)
 				{
-					World.DeleteUnit(u);
+					switch (u) {
+					case UNTeleInput input:
+					{
+						if (input.GetConnectedOutput() is { } output)
+						{
+							World.DeleteUnit(output);
+						}
+						World.DeleteUnit(u);
+						break;
+					}
+					case UNTeleOutput output:
+					{
+						if (output.GetConnectedInput() is { } input)
+						{
+							World.DeleteUnit(input);
+						}
+						World.DeleteUnit(u);
+						break;
+					}
+					default:
+						World.DeleteUnit(u);
+						break;
+					}
 				}
 			}
 			break;
@@ -435,7 +433,7 @@ public partial class Editor : Godot.Node2D
 			}
 			break;
 		}
-		case State.ConnectingTeleporter:
+		case State.PlacingMatchingTeleOutput:
 		{
 			if (ev is InputEventMouse mev && mev.IsPressed() && !mev.CtrlPressed && !mev.ShiftPressed)
 			{
@@ -445,10 +443,8 @@ public partial class Editor : Godot.Node2D
 					if (Unit.CanFitIn(World, mgloc, Vector2I.One, Direction.East))
 					{
 						var teleIn = (m_ConnecterUnit as UNTeleInput)!;
-						var teleOut = World.PlaceTeleOutput(mgloc, m_CurrUnitPlacement.Dir, 0);
-						teleIn.DisconnectOutput(bBothWays: true);
+						var teleOut = World.PlaceTeleOutput(mgloc, m_CurrUnitPlacement.Dir, 1);
 						teleIn.AssignOutput(teleOut);
-						teleOut.AssignInput(teleIn);
 						m_ConnecterUnit = null;
 						SetState(State.Placement);
 					}
@@ -508,7 +504,7 @@ public partial class Editor : Godot.Node2D
 
 		case State.Placement:
 		case State.ConnectingSliders:
-		case State.ConnectingTeleporter:
+		case State.PlacingMatchingTeleOutput:
 			PlacementDirLabel.Position = GetLocalMousePosition() + Vector2.One * 50;
 			break;
 
@@ -686,7 +682,7 @@ public partial class Editor : Godot.Node2D
 
 		case State.Placement:
 		case State.ConnectingSliders:
-		case State.ConnectingTeleporter:
+		case State.PlacingMatchingTeleOutput:
 			PlayButt.Disabled = true;
 			HaltButt.Disabled = true;
 			DebugButt.Disabled = true;

@@ -209,10 +209,7 @@ public partial class UNSlider : Unit
 		// I could also just add a third type, but I learned the hard way that simple is always the way to go.
 		if (tl.HasItem())
 		{
-			if (World.HasTile(GLocation + Dir.ToGrid()))
-			{
-				pender.Pend([ [new CmdSlide(tl, Dir)] ]);
-			}
+			pender.Pend([ [new CmdSlide(tl, Dir)] ]);
 			m_Ext?.OnItemLeave(this);
 		}
 	}

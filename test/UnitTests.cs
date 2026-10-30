@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
 using Godot;
@@ -21,7 +22,7 @@ public class UnitTests : ArTest.TestSuit
 	public override void BeforeEach()
 	{
 		Lvl.World.Reset();
-		Lvl.World.SetDims(new(6, 6));
+		Lvl.World.SetDims(new(10, 10));
 	}
 
 	public override void AfterEach()
@@ -1007,33 +1008,94 @@ public class UnitTests : ArTest.TestSuit
 			injy.PendFullSequence([[ new CmdSlide(tlIn, clo.Dir) ]]);
 			await Lvl.TickOnceForTestingAsync(); // Item slides in
 			await Lvl.TickOnceForTestingAsync(); // Nothing happens
-			await Lvl.TickOnceForTestingAsync(); // Nothing should slide out as normal!
-			AssertFalse(tlOut1.HasItem());
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			AssertFalse(tlOut1.HasItem());
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			AssertFalse(tlOut1.HasItem());
+			await Lvl.TickOnceForTestingAsync(); // Should slide out anyway
+			AssertTrue(tlOut1.HasItem());
+			AssertTrue(tlOut1.Item.IsMidAnimation());
 		}
 
-		var tlOut0 = world.InstallEmptyTile(clo.OutTile0.GLocation + clo.Dir.ToGrid());
 		world.DeleteTile(tlOut1.GLocation);
+		var tlOut0 = world.InstallEmptyTile(clo.OutTile0.GLocation + clo.Dir.ToGrid());
 		using (Lvl.Clock.PlaySimulationInDebug()) // The other output this time.
 		{
 			world.SpawnItem(tlIn, 508);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, clo.Dir) ]]);
 			await Lvl.TickOnceForTestingAsync(); // Item slides in
 			await Lvl.TickOnceForTestingAsync(); // Nothing happens
-			await Lvl.TickOnceForTestingAsync(); // Nothing should slide out as normal!
-			AssertFalse(tlOut0.HasItem());
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			AssertFalse(tlOut0.HasItem());
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			AssertFalse(tlOut0.HasItem());
+			await Lvl.TickOnceForTestingAsync(); // Should slide out anyway
+			AssertTrue(tlOut0.HasItem());
+			AssertTrue(tlOut0.Item.IsMidAnimation());
 		}
 	}
 
 	[ArTest.Test] public async Task TestTeleporter_vanilla()
 	{
-		AssertFalse(true);
+		var world = Lvl.World;
+		var teleIn = world.PlaceTeleInput(new Vector2I(2, 1), Direction.West, 1);
+		var teleOut = world.PlaceTeleOutput(new Vector2I(5, 1), Direction.East, 2);
+		teleIn.AssignOutput(teleOut);
+		var injy = world.PlaceInjector();
+
+		// Place some tiles in the way
+		world.InstallEmptyTile(new Vector2I(3, 1));
+		world.InstallEmptyTile(new Vector2I(4, 1));
+
+		var tlIn = world.InstallEmptyTile(teleIn.InTile.GLocation + teleIn.Dir.ToGrid());
+		var tlOut = world.InstallEmptyTile(teleOut.OutTile.GLocation + teleOut.Dir.ToGrid());
+
+		using (Lvl.Clock.PlaySimulationInDebug())
+		{
+			var it = world.SpawnItem(tlIn, -410);
+			injy.PendFullSequence([[ new CmdSlide(tlIn, teleIn.Dir.Invert()) ]]);
+
+			await Lvl.TickOnceForTestingAsync(); // Item slides in
+			await Lvl.TickOnceForTestingAsync(); // 1...
+			await Lvl.TickOnceForTestingAsync(); // 2!
+			await Lvl.TickOnceForTestingAsync(); // Item slides out from the other side
+			AssertTrue(tlOut.HasItem());
+			AssertRefEq(tlOut.Item, it);
+			AssertTrue(tlOut.Item.IsMidAnimation());
+		}
+	}
+
+	[ArTest.Test] public async Task TestTeleporter_lone_input()
+	{
+		var world = Lvl.World;
+		var teleIn = world.PlaceTeleInput(new Vector2I(2, 1), Direction.West, 1);
+		var injy = world.PlaceInjector();
+
+		var tlIn = world.InstallEmptyTile(teleIn.InTile.GLocation + teleIn.Dir.ToGrid());
+
+		using (Lvl.Clock.PlaySimulationInDebug())
+		{
+			var it = world.SpawnItem(tlIn, 189);
+			injy.PendFullSequence([[ new CmdSlide(tlIn, teleIn.Dir.Invert()) ]]);
+
+			await Lvl.TickOnceForTestingAsync(); // Item slides in
+			await Lvl.TickOnceForTestingAsync(); // And never leaves...
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+		}
+
+		var teleOut = world.PlaceTeleOutput(new Vector2I(5, 1), Direction.East, 2);
+		teleIn.AssignOutput(teleOut);
+		AssertTrue(teleIn.IsConnectedTo(teleOut));
+		// AssertTrue(teleOut.IsConnectedTo(teleIn)); // Not sure if this will be provided.
+		teleIn.UnassignOutput(); // Making sure this works...
+		AssertFalse(teleIn.IsConnectedTo(teleOut));
+
+		using (Lvl.Clock.PlaySimulationInDebug()) // Double checking...
+		{
+			var it = world.SpawnItem(tlIn, -457);
+			injy.PendFullSequence([[ new CmdSlide(tlIn, teleIn.Dir.Invert()) ]]);
+
+			await Lvl.TickOnceForTestingAsync(); // Item slides in
+			await Lvl.TickOnceForTestingAsync(); // And never leaves...
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.TickOnceForTestingAsync(); // Clogged
+		}
 	}
 }
