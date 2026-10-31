@@ -12,7 +12,7 @@ public class CmdKill(Vector2I gloc) : Command(1)
 
 	public CmdKill (Tile tl) : this(tl.GLocation) { }
 
-	protected override void OnTick(Editor.OnTickMediator ticker)
+	protected override void OnTick(Simulator.OnTickMediator ticker)
 	{
 		Debug.Assert(HasTileWithItemNotMidAnim(ticker.World, GLocation));
 		

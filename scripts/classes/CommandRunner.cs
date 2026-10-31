@@ -4,51 +4,79 @@ using System.Linq;
 
 namespace ArFactory;
 
-public readonly struct CommandRunner()
+public class CommandRunner
 {
 	public class CmdWrapper(Unit penderUnit, Command cmd, IEnumerable<Command> dep)
 	{
-		public readonly Command Cmd = cmd;
-		public readonly List<Command> DepCmds = [.. dep];
 		public readonly Unit PenderUnit = penderUnit;
-		public bool bRanThisTick = false;
+		public readonly Command Cmd = cmd;
+		private readonly List<Command> m_DepCmds = [.. dep];
+		private bool m_bRanThisTick = false;
 
-		public bool AllDepsDone() => DepCmds.All(c => c.IsDone());
+		public bool AllDepsDone() => m_DepCmds.All(c => c.IsDone());
+		public bool HasRanThisTick() => m_bRanThisTick;
 		public override string ToString() => Cmd.ToString();
+
+		public void OnTick(Simulator.OnTickMediator ticker)
+		{
+			Debug.Assert(!m_bRanThisTick);
+			Cmd.HandleOnTick(ticker);
+			m_bRanThisTick = true;
+			if (!Cmd.IsSmooth())
+			{
+				Cmd.CountThisTick();
+			}
+		}
+
+		public void OnEdge(Simulator.OnEdgeMediator ticker)
+		{
+			Debug.Assert(m_bRanThisTick);
+			Debug.Assert(Cmd.IsSmooth());
+			Cmd.HandleOnEdge(ticker);
+			Cmd.CountThisTick();
+		}
+
+		public void ResetRunFlag() => m_bRanThisTick = false;
 	}
 
 	public class OnTickPender(CommandRunner runner)
 	{
-		public readonly List<List<CmdWrapper>> Groups = [];
-		public Unit? PenderUnit;
+		public readonly List<List<Command>> Groups = [];
+		public Unit? PenderUnit { get; private set; }
 		private readonly CommandRunner m_Runner = runner;
 
 		public void Pend(IEnumerable<IEnumerable<Command>> newSequence, int startIndex = 0)
 		{
 			Debug.Assert(0 <= startIndex && startIndex <= Groups.Count);
 			Debug.AssertNotNull(PenderUnit);
-			
-			IEnumerable<Command> lastNewCmdGroup = [];
+
 			var i = startIndex;
 			foreach (var ng in newSequence)
 			{
 				if (i < Groups.Count)
 				{
-					Groups[i].AddRange(ng.Select(c => new CmdWrapper(PenderUnit!, c, lastNewCmdGroup)));
+					Groups[i].AddRange(ng);
 				}
 				else
 				{
-					Groups.Add([.. ng.Select( c => new CmdWrapper(PenderUnit!, c, lastNewCmdGroup) )]);
+					Groups.Add([.. ng]);
 				}
-				lastNewCmdGroup = ng;
 				++i;
 			}
-
-			PenderUnit!.AddCommandsToWaitList(newSequence);
 		}
 
 		public void QueueBlockedSlideCmdByAnotherItem(WorldPanel world, CmdSlide cmd) 
 			=> m_Runner.QueueBlockedSlideCmdByAnotherItem(world, cmd);
+		
+		/// <summary>
+		/// </summary>
+		/// <param name="proofRunner">Used to make it impossible to call this from the Command side</param>
+		public void _SetPenderUnit(CommandRunner proofRunner, Unit newUnit)
+		{
+			Debug.AssertNotNull(newUnit);
+			Debug.AssertRefEq(proofRunner, m_Runner);
+			PenderUnit = newUnit;
+		}
 	}
 
 	private static readonly Type[] s_CmdPiorities =
@@ -119,7 +147,7 @@ public readonly struct CommandRunner()
 	/// <summary>
 	/// Should be called on the beginning of the tick, this does nothing when no commands are left to be executed.
 	/// </summary>
-	public bool OnTick(Editor.OnTickMediator ticker)
+	public bool OnTick(Simulator.OnTickMediator ticker)
 	{
 		if (IsDone())
 		{
@@ -135,35 +163,17 @@ public readonly struct CommandRunner()
 				foreach (var cw in currGroup)
 				{
 					// Commands that were forced to end can be done before first tick so...
-					if (!cw.Cmd.IsDone() && !cw.bRanThisTick && cw.AllDepsDone())
+					if (!cw.Cmd.IsDone() && !cw.HasRanThisTick() && cw.AllDepsDone())
 					{
-						ticker.Pender.PenderUnit = cw.PenderUnit;
-						cw.Cmd.HandleOnTick(ticker);
-						cw.bRanThisTick = true;
-						if (!cw.Cmd.IsSmooth()) 
-						{
-							cw.Cmd.CountThisTick();
-						}
-
+						ticker.Pender._SetPenderUnit(this, cw.PenderUnit);
+						cw.OnTick(ticker);
 						bGoingNextGroup = true;
 					}
 				}
 				currGroup.RemoveAll(c => c.Cmd.IsDone());
 				if (ticker.Pender.Groups.Count > 0)
 				{
-					var i = gIndex;
-					foreach (var ng in ticker.Pender.Groups)
-					{
-						if (i < m_Groups.Count)
-						{
-							m_Groups[i].AddRange(ng);
-						}
-						else
-						{
-							m_Groups.Add([.. ng]);
-						}
-						++i;
-					}
+					PendFullSequence(ticker.Pender.PenderUnit!, ticker.Pender.Groups, gIndex);
 					ticker.Pender.Groups.Clear();
 				}
 				else break;
@@ -181,7 +191,7 @@ public readonly struct CommandRunner()
 		return IsDone();
 	}
 
-	public bool DoPerFrame(Editor.PerFrameMediator ticker)
+	public bool DoPerFrame(Simulator.PerFrameMediator ticker)
 	{
 		if (IsDone())
 		{
@@ -193,7 +203,7 @@ public readonly struct CommandRunner()
 			var bSomethingRan = false;
 			foreach (var cw in group)
 			{
-				if (cw.bRanThisTick && cw.Cmd.IsSmooth())
+				if (cw.HasRanThisTick() && cw.Cmd.IsSmooth())
 				{
 					cw.Cmd.HandleFrame(ticker);
 					bSomethingRan = true;
@@ -211,7 +221,7 @@ public readonly struct CommandRunner()
 	/// <summary>
 	/// Should be called at the end of the tick, this does nothing when no commands are left to be executed.
 	/// </summary>
-	public bool OnEdge(Editor.OnEdgeMediator ticker)
+	public bool OnEdge(Simulator.OnEdgeMediator ticker)
 	{
 		foreach (var group in m_Groups)
 		{
@@ -219,13 +229,12 @@ public readonly struct CommandRunner()
 			foreach (var cw in group)
 			{
 				// Smooth commands that were forced to finish after OnTick was called can be done by this point.
-				if (!cw.Cmd.IsDone() && cw.bRanThisTick && cw.Cmd.IsSmooth())
+				if (!cw.Cmd.IsDone() && cw.HasRanThisTick() && cw.Cmd.IsSmooth())
 				{
-					cw.Cmd.HandleOnEdge(ticker);
-					cw.Cmd.CountThisTick();
+					cw.OnEdge(ticker);
 					bSomethingRan = true;
 				}
-				cw.bRanThisTick = false;
+				cw.ResetRunFlag();
 			}
 			group.RemoveAll(c => c.Cmd.IsDone());
 			if (!bSomethingRan)

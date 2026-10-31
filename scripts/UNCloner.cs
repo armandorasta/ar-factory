@@ -24,7 +24,7 @@ public partial class UNCloner : Unit
 		m_tlOut1 = AddOutput(new(0, 1), Direction.East);
 	}
 
-	public override void PendNewCommands(Editor.PendProxy pender)
+	public override void PendNewCommands(Simulator.PendProxy pender)
 	{
 		if (HasPendingCmds())
 		{

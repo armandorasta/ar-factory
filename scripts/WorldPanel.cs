@@ -509,7 +509,7 @@ public partial class WorldPanel : Godot.Panel
 	#endregion // Essential Functions
 	#region .Simulation Related
 
-	public void OnTick(Editor.PendProxy pender)
+	public void OnTick(Simulator.PendProxy pender)
 	{
 		foreach (var tl in m_Tiles)
 		{

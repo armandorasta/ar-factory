@@ -73,7 +73,7 @@ public class CmdIf : Command
 	{ }
 
 
-	protected override void OnTick(Editor.OnTickMediator ticker)
+	protected override void OnTick(Simulator.OnTickMediator ticker)
 	{
 		var bCondMet = Apply(Check, ticker.World.GetTileOrNull(GLocation), CmpValue);
 		if ((bCondMet ? TrueBranch : ElseBranch) is { } winnerBranch)

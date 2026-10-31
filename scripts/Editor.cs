@@ -8,64 +8,6 @@ namespace ArFactory;
 
 public partial class Editor : Godot.Node2D
 {
-	public class PendProxy(CommandRunner runner)
-	{
-		public Unit? PenderUnit;
-		private readonly CommandRunner m_Runner = runner;
-
-		public void Pend(IEnumerable<IEnumerable<Command>> groups, int startIndex = 0)
-		{
-			m_Runner.PendFullSequence(PenderUnit!, groups.Where(g => g.Any(_ => true)), startIndex);
-		}
-	}
-
-	public struct ExecState()
-	{
-		public enum Status
-		{
-			NothingSus,
-			IncorrectValue,
-		}
-		
-		public Status Stat = Status.NothingSus;
-		public int ExpectedValue = Item.InvalidValue;
-		public int RecievedValue = Item.InvalidValue;
-		public Vector2I GLocation = new(-1, -1);
-	}
-
-	public class OnTickMediator(WorldPanel world, CommandRunner runner)
-	{
-		public CommandRunner.OnTickPender Pender = new(runner);
-		public WorldPanel World = world;
-		public ExecState m_TState;
-
-		public void CrashSimulation(int expected, int found, Vector2I where)
-		{
-			m_TState = new()
-			{
-				Stat = ExecState.Status.IncorrectValue,
-				ExpectedValue = expected,
-				RecievedValue = found,
-				GLocation = where,
-			};
-		}
-	}
-
-	public class PerFrameMediator(WorldPanel world, SimulatorClock clock, double dt)
-	{
-		public WorldPanel World = world;
-		public double FrameDelta = dt;
-		public double TickMillis => m_Clock.GetMilliSecondsPerTick();
-		public double TickElapsedPercent => m_Clock.GetTickElapsedMillis() / TickMillis;
-
-		private readonly SimulatorClock m_Clock = clock;
-	}
-
-	public class OnEdgeMediator(WorldPanel world)
-	{
-		public WorldPanel World = world;
-	}
-
 	private enum State
 	{
 		Off,
@@ -89,7 +31,7 @@ public partial class Editor : Godot.Node2D
 	public Godot.HSlider SpeedSlider => m_SpeedSlider!;
 	public Godot.Label TickSpeedLabel => m_TickSpeedLabel!;
 
-	#region
+	#region Actual Nodes
 	private Cam? m_Cam;
 	private WorldPanel? m_World;
 	private Godot.Button? m_PlayButt;
@@ -104,13 +46,12 @@ public partial class Editor : Godot.Node2D
 
 	// Publics
 	public float DefaultTickMillis = 300.0f;
-	public SimulatorClock Clock => m_Clock;
+	public Simulator Simy => m_Simy;
 
 	// Privates
 	private State m_CurrState = State.Off;
 	private float m_TickMillis;
-	private readonly SimulatorClock m_Clock = new();
-	private readonly CommandRunner m_Runner = new();
+	private readonly Simulator m_Simy = new();
 
 	// Editor stuff
 	private record struct UnitPlacement(Godot.ButtonGroup ButtGroup, Godot.Button? Butt, Direction Dir);
@@ -138,7 +79,6 @@ public partial class Editor : Godot.Node2D
 		WorldCam.Position = World!.Size * 0.5f;
 		WorldCam.MaxZoom = 1.0f;
 		WorldCam.MinZoom = 0.3f;
-		InitSimy();
 		InitSimButts();
 		InitSimSpeedSlider();
 		InitTools();
@@ -160,15 +100,6 @@ public partial class Editor : Godot.Node2D
 		m_TickSpeedLabel = GetNode<Godot.Label>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TickSpeedLabel");
 	}
 
-	private void InitSimy()
-	{
-		AddChild(Clock);
-		m_Clock.Connect(SimulatorClock.SignalName.SimulationStarted, Callable.From(OnSimulationStart));
-		m_Clock.Connect(SimulatorClock.SignalName.SimulationEnded, Callable.From(OnSimulationEnd));
-		m_Clock.Connect(SimulatorClock.SignalName.TickStarted, Callable.From(OnTick));
-		m_Clock.Connect(SimulatorClock.SignalName.TickEnded, Callable.From(OnEdge));
-	}
-
 	private void InitSimButts()
 	{
 		PlayButt.Pressed += OnPlayButt_Pressed;
@@ -179,7 +110,7 @@ public partial class Editor : Godot.Node2D
 	private void InitSimSpeedSlider()
 	{
 		SpeedSlider.ValueChanged += OnSpeedSlider_ValueChanged;
-		SpeedSlider.Value = m_Clock.GetTickRate();
+		SpeedSlider.Value = m_Simy.GetTickRate();
 	}
 
 	private void InitTools()
@@ -515,77 +446,6 @@ public partial class Editor : Godot.Node2D
 		}
 	}
 
-	/// <summary>
-	/// Used for testing for exceptions. Otherwise I just use the method inside of <see cref="SimulatorClock"/> directly.
-	/// This does the same exact thing as the Simulator method, but kinda bloats this class with simulation code.
-	/// </summary>
-	public async Task TickOnceForTestingAsync()
-	{
-		Debug.Assert(m_CurrState is State.Debug);
-		if (!Clock.IsPaused())
-		{
-			await Clock.EndTickAsync();
-		}
-
-		Clock.TickOnceNoSignal();
-		OnTick();
-	}
-
-	public void OnTick()
-	{
-		Debug.Assert(m_CurrState is State.Play or State.Debug);
-
-		var ticker = new OnTickMediator(World, m_Runner);
-		World.OnTick(new PendProxy(m_Runner));
-		
-		m_Runner.OnTick(ticker);
-		switch (ticker.m_TState.Stat) {
-		case ExecState.Status.NothingSus:
-			break;
-		
-		case ExecState.Status.IncorrectValue:
-			m_Clock.HaltSimulation();
-			GD.PrintErr($"Expected {ticker.m_TState.ExpectedValue} but found {ticker.m_TState.RecievedValue} on {ticker.m_TState.GLocation}");
-			break;
-
-		default:
-			throw new NotImplementedException("New ExecState.Status?");
-		}
-
-		switch (World.CheckForErrorsThisTick()) {
-		case WorldPanel.TickState.NothingSus:
-			break;
-
-		case WorldPanel.TickState.RanOutOfItems:
-			m_Clock.HaltSimulation();
-			GD.PrintErr("RAN OUT OF ITEMS!!");
-			break;
-		
-		case WorldPanel.TickState.SuccessfulRun:
-			m_Clock.HaltSimulation();
-			GD.PrintErr("WIN!");
-			break;
-
-		default:
-			throw new NotImplementedException("New WorldPanel.TickState?");
-		}
-
-		UpdateTickCountLabel();
-
-	}
-
-	public void DoPerFrame(double dt)
-	{
-		var ticker = new PerFrameMediator(World, m_Clock, dt);
-		m_Runner.DoPerFrame(ticker);
-	}
-
-	public void OnEdge()
-	{
-		var ticker = new OnEdgeMediator(World);
-		m_Runner.OnEdge(ticker);
-	}
-
 	#region .Signal Handlers
 
 	private void OnPlayButt_Pressed()
@@ -593,7 +453,7 @@ public partial class Editor : Godot.Node2D
 		Debug.Assert(m_CurrState is State.Off or State.Debug);
 		switch (m_CurrState) {
 		case State.Off:
-			m_Clock.PlaySimulation();
+			m_Simy.PlaySimulation();
 			SetState(State.Play);
 			break;
 

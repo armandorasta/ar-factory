@@ -13,7 +13,7 @@ public class CmdSlide : Command
 	public Direction Dir { get; private set; }
 	public WeakReference<Item>? TrackedItemRef { get; private set; }
 	
-	private Action<Editor.OnTickMediator>? m_StateFunc;
+	private Action<Simulator.OnTickMediator>? m_StateFunc;
 
 	public CmdSlide(Vector2I gfrom, Direction dir) : base(1, true)
 	{
@@ -57,12 +57,12 @@ public class CmdSlide : Command
 		else return false;
 	}
 
-	protected override void OnTick(Editor.OnTickMediator ticker)
+	protected override void OnTick(Simulator.OnTickMediator ticker)
 	{
 		m_StateFunc!.Invoke(ticker);
 	}
 
-	protected override void DoPerFrame(Editor.PerFrameMediator ticker)
+	protected override void DoPerFrame(Simulator.PerFrameMediator ticker)
 	{
 		if (IsAwaitingAnim())
 		{
@@ -76,7 +76,7 @@ public class CmdSlide : Command
 		}
 	}
 
-	protected override void OnEdge(Editor.OnEdgeMediator ticker)
+	protected override void OnEdge(Simulator.OnEdgeMediator ticker)
 	{
 		if (IsAwaitingAnim())
 		{
@@ -101,7 +101,7 @@ public class CmdSlide : Command
 		}
 	}
 
-	private void HandleDefault(Editor.OnTickMediator ticker)
+	private void HandleDefault(Simulator.OnTickMediator ticker)
 	{
 		Debug.Assert(TrackedItemRef is null);
 		Debug.Assert(HasTileWithItemNotMidAnim(ticker.World, GridFrom));

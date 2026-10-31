@@ -5,19 +5,6 @@ namespace ArFactory;
 
 public partial class SimulatorClock : Godot.Node
 {
-	public sealed class SimulationAutoEnder(SimulatorClock sim) : IDisposable
-	{
-		private readonly SimulatorClock m_Sim = sim;
-		void IDisposable.Dispose()
-		{
-			if (!m_Sim.IsHalted())
-			{
-				m_Sim.HaltSimulation();
-			}
-		}
-
-	}
-
 	private enum State
 	{
 		Off,
@@ -28,22 +15,19 @@ public partial class SimulatorClock : Godot.Node
 	public const float MinTickRate = 0.1f;
 	public const float MaxTickRate = 1000.0f;
 
-	[Godot.Signal] public delegate void SimulationStartedEventHandler();
-	[Godot.Signal] public delegate void SimulationEndedEventHandler();
-	[Godot.Signal] public delegate void TickStartedEventHandler();
-	[Godot.Signal] public delegate void TickEndedEventHandler();
-
 
 	public float DefaultTickMillis = 300.0f;
 
 	private State m_CurrState;
+	private Simulator m_ParentSimy;
 	private Godot.Timer m_TickTimer = new();
 	private int m_TickCount = 0; // Number of ticks since the start.
 	private float m_TickMillis;
 
-	public SimulatorClock()
+	public SimulatorClock(Simulator parentSimy)
 	{
-		m_TickMillis = DefaultTickMillis;
+		this.m_TickMillis = DefaultTickMillis;
+		this.m_ParentSimy = parentSimy;
 		InitTimer();
 	}
 
@@ -64,63 +48,29 @@ public partial class SimulatorClock : Godot.Node
 		=> m_TickMillis = 1000.0f / float.Clamp(ratePerSec, MinTickRate, MaxTickRate);
 	public void SetTickMillis(float millis) => SetTickRate(1000.0f / millis);
 
-	public bool IsHalted() => m_CurrState is State.Off;
-	/// <summary>
-	/// Checks if we are in debug mode.
-	/// </summary>
-	public bool IsDebugging() => m_CurrState == State.Debug;
-	/// <summary>
-	/// Checks if the simulation is paused just before the next tick is to be processed.
-	/// This function only returns <see langword="true"/> in debug mode, only when <see cref="IsDebugging"/>
-	/// returns <see langword="true"/>.
-	/// </summary>
-	public bool IsPaused() => IsDebugging() && IsPausedRightAtTickStart();
-
+	public bool IsStopped() => m_CurrState is State.Off;
 	/// <summary>
 	/// Checks if the tick timer has timed out, this almost certainly means we are in debug mode waiting for the user
 	/// to advance, but there's an extremely small chance this function returns /// <see langword="true"/> in normal
 	/// mode...
 	/// </summary>
-	private bool IsPausedRightAtTickStart() => m_TickTimer.TimeLeft == 0.0;
+	public bool IsPausedRightAtTickStart() => m_TickTimer.TimeLeft == 0.0;
 
-	/// <summary>
-	/// Same as pressing the play button on the level.
-	/// </summary>
-	/// <returns>
-	/// A proxy that can be used in a using statement which will automatically end the simulation.
-	/// </returns>
-	public SimulationAutoEnder PlaySimulation() => StartSimulation(bPauseOnEntry: false);
-	/// <summary>
-	/// Same as pressing the debug button to start the level. This pauses the simulation before the
-	/// first tick is processed then <see cref="TickOnce"/> or <see cref="ResumeSimulation"/> can
-	/// be used to proceed.
-	/// </summary>
-	/// <returns>
-	/// A proxy that can be used in a using statement which will automatically end the simulation.
-	/// </returns>
-	public SimulationAutoEnder PlaySimulationInDebug() => StartSimulation(bPauseOnEntry: true);
-
-	/// <summary>
-	/// Returns a proxy that can be used in a using statement which will automatically end the simulation.
-	/// </summary>
-	private SimulationAutoEnder StartSimulation(bool bPauseOnEntry = false)
+	public void Start(bool bPauseOnEntry = false)
 	{
 		// When it's off, both values for bPauseOnEntry work because of the tests...
 		SetState(bPauseOnEntry ? State.Debug : State.Play);
-		OnSimulationStart();
+		OnStart();
 		m_TickTimer.Paused = false;
-		m_TickTimer.Stop();
-		EmitSignal(SignalName.SimulationStarted);
 		BeginTick();
-		return new(this);
 	}
 
 	/// <summary>
 	/// Same as hitting the play button mid-simlation to exit debug mode.
 	/// </summary>
-	public void ResumeSimulation()
+	public void Resume()
 	{
-		Debug.Assert(m_CurrState == State.Debug);
+		Debug.Assert(m_CurrState is State.Debug);
 		SetState(State.Play);
 
 		if (IsPausedRightAtTickStart())
@@ -132,7 +82,7 @@ public partial class SimulatorClock : Godot.Node
 	/// <summary>
 	/// Same as hitting the debug button mid-simlation in normal mode to enter debug mode.
 	/// </summary>
-	public void PauseSimulation()
+	public void Pause()
 	{
 		Debug.Assert(m_CurrState == State.Play);
 		SetState(State.Debug);
@@ -141,13 +91,12 @@ public partial class SimulatorClock : Godot.Node
 	/// <summary>
 	/// Halts everything, bombs all items, resets all the units, etc...
 	/// </summary>
-	public void HaltSimulation()
+	public void Stop()
 	{
 		Debug.Assert(m_CurrState is State.Play or State.Debug);
 		// This has to be called before switching the PlayMode for fast tick rates.
-		OnSimulationEnd();
+		OnStop();
 		SetState(State.Off);
-		EmitSignal(SignalName.SimulationEnded);
 	}
 
 	/// <summary>
@@ -157,22 +106,13 @@ public partial class SimulatorClock : Godot.Node
 	/// </summary>
 	public void TickOnce()
 	{
-		TickOnceNoSignal();
-		EmitSignal(SignalName.TickStarted);
-	}
-
-	/// <summary>
-	/// This just fires the timer without alerting anything. usefull for manually triggering one thing and leaving 
-	/// others in the dark.
-	/// </summary>
-	public void TickOnceNoSignal()
-	{
 		Debug.Assert(m_CurrState is State.Play or State.Debug);
 		Debug.Assert(!m_TickTimer.Paused);
 		Debug.Assert(IsPausedRightAtTickStart());
 
 		m_TickTimer.Start(m_TickMillis * 0.001f);
 		m_TickCount += 1;
+		m_ParentSimy.OnTick();
 	}
 
 	/// <summary>
@@ -224,7 +164,7 @@ public partial class SimulatorClock : Godot.Node
 		Debug.Assert(m_CurrState is State.Play or State.Debug);
 		for (var i = 0; i < tickCount; ++i)
 		{
-			await ToSignal(this, SignalName.TickStarted);
+			await EndTickAsync();
 		}
 	}
 
@@ -234,7 +174,7 @@ public partial class SimulatorClock : Godot.Node
 	private void OnTickTimer_TimeOut()
 	{
 		Debug.Assert(m_CurrState is State.Play or State.Debug);
-		EmitSignal(SignalName.TickEnded);
+		m_ParentSimy.OnEdge();
 		BeginTick();
 	}
 
@@ -265,14 +205,15 @@ public partial class SimulatorClock : Godot.Node
 		m_CurrState = newPlayMode;
 	}
 
-	private void OnSimulationStart()
+	private void OnStart()
 	{
 	}
 
-	private void OnSimulationEnd()
+	private void OnStop()
 	{
 		Debug.Assert(m_CurrState is State.Play or State.Debug);
 		m_TickTimer.Paused = true;
+		m_TickTimer.Stop();
 		m_TickCount = 0;
 	}
 }

@@ -27,7 +27,7 @@ public class CmdClone : Command
 	{ }
 
 
-	protected override void OnTick(Editor.OnTickMediator ticker)
+	protected override void OnTick(Simulator.OnTickMediator ticker)
 	{
 		Debug.Assert(HasTileWithItemNotMidAnim(ticker.World, SourceGL));
 		Debug.Assert(DestinationGLs.All( l => HasTileUnreserved(ticker.World, l) ));

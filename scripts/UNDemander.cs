@@ -27,7 +27,7 @@ public partial class UNDemander : Unit
 		m_In0 = AddInput(Vector2I.Zero, Direction.East, true);
 	}
 
-	public override void PendNewCommands(Editor.PendProxy pender)
+	public override void PendNewCommands(Simulator.PendProxy pender)
 	{
 		if (IsDoneWithOutputSeq())
 		{

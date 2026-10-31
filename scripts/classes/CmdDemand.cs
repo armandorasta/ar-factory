@@ -20,7 +20,7 @@ public class CmdDemand : Command
 	public CmdDemand(Tile tl, int reqVal) : this(tl.GLocation, reqVal) { }
 
 
-	protected override void OnTick(Editor.OnTickMediator ticker)
+	protected override void OnTick(Simulator.OnTickMediator ticker)
 	{
 		Debug.Assert(HasTileWithItemNotMidAnim(ticker.World, GLocation));
 

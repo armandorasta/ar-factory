@@ -63,7 +63,7 @@ public partial class UNUpdater : Unit
 		AddOutput(Vector2I.Zero, Direction.East);
 	}
 
-	public override void PendNewCommands(Editor.PendProxy pender)
+	public override void PendNewCommands(Simulator.PendProxy pender)
 	{
 		if (HasPendingCmds())
 		{

@@ -21,7 +21,7 @@ public class CmdCombine(Vector2I glLeft, Vector2I glRight, Vector2I glDest, Bina
 	{ }
 
 
-	protected override void OnTick(Editor.OnTickMediator ticker)
+	protected override void OnTick(Simulator.OnTickMediator ticker)
 	{
 		Debug.Assert(HasTileWithItemNotMidAnim(ticker.World, LeftGL));
 		Debug.Assert(HasTileWithItemNotMidAnim(ticker.World, RightGL));

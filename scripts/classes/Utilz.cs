@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace ArFactory;
 
@@ -27,5 +28,23 @@ public static class Utilz
 	public static string ReplaceBaseNameInToString(string strBase, string newName)
 	{
 		return $"{newName}[{strBase[(strBase.IndexOf('[') + 1) .. (strBase.Length-1)]}]";		
+	}
+
+	public static void PendFullSequence<T>(
+		IEnumerable<IEnumerable<T>> newSequence, List<List<T>> destColl, int startIndex = 0)
+	{
+		var i = startIndex;
+		foreach (var ng in newSequence)
+		{
+			if (i < destColl.Count)
+			{
+				destColl[i].AddRange(ng);
+			}
+			else
+			{
+				destColl.Add([.. ng]);
+			}
+			++i;
+		}
 	}
 }

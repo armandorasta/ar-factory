@@ -13,7 +13,7 @@ public partial class UNCmdInjector : Unit
 
 	protected override void BuildTilesAsIfFacingEast() { }
 	
-	public override void PendNewCommands(Editor.PendProxy pender)
+	public override void PendNewCommands(Simulator.PendProxy pender)
 	{
 		pender.Pend(m_CmdSequenceNextTick);
 		m_CmdSequenceNextTick.Clear();

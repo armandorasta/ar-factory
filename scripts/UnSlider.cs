@@ -196,7 +196,7 @@ public partial class UNSlider : Unit
 		AddInput(Vector2I.Zero, Direction.South);
 	}
 
-	public override void PendNewCommands(Editor.PendProxy pender)
+	public override void PendNewCommands(Simulator.PendProxy pender)
 	{
 		if (HasPendingCmds() && !AllCmdsAreEndingSlidingCmds())
 		{
