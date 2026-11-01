@@ -14,7 +14,7 @@ public class WorldPanelTests : ArTest.TestSuit
 		var levelScene = GD.Load<Godot.PackedScene>(SceneManager.EditorScenePath);
 		m_Lv = levelScene.Instantiate<Editor>();
 		AddNode(m_Lv);
-		m_Lv.Clock.SetTickRate(100);
+		m_Lv.Simy.Clock.SetTickRate(100);
 	}
 
 	public override void BeforeEach()
@@ -25,13 +25,12 @@ public class WorldPanelTests : ArTest.TestSuit
 
 	public override void AfterEach()
 	{
-		AssertTrue(Lvl.Clock.IsHalted());
+		AssertTrue(Lvl.Simy.IsHalted());
 	}
 
 	public override void AfterAll()
 	{
 		Lvl.QueueFree();
-		RemoveNode(Lvl);
 	}
 
 	[ArTest.Test] public void TestInstallTile_vanilla()

@@ -213,7 +213,6 @@ public class Tile
 		{
 			Debug.Assert(bMaybeMidAnim || !m_Item.IsMidAnimation());
 			m_Item.QueueFree();
-			m_Item.GetParent().RemoveChild(m_Item);
 			m_Item = null;
 		}
 	}

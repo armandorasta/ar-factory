@@ -56,9 +56,9 @@ script = ExtResource("2_kl8ac")
 position = Vector2(530, 248)
 script = ExtResource("3_qifjx")
 
-[node name="HUDLayer" type="CanvasLayer" parent="WorldPanel" unique_id=1773833209]
+[node name="HUDLayer" type="CanvasLayer" parent="." unique_id=1773833209]
 
-[node name="MarginContainer" type="MarginContainer" parent="WorldPanel/HUDLayer" unique_id=1432749004]
+[node name="MarginContainer" type="MarginContainer" parent="HUDLayer" unique_id=1432749004]
 anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
@@ -68,18 +68,18 @@ grow_horizontal = 2
 grow_vertical = 0
 theme_override_constants/margin_bottom = 15
 
-[node name="HBoxContainer" type="HBoxContainer" parent="WorldPanel/HUDLayer/MarginContainer" unique_id=1312282162]
+[node name="HBoxContainer" type="HBoxContainer" parent="HUDLayer/MarginContainer" unique_id=1312282162]
 layout_mode = 2
 alignment = 1
 
-[node name="FactoryPan" type="Panel" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer" unique_id=1562847483]
+[node name="FactoryPan" type="Panel" parent="HUDLayer/MarginContainer/HBoxContainer" unique_id=1562847483]
 custom_minimum_size = Vector2(700, 50)
 layout_mode = 2
 size_flags_horizontal = 4
 size_flags_vertical = 4
 theme_override_styles/panel = SubResource("StyleBoxFlat_0wfyh")
 
-[node name="MarginContainer" type="MarginContainer" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan" unique_id=1003673875]
+[node name="MarginContainer" type="MarginContainer" parent="HUDLayer/MarginContainer/HBoxContainer/FactoryPan" unique_id=1003673875]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -91,33 +91,33 @@ theme_override_constants/margin_top = 4
 theme_override_constants/margin_right = 4
 theme_override_constants/margin_bottom = 4
 
-[node name="ToolsHBox" type="HBoxContainer" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer" unique_id=324215663]
+[node name="ToolsHBox" type="HBoxContainer" parent="HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer" unique_id=324215663]
 layout_mode = 2
 
-[node name="Button" type="Button" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/ToolsHBox" unique_id=2043644016]
+[node name="Button" type="Button" parent="HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/ToolsHBox" unique_id=2043644016]
 visible = false
 layout_mode = 2
 text = ">>>"
 
-[node name="PlayHBox" type="HBoxContainer" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer" unique_id=866974895]
+[node name="PlayHBox" type="HBoxContainer" parent="HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer" unique_id=866974895]
 visible = false
 layout_mode = 2
 
-[node name="TicksLabel" type="Label" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox" unique_id=2014007337]
+[node name="TicksLabel" type="Label" parent="HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox" unique_id=2014007337]
 layout_mode = 2
 size_flags_vertical = 1
 text = "tick: 0"
 vertical_alignment = 1
 
-[node name="HSeparator" type="HSeparator" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox" unique_id=1248349749]
+[node name="HSeparator" type="HSeparator" parent="HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox" unique_id=1248349749]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="TickSpeedLabel" type="Label" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox" unique_id=989708163]
+[node name="TickSpeedLabel" type="Label" parent="HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox" unique_id=989708163]
 layout_mode = 2
 text = "100 tick/s"
 
-[node name="SpeedHSlider" type="HSlider" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox" unique_id=1542266594]
+[node name="SpeedHSlider" type="HSlider" parent="HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox" unique_id=1542266594]
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 size_flags_vertical = 1
@@ -126,12 +126,12 @@ max_value = 20.0
 step = 0.1
 value = 1.0
 
-[node name="ButtPanel" type="Panel" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer" unique_id=1305208497]
+[node name="ButtPanel" type="Panel" parent="HUDLayer/MarginContainer/HBoxContainer" unique_id=1305208497]
 custom_minimum_size = Vector2(350, 50)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_0wfyh")
 
-[node name="MarginContainer" type="MarginContainer" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel" unique_id=1190093278]
+[node name="MarginContainer" type="MarginContainer" parent="HUDLayer/MarginContainer/HBoxContainer/ButtPanel" unique_id=1190093278]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -143,25 +143,66 @@ theme_override_constants/margin_top = 6
 theme_override_constants/margin_right = 6
 theme_override_constants/margin_bottom = 6
 
-[node name="ButtsHBox" type="HBoxContainer" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer" unique_id=202614545]
+[node name="ButtsHBox" type="HBoxContainer" parent="HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer" unique_id=202614545]
 layout_mode = 2
 theme_override_constants/separation = 10
 alignment = 1
 
-[node name="PlayButt" type="Button" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox" unique_id=1254505]
+[node name="PlayButt" type="Button" parent="HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox" unique_id=1254505]
 custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
 shortcut = SubResource("Shortcut_h4qsp")
 text = "PLAY"
 
-[node name="PauseButt" type="Button" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox" unique_id=1866396312]
+[node name="PauseButt" type="Button" parent="HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox" unique_id=1866396312]
 custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
 shortcut = SubResource("Shortcut_xqrfn")
 text = "PAUSE"
 
-[node name="DebugButt" type="Button" parent="WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox" unique_id=1629186902]
+[node name="DebugButt" type="Button" parent="HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox" unique_id=1629186902]
 custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
 shortcut = SubResource("Shortcut_u716c")
 text = "DEBUG"
+
+[node name="UnitPlacerMarCon" type="MarginContainer" parent="HUDLayer" unique_id=131520313]
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -230.0
+offset_top = -200.0
+offset_bottom = 200.0
+grow_horizontal = 0
+grow_vertical = 2
+theme_override_constants/margin_right = 30
+
+[node name="Pan" type="Panel" parent="HUDLayer/UnitPlacerMarCon" unique_id=737610610]
+custom_minimum_size = Vector2(200, 600)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_0wfyh")
+
+[node name="MarginContainer" type="MarginContainer" parent="HUDLayer/UnitPlacerMarCon/Pan" unique_id=1281080587]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 6
+
+[node name="GCon" type="GridContainer" parent="HUDLayer/UnitPlacerMarCon/Pan/MarginContainer" unique_id=300809229]
+layout_mode = 2
+columns = 2
+
+[node name="Button" type="Button" parent="HUDLayer/UnitPlacerMarCon/Pan/MarginContainer/GCon" unique_id=1253497457]
+visible = false
+custom_minimum_size = Vector2(0, 90)
+layout_mode = 2
+size_flags_horizontal = 3
+text = ">>>"

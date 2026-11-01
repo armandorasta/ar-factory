@@ -10,8 +10,8 @@
 
   <PropertyGroup>
     <!-- We have: DEBUG, TEST, ASSERTIONS -->
-    <!-- <DefineConstants>ASSERTIONS</DefineConstants> -->
-    <DefineConstants>TEST; ASSERTIONS</DefineConstants>
+    <DefineConstants>ASSERTIONS</DefineConstants>
+    <!-- <DefineConstants>TEST; ASSERTIONS</DefineConstants> -->
   </PropertyGroup>
 
   <ItemGroup>

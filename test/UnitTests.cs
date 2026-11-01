@@ -16,7 +16,7 @@ public class UnitTests : ArTest.TestSuit
 		var levelScene = GD.Load<Godot.PackedScene>(SceneManager.EditorScenePath);
 		m_Lv = levelScene.Instantiate<Editor>();
 		AddNode(Lvl);
-		Lvl.Clock.SetTickRate(100);
+		Lvl.Simy.Clock.SetTickRate(100);
 	}
 
 	public override void BeforeEach()
@@ -27,13 +27,12 @@ public class UnitTests : ArTest.TestSuit
 
 	public override void AfterEach()
 	{
-		AssertTrue(Lvl.Clock.IsHalted());
+		AssertTrue(Lvl.Simy.IsHalted());
 	}
 
 	public override void AfterAll()
 	{
 		Lvl.QueueFree();
-		RemoveNode(Lvl);
 	}
 
 	[ArTest.Test] public void TestCanFitIn()
@@ -123,42 +122,42 @@ public class UnitTests : ArTest.TestSuit
 		var supp = world.PlaceSupplier(Vector2I.Zero, Direction.East, 3, [237, 68, 236]);
 		var tl1 = world.InstallEmptyTile(new Vector2I(1, 0));
 		AssertTrue(world.HasTile(supp.GLocation));
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
-			await Lvl.Clock.TickOnceAsync(); // Tick 0 processed
+			await Lvl.Simy.TickOnceAsync(); // Tick 0 processed
 			AssertFalse(tl1.HasItem());
-			await Lvl.Clock.TickOnceAsync(); // Tick 1 processed
+			await Lvl.Simy.TickOnceAsync(); // Tick 1 processed
 			AssertFalse(tl1.HasItem());
-			await Lvl.Clock.TickOnceAsync(); // Tick 2 processed, first item
+			await Lvl.Simy.TickOnceAsync(); // Tick 2 processed, first item
 			AssertTrue(tl1.HasItem());
 			AssertTrue(tl1.Item.IsMidAnimation());
 			AssertEq(tl1.Item.Value, 237);
 
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			AssertTrue(tl1.HasItem());
 			AssertFalse(tl1.Item.IsMidAnimation());
 			tl1.DestroyItem();
 		
-			await Lvl.Clock.TickOnceAsync(); // Tick 3 processed
+			await Lvl.Simy.TickOnceAsync(); // Tick 3 processed
 			AssertFalse(tl1.HasItem());
-			await Lvl.Clock.TickOnceAsync(); // Tick 4 processed
+			await Lvl.Simy.TickOnceAsync(); // Tick 4 processed
 			AssertFalse(tl1.HasItem());
-			await Lvl.Clock.TickOnceAsync(); // Tick 5 processed, second item
+			await Lvl.Simy.TickOnceAsync(); // Tick 5 processed, second item
 			AssertTrue(tl1.HasItem());
 			AssertTrue(tl1.Item.IsMidAnimation());
 			AssertEq(tl1.Item.Value, 68);
 
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			AssertTrue(tl1.HasItem());
 			AssertFalse(tl1.Item.IsMidAnimation());
 			tl1.DestroyItem();
 		
-			await Lvl.Clock.TickOnceAsync(); // Tick 6 processed
+			await Lvl.Simy.TickOnceAsync(); // Tick 6 processed
 			AssertFalse(tl1.HasItem());
-			await Lvl.Clock.TickOnceAsync(); // Tick 7 processed
+			await Lvl.Simy.TickOnceAsync(); // Tick 7 processed
 			AssertFalse(tl1.HasItem());
 
-			await Lvl.Clock.TickOnceAsync(); // Tick 8 processed, third item
+			await Lvl.Simy.TickOnceAsync(); // Tick 8 processed, third item
 			AssertTrue(tl1.HasItem());
 			AssertTrue(tl1.Item.IsMidAnimation());
 			AssertEq(tl1.Item.Value, 236);
@@ -173,9 +172,9 @@ public class UnitTests : ArTest.TestSuit
 		var supp = world.PlaceSupplier(Vector2I.One, Direction.East, 1, [261, 296]);
 		var tl1 = world.InstallEmptyTile(supp.GLocation + supp.Dir.ToGrid());
 		AssertTrue(world.HasTile(supp.GLocation));
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
-			await Lvl.Clock.TickOnceAsync();
+			await Lvl.Simy.TickOnceAsync();
 			AssertTrue(tl1.HasItem());
 			AssertTrue(tl1.Item.IsMidAnimation());
 			AssertEq(tl1.Item.Value, 261);
@@ -190,22 +189,22 @@ public class UnitTests : ArTest.TestSuit
 		var tlNearby = world.InstallEmptyTile(supp.GLocation + supp.Dir.ToGrid());
 		var tlFar = world.InstallEmptyTile(supp.GLocation + 2 * supp.Dir.ToGrid());
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			world.SpawnItem(tlNearby, -217); // In the way
 
-			await Lvl.Clock.TickOnceAsync(); // Nothing should happen, but we have no way of checking
-			await Lvl.Clock.TickOnceAsync(); // First might have spawned, but not checkable
-			await Lvl.Clock.TickOnceAsync(); // Nothing should happen
-			await Lvl.Clock.TickOnceAsync(); // Blocked.
+			await Lvl.Simy.TickOnceAsync(); // Nothing should happen, but we have no way of checking
+			await Lvl.Simy.TickOnceAsync(); // First might have spawned, but not checkable
+			await Lvl.Simy.TickOnceAsync(); // Nothing should happen
+			await Lvl.Simy.TickOnceAsync(); // Blocked.
 
 			tlNearby.DestroyItem(); // Remove the obsticle
-			await Lvl.Clock.TickOnceAsync(); // First item slides out first.
+			await Lvl.Simy.TickOnceAsync(); // First item slides out first.
 			AssertTrue(tlNearby.HasItem());
 			AssertTrue(tlNearby.Item.IsMidAnimation());
 			AssertEq(tlNearby.Item.Value, 261);
 
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			AssertTrue(tlNearby.HasItem());
 			AssertFalse(tlNearby.Item.IsMidAnimation());
 			AssertEq(tlNearby.Item.Value, 261);
@@ -213,7 +212,7 @@ public class UnitTests : ArTest.TestSuit
 			injy.PendParallel([new CmdSlide(tlNearby, supp.Dir)]);
 
 			// First item finished sliding out, second item spawns and slides out right after it.
-			await Lvl.Clock.TickOnceAsync();
+			await Lvl.Simy.TickOnceAsync();
 			AssertTrue(tlNearby.HasItem());
 			AssertTrue(tlNearby.Item.IsMidAnimation());
 			AssertEq(tlNearby.Item.Value, 296);
@@ -232,25 +231,25 @@ public class UnitTests : ArTest.TestSuit
 		var supp = world.PlaceSupplier(Vector2I.One, Direction.East, 2, [854, 743, -374]);
 		var tlSupp = supp.GetTile(Vector2I.Zero);
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
-			await Lvl.Clock.TickOnceAsync(); // Nothing happens
-			await Lvl.Clock.TickOnceAsync(); // Item would slide out if the supplier was connected.
-			await Lvl.Clock.TickOnceAsync(); // clogged
-			await Lvl.Clock.TickOnceAsync(); // clogged
-			await Lvl.Clock.TickOnceAsync(); // clogged
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // Item would slide out if the supplier was connected.
+			await Lvl.Simy.TickOnceAsync(); // clogged
+			await Lvl.Simy.TickOnceAsync(); // clogged
+			await Lvl.Simy.TickOnceAsync(); // clogged
 
 			var tl = world.InstallEmptyTile(tlSupp.GLocation + supp.Dir.ToGrid());
-			await Lvl.Clock.TickOnceAsync(); // First item slides out
+			await Lvl.Simy.TickOnceAsync(); // First item slides out
 			AssertTrue(tl.HasItem());
 			AssertEq(tl.Item.Value, 854);
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			world.DeleteTile(tl.GLocation);
 
-			await Lvl.Clock.TickOnceAsync(); // Next item would slide out if I didn't delete the tile.
-			await Lvl.Clock.TickOnceAsync(); // clogged
-			await Lvl.Clock.TickOnceAsync(); // clogged
-			await Lvl.Clock.TickOnceAsync(); // clogged
+			await Lvl.Simy.TickOnceAsync(); // Next item would slide out if I didn't delete the tile.
+			await Lvl.Simy.TickOnceAsync(); // clogged
+			await Lvl.Simy.TickOnceAsync(); // clogged
+			await Lvl.Simy.TickOnceAsync(); // clogged
 		}
 	}
 
@@ -260,47 +259,47 @@ public class UnitTests : ArTest.TestSuit
 		var supp = world.PlaceSupplier(Vector2I.One, Direction.East, 2, [854, 743, -374]);
 		var tlNearby = world.InstallEmptyTile(supp.GLocation + supp.Dir.ToGrid());
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
-			await Lvl.Clock.TickOnceAsync(); // Nothing happens
-			await Lvl.Clock.TickOnceAsync(); // First item slides out
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // First item slides out
 			AssertTrue(tlNearby.HasItem());
 			AssertEq(tlNearby.Item.Value, 854);
 		}
 
-		using (Lvl.Clock.PlaySimulationInDebug()) // Restart
+		using (Lvl.Simy.StartAndPause()) // Restart
 		{
-			await Lvl.Clock.TickOnceAsync(); // Nothing happens
-			await Lvl.Clock.TickOnceAsync(); // First item slides out
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // First item slides out
 			AssertTrue(tlNearby.HasItem());
 			AssertEq(tlNearby.Item.Value, 854);
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			tlNearby.DestroyItem();
 			
-			await Lvl.Clock.TickOnceAsync(); // Nothing happens
-			await Lvl.Clock.TickOnceAsync(); // Second item slides out
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // Second item slides out
 			AssertTrue(tlNearby.HasItem());
 			AssertEq(tlNearby.Item.Value, 743);
 		}
 
-		using (Lvl.Clock.PlaySimulationInDebug()) // Restart
+		using (Lvl.Simy.StartAndPause()) // Restart
 		{
-			await Lvl.Clock.TickOnceAsync(); // Nothing happens
-			await Lvl.Clock.TickOnceAsync(); // First item slides out
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // First item slides out
 			AssertTrue(tlNearby.HasItem());
 			AssertEq(tlNearby.Item.Value, 854);
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			tlNearby.DestroyItem();
 
-			await Lvl.Clock.TickOnceAsync(); // Nothing happens
-			await Lvl.Clock.TickOnceAsync(); // Second item slides out
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // Second item slides out
 			AssertTrue(tlNearby.HasItem());
 			AssertEq(tlNearby.Item.Value, 743);
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			tlNearby.DestroyItem();
 
-			await Lvl.Clock.TickOnceAsync(); // Nothing happens
-			await Lvl.Clock.TickOnceAsync(); // Second item slides out
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // Second item slides out
 			AssertTrue(tlNearby.HasItem());
 			AssertEq(tlNearby.Item.Value, -374);
 		}
@@ -318,23 +317,23 @@ public class UnitTests : ArTest.TestSuit
 		var tlSouth = world.InstallEmptyTile(tlSlid.GLocation + Direction.South.ToGrid());
 		var tlWest = world.InstallEmptyTile(tlSlid.GLocation + Direction.West.ToGrid());
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			// From south
 			world.SpawnItem(tlSouth, -511);
 			injy.PendFullSequence([[ new CmdSlide(tlSouth, Direction.North) ]]);
-			await Lvl.Clock.TickOnceAsync();
+			await Lvl.Simy.TickOnceAsync();
 			AssertTrue(tlSlid.HasItem());
 			AssertTrue(tlSlid.Item.IsMidAnimation());
 			AssertEq(tlSlid.Item.Value, -511);
 
-			await Lvl.Clock.TickOnceAsync();
+			await Lvl.Simy.TickOnceAsync();
 			AssertFalse(tlSlid.HasItem());
 			AssertTrue(tlNorth.HasItem());
 			AssertTrue(tlNorth.Item.IsMidAnimation());
 			AssertEq(tlNorth.Item.Value, -511);
 
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			AssertFalse(tlNorth.Item.IsMidAnimation());
 			AssertFalse(injy.HasPendingCmds());
 			tlNorth.DestroyItem();
@@ -342,18 +341,18 @@ public class UnitTests : ArTest.TestSuit
 			// From east
 			world.SpawnItem(tlEast, 635);
 			injy.PendFullSequence([[ new CmdSlide(tlEast, Direction.West) ]]);
-			await Lvl.Clock.TickOnceAsync();
+			await Lvl.Simy.TickOnceAsync();
 			AssertTrue(tlSlid.HasItem());
 			AssertTrue(tlSlid.Item.IsMidAnimation());
 			AssertEq(tlSlid.Item.Value, 635);
 
-			await Lvl.Clock.TickOnceAsync();
+			await Lvl.Simy.TickOnceAsync();
 			AssertFalse(tlSlid.HasItem());
 			AssertTrue(tlNorth.HasItem());
 			AssertTrue(tlNorth.Item.IsMidAnimation());
 			AssertEq(tlNorth.Item.Value, 635);
 
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			AssertFalse(tlNorth.Item.IsMidAnimation());
 			AssertFalse(injy.HasPendingCmds());
 			tlNorth.DestroyItem();
@@ -361,18 +360,18 @@ public class UnitTests : ArTest.TestSuit
 			// From west
 			world.SpawnItem(tlWest, 999);
 			injy.PendFullSequence([[ new CmdSlide(tlWest, Direction.East) ]]);
-			await Lvl.Clock.TickOnceAsync();
+			await Lvl.Simy.TickOnceAsync();
 			AssertTrue(tlSlid.HasItem());
 			AssertTrue(tlSlid.Item.IsMidAnimation());
 			AssertEq(tlSlid.Item.Value, 999);
 
-			await Lvl.Clock.TickOnceAsync();
+			await Lvl.Simy.TickOnceAsync();
 			AssertFalse(tlSlid.HasItem());
 			AssertTrue(tlNorth.HasItem());
 			AssertTrue(tlNorth.Item.IsMidAnimation());
 			AssertEq(tlNorth.Item.Value, 999);
 
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			AssertFalse(tlNorth.Item.IsMidAnimation());
 			AssertFalse(injy.HasPendingCmds());
 			tlNorth.DestroyItem();
@@ -380,7 +379,7 @@ public class UnitTests : ArTest.TestSuit
 			// From north (will be stuck forever)
 			world.SpawnItem(tlNorth, 638);
 			injy.PendFullSequence([[ new CmdSlide(tlNorth, Direction.South) ]]);
-			await Lvl.Clock.TickOnceAsync();
+			await Lvl.Simy.TickOnceAsync();
 			AssertFalse(tlSlid.HasItem());
 			AssertTrue(tlNorth.HasItem());
 			AssertFalse(tlNorth.Item.IsMidAnimation());
@@ -397,46 +396,46 @@ public class UnitTests : ArTest.TestSuit
 		var tlSlid = slid.GetTile(Vector2I.Zero);
 		var tlDest = world.InstallEmptyTile(tlSlid.GLocation + Direction.West.ToGrid());
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			world.SpawnItem(tlSlid, 13);
-			await Lvl.Clock.TickOnceAsync(); // Should move 2 ticks from now.
+			await Lvl.Simy.TickOnceAsync(); // Should move 2 ticks from now.
 			AssertTrue(tlSlid.HasItem());
 			AssertFalse(tlSlid.Item.IsMidAnimation());
-			await Lvl.Clock.TickOnceAsync(); // Next tick
+			await Lvl.Simy.TickOnceAsync(); // Next tick
 			AssertTrue(tlSlid.HasItem());
 			AssertFalse(tlSlid.Item.IsMidAnimation());
 
-			await Lvl.Clock.TickOnceAsync(); // Moves
+			await Lvl.Simy.TickOnceAsync(); // Moves
 			AssertFalse(tlSlid.HasItem());
 			AssertTrue(tlDest.HasItem());
 			AssertTrue(tlDest.Item.IsMidAnimation());
 			AssertEq(tlDest.Item.Value, 13);
 
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			tlDest.DestroyItem();
 
-			await Lvl.Clock.TickOnceAsync();
+			await Lvl.Simy.TickOnceAsync();
 		
 			world.SpawnItem(tlSlid, -804);
-			await Lvl.Clock.TickOnceAsync(); // Should still move the tick after this one.
+			await Lvl.Simy.TickOnceAsync(); // Should still move the tick after this one.
 			AssertTrue(tlSlid.HasItem());
 			AssertFalse(tlSlid.Item.IsMidAnimation());
 		
-			await Lvl.Clock.TickOnceAsync(); // Moves
+			await Lvl.Simy.TickOnceAsync(); // Moves
 			AssertFalse(tlSlid.HasItem());
 			AssertTrue(tlDest.HasItem());
 			AssertTrue(tlDest.Item.IsMidAnimation());
 			AssertEq(tlDest.Item.Value, -804);
 
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			tlDest.DestroyItem();
 
-			await Lvl.Clock.TickOnceAsync();
-			await Lvl.Clock.TickOnceAsync();
+			await Lvl.Simy.TickOnceAsync();
+			await Lvl.Simy.TickOnceAsync();
 		
 			world.SpawnItem(tlSlid, 982); // Should move next tick right away.
-			await Lvl.Clock.TickOnceAsync(); // Moves
+			await Lvl.Simy.TickOnceAsync(); // Moves
 			AssertFalse(tlSlid.HasItem());
 			AssertTrue(tlDest.HasItem());
 			AssertTrue(tlDest.Item.IsMidAnimation());
@@ -450,10 +449,10 @@ public class UnitTests : ArTest.TestSuit
 		var slid = world.PlaceSlider(new Vector2I(3, 4), Direction.West, 3);
 		var tlSlid = slid.GetTile(Vector2I.Zero);
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			world.SpawnItem(tlSlid, 261);
-			await Lvl.Clock.TickOnceAsync();
+			await Lvl.Simy.TickOnceAsync();
 			AssertTrue(tlSlid.HasItem());
 			AssertFalse(tlSlid.Item.IsMidAnimation());
 			AssertEq(tlSlid.Item.Value, 261);
@@ -475,30 +474,30 @@ public class UnitTests : ArTest.TestSuit
 		var tlSlid = slid.GetTile(Vector2I.Zero);
 		var tlOut = world.InstallEmptyTile(slid.GLocation + slid.Dir.ToGrid());
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			world.SpawnItem(tlIn, -103);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, slid.Dir) ]]);
 			slid.Lock(); // Should not crash
 			AssertTrue(slid.IsLocked());
-			await Lvl.TickOnceForTestingAsync(); // Item slides in
-			await Lvl.TickOnceForTestingAsync(); // 1
-			await Lvl.TickOnceForTestingAsync(); // 2, here with locking the item would slide out, but it shouldn't
+			await Lvl.Simy.TickOnceAsync(); // Item slides in
+			await Lvl.Simy.TickOnceAsync(); // 1
+			await Lvl.Simy.TickOnceAsync(); // 2, here with locking the item would slide out, but it shouldn't
 			AssertTrue(tlSlid.HasItem());
 			AssertFalse(tlOut.HasItem());
-			await Lvl.TickOnceForTestingAsync(); // Locked
+			await Lvl.Simy.TickOnceAsync(); // Locked
 			AssertTrue(tlSlid.HasItem());
 			AssertFalse(tlOut.HasItem());
-			await Lvl.TickOnceForTestingAsync(); // Locked
+			await Lvl.Simy.TickOnceAsync(); // Locked
 			AssertTrue(tlSlid.HasItem());
 			AssertFalse(tlOut.HasItem());
 
 			slid.Unlock();
 			AssertFalse(slid.IsLocked());
-			await Lvl.TickOnceForTestingAsync(); // 1 (counter resets when locking)
+			await Lvl.Simy.TickOnceAsync(); // 1 (counter resets when locking)
 			AssertTrue(tlSlid.HasItem());
 			AssertFalse(tlOut.HasItem());
-			await Lvl.TickOnceForTestingAsync(); // 2, item slides out yay!
+			await Lvl.Simy.TickOnceAsync(); // 2, item slides out yay!
 			AssertFalse(tlSlid.HasItem());
 			AssertTrue(tlOut.HasItem());
 		}
@@ -516,17 +515,17 @@ public class UnitTests : ArTest.TestSuit
 		var tlIn = world.InstallEmptyTile(tlUpd.GLocation + upd.Dir.Invert().ToGrid());
 		var tlOut = world.InstallEmptyTile(tlUpd.GLocation + upd.Dir.ToGrid());
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			world.SpawnItem(tlIn, 402);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, upd.Dir) ]]);
 
-			await Lvl.Clock.TickOnceAsync(); // Slides in and updater starts counting ticks.
+			await Lvl.Simy.TickOnceAsync(); // Slides in and updater starts counting ticks.
 			AssertFalse(tlOut.HasItem());
-			await Lvl.Clock.TickOnceAsync(); // Rate is 2 ticks per item, this tick does nothing.
+			await Lvl.Simy.TickOnceAsync(); // Rate is 2 ticks per item, this tick does nothing.
 			AssertFalse(tlOut.HasItem());
 
-			await Lvl.Clock.TickOnceAsync(); // Updated item pops out.
+			await Lvl.Simy.TickOnceAsync(); // Updated item pops out.
 			AssertTrue(tlOut.HasItem());
 			AssertEq(tlOut.Item.Value, 402 + 1);
 		}
@@ -539,20 +538,20 @@ public class UnitTests : ArTest.TestSuit
 		var injy = world.PlaceInjector();
 		var tlIn = world.InstallEmptyTile(upd.Output.GLocation + upd.Dir.Invert().ToGrid());
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			world.SpawnItem(tlIn, 142);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, upd.Dir) ]]);
 			
-			await Lvl.Clock.TickOnceAsync(); // Slides in and updater starts counting ticks.
-			await Lvl.Clock.TickOnceAsync(); // 1
-			await Lvl.Clock.TickOnceAsync(); // 2, would slide out if there was a way.
-			await Lvl.Clock.TickOnceAsync(); // Clogged
-			await Lvl.Clock.TickOnceAsync(); // Clogged
-			await Lvl.Clock.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Slides in and updater starts counting ticks.
+			await Lvl.Simy.TickOnceAsync(); // 1
+			await Lvl.Simy.TickOnceAsync(); // 2, would slide out if there was a way.
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
 
 			var tlOut = world.InstallEmptyTile(upd.Output.GLocation + upd.Dir.ToGrid());
-			await Lvl.Clock.TickOnceAsync(); // Item slides out updated
+			await Lvl.Simy.TickOnceAsync(); // Item slides out updated
 			AssertTrue(tlOut.HasItem());
 			AssertTrue(tlOut.Item.IsMidAnimation());
 			AssertEq(tlOut.Item.Value, 142 + 1);
@@ -571,49 +570,49 @@ public class UnitTests : ArTest.TestSuit
 		var tlSouth = world.InstallEmptyTile(tlBin.GLocation + Direction.South.ToGrid());
 		var tlWest = world.InstallEmptyTile(tlBin.GLocation + Direction.West.ToGrid());
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			// From north
 			var it = world.SpawnItem(tlNorth, 575)!;
 			injy.PendFullSequence([[ new CmdSlide(tlNorth, Direction.South) ]]);
-			await Lvl.Clock.TickOnceAsync(); // Slides in
+			await Lvl.Simy.TickOnceAsync(); // Slides in
 			AssertTrue(GodotObject.IsInstanceValid(it));
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			AssertTrue(GodotObject.IsInstanceValid(it));
-			await Lvl.Clock.TickOnceAsync(); // Gets bombed
+			await Lvl.Simy.TickOnceAsync(); // Gets bombed
 			AssertTrue(it.IsQueuedForDeletion());
 			AssertFalse(tlBin.IsReserved());
 			
 			// From east
 			it = world.SpawnItem(tlEast, -241)!;
 			injy.PendFullSequence([[ new CmdSlide(tlEast, Direction.West) ]]);
-			await Lvl.Clock.TickOnceAsync(); // Slides in
+			await Lvl.Simy.TickOnceAsync(); // Slides in
 			AssertTrue(GodotObject.IsInstanceValid(it));
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			AssertTrue(GodotObject.IsInstanceValid(it));
-			await Lvl.Clock.TickOnceAsync(); // Gets bombed
+			await Lvl.Simy.TickOnceAsync(); // Gets bombed
 			AssertTrue(it.IsQueuedForDeletion());
 			AssertFalse(tlBin.IsReserved());
 
 			// From south
 			it = world.SpawnItem(tlSouth, -511)!;
 			injy.PendFullSequence([[ new CmdSlide(tlSouth, Direction.North) ]]);
-			await Lvl.Clock.TickOnceAsync(); // Slides in
+			await Lvl.Simy.TickOnceAsync(); // Slides in
 			AssertTrue(GodotObject.IsInstanceValid(it));
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			AssertTrue(GodotObject.IsInstanceValid(it));
-			await Lvl.Clock.TickOnceAsync(); // Gets bombed
+			await Lvl.Simy.TickOnceAsync(); // Gets bombed
 			AssertTrue(it.IsQueuedForDeletion());
 			AssertFalse(tlBin.IsReserved());
 
 			// From west
 			it = world.SpawnItem(tlWest, 628)!;
 			injy.PendFullSequence([[ new CmdSlide(tlWest, Direction.East) ]]);
-			await Lvl.Clock.TickOnceAsync(); // Slides in
+			await Lvl.Simy.TickOnceAsync(); // Slides in
 			AssertTrue(GodotObject.IsInstanceValid(it));
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			AssertTrue(GodotObject.IsInstanceValid(it));
-			await Lvl.Clock.TickOnceAsync(); // Gets bombed
+			await Lvl.Simy.TickOnceAsync(); // Gets bombed
 			AssertTrue(it.IsQueuedForDeletion());
 			AssertFalse(tlBin.IsReserved());
 		}
@@ -630,23 +629,23 @@ public class UnitTests : ArTest.TestSuit
 		var tlTrue = world.InstallEmptyTile(bra.GLocation + bra.Dir.ToGrid());
 		var tlFalse = world.InstallEmptyTile(tlTrue.GLocation + new Vector2I(0, 1));
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			// When the check returns true
 			var positiveIt = world.SpawnItem(tlIn, 535)!;
 			injy.PendFullSequence([[ new CmdSlide(tlIn, bra.Dir) ]]);
-			await Lvl.Clock.TickOnceAsync(); // Item slides in.
+			await Lvl.Simy.TickOnceAsync(); // Item slides in.
 			AssertFalse(tlIn.HasItem());
 			AssertTrue(positiveIt.IsMidAnimation());
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			AssertFalse(injy.HasPendingCmds());
 			
-			await Lvl.Clock.TickOnceAsync(); // Item pops out of the true tile
+			await Lvl.Simy.TickOnceAsync(); // Item pops out of the true tile
 			AssertFalse(tlFalse.HasItem());
 			AssertTrue(tlTrue.HasItem());
 			AssertTrue(tlTrue.Item.IsMidAnimation());
 			AssertRefEq(tlTrue.Item, positiveIt);
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			AssertTrue(tlTrue.HasItem());
 			AssertFalse(tlTrue.Item.IsMidAnimation());
 			tlTrue.DestroyItem();
@@ -654,18 +653,18 @@ public class UnitTests : ArTest.TestSuit
 			// When the check returns false
 			var negativeIt = world.SpawnItem(tlIn, -312)!;
 			injy.PendFullSequence([[ new CmdSlide(tlIn, bra.Dir) ]]);
-			await Lvl.Clock.TickOnceAsync(); // Item slides in.
+			await Lvl.Simy.TickOnceAsync(); // Item slides in.
 			AssertFalse(tlIn.HasItem());
 			AssertTrue(negativeIt.IsMidAnimation());
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			AssertFalse(injy.HasPendingCmds());
 			
-			await Lvl.Clock.TickOnceAsync(); // Item pops out of the false tile
+			await Lvl.Simy.TickOnceAsync(); // Item pops out of the false tile
 			AssertFalse(tlTrue.HasItem());
 			AssertTrue(tlFalse.HasItem());
 			AssertTrue(tlFalse.Item.IsMidAnimation());
 			AssertRefEq(tlFalse.Item, negativeIt);
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			AssertTrue(tlFalse.HasItem());
 			AssertFalse(tlFalse.Item.IsMidAnimation());
 			tlFalse.DestroyItem();
@@ -683,7 +682,7 @@ public class UnitTests : ArTest.TestSuit
 		var tlTrue = world.InstallEmptyTile(bra.GLocation + bra.Dir.ToGrid());
 		var tlFalse = world.InstallEmptyTile(tlTrue.GLocation + new Vector2I(0, 1));
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			// Blocking both output tiles.
 			world.SpawnItem(tlTrue, 27);
@@ -692,29 +691,29 @@ public class UnitTests : ArTest.TestSuit
 			// When the check returns true
 			var positiveIt = world.SpawnItem(tlIn, 535)!;
 			injy.PendFullSequence([[ new CmdSlide(tlIn, bra.Dir) ]]);
-			await Lvl.Clock.TickOnceAsync(); // Item slides in.
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.TickOnceAsync(); // Item slides in.
+			await Lvl.Simy.EndTickAsync();
 			AssertFalse(injy.HasPendingCmds());
-			await Lvl.Clock.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
 			tlTrue.DestroyItem();
 			
-			await Lvl.Clock.TickOnceAsync(); // Item pops out of the true tile
+			await Lvl.Simy.TickOnceAsync(); // Item pops out of the true tile
 			AssertTrue(tlTrue.HasItem());
 			AssertTrue(tlTrue.Item.IsMidAnimation());
 			AssertRefEq(tlTrue.Item, positiveIt);
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			AssertFalse(tlTrue.Item.IsMidAnimation());
 
 			// When the check returns false
 			var negativeIt = world.SpawnItem(tlIn, -312)!;
 			injy.PendFullSequence([[ new CmdSlide(tlIn, bra.Dir) ]]);
-			await Lvl.Clock.TickOnceAsync(); // Item slides in.
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.TickOnceAsync(); // Item slides in.
+			await Lvl.Simy.EndTickAsync();
 			AssertFalse(injy.HasPendingCmds());
-			await Lvl.Clock.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
 			tlFalse.DestroyItem();
 			
-			await Lvl.Clock.TickOnceAsync(); // Item pops out of the false tile
+			await Lvl.Simy.TickOnceAsync(); // Item pops out of the false tile
 			AssertTrue(tlTrue.HasItem()); // From last time, need to make sure it doesn't get deleted somehow.
 			AssertTrue(tlFalse.HasItem());
 			AssertRefEq(tlFalse.Item, negativeIt);
@@ -728,39 +727,39 @@ public class UnitTests : ArTest.TestSuit
 		var injy = world.PlaceInjector();
 		var tlIn = world.InstallEmptyTile(dem.GLocation + dem.Dir.ToGrid());
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			world.SpawnItem(tlIn, 655);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, dem.Dir.Invert()) ]]);
 
-			await Lvl.TickOnceForTestingAsync(); // Item slides in
-			AssertFalse(Lvl.Clock.IsHalted());
+			await Lvl.Simy.TickOnceAsync(); // Item slides in
+			AssertFalse(Lvl.Simy.IsHalted());
 			AssertTrue(dem.Input.HasItem());
 
-			await Lvl.TickOnceForTestingAsync(); // Item gets consumed
-			AssertFalse(Lvl.Clock.IsHalted());
+			await Lvl.Simy.TickOnceAsync(); // Item gets consumed
+			AssertFalse(Lvl.Simy.IsHalted());
 			AssertFalse(dem.Input.HasItem());
 
 			world.SpawnItem(tlIn, 282);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, dem.Dir.Invert()) ]]);
 
-			await Lvl.TickOnceForTestingAsync(); // Item slides in
-			AssertFalse(Lvl.Clock.IsHalted());
+			await Lvl.Simy.TickOnceAsync(); // Item slides in
+			AssertFalse(Lvl.Simy.IsHalted());
 			AssertTrue(dem.Input.HasItem());
 
-			await Lvl.TickOnceForTestingAsync(); // Item gets consumed
-			AssertFalse(Lvl.Clock.IsHalted());
+			await Lvl.Simy.TickOnceAsync(); // Item gets consumed
+			AssertFalse(Lvl.Simy.IsHalted());
 			AssertFalse(dem.Input.HasItem());
 
 			world.SpawnItem(tlIn, -279);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, dem.Dir.Invert()) ]]);
 
-			await Lvl.TickOnceForTestingAsync(); // Item slides in
-			AssertFalse(Lvl.Clock.IsHalted());
+			await Lvl.Simy.TickOnceAsync(); // Item slides in
+			AssertFalse(Lvl.Simy.IsHalted());
 			AssertTrue(dem.Input.HasItem());
 
-			await Lvl.TickOnceForTestingAsync(); // Item gets consumed
-			AssertTrue(Lvl.Clock.IsHalted()); // Last item, so simulation should succeed.
+			await Lvl.Simy.TickOnceAsync(); // Item gets consumed
+			AssertTrue(Lvl.Simy.IsHalted()); // Last item, so simulation should succeed.
 		}
 	}
 
@@ -771,52 +770,52 @@ public class UnitTests : ArTest.TestSuit
 		var injy = world.PlaceInjector();
 		var tlIn = world.InstallEmptyTile(dem.GLocation + dem.Dir.ToGrid());
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			world.SpawnItem(tlIn, -76);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, dem.Dir.Invert()) ]]);
 
-			await Lvl.TickOnceForTestingAsync(); // Item slides in
-			AssertFalse(Lvl.Clock.IsHalted());
+			await Lvl.Simy.TickOnceAsync(); // Item slides in
+			AssertFalse(Lvl.Simy.IsHalted());
 			AssertTrue(dem.Input.HasItem());
 
-			await Lvl.TickOnceForTestingAsync(); // Item gets consumed
-			AssertFalse(Lvl.Clock.IsHalted());
+			await Lvl.Simy.TickOnceAsync(); // Item gets consumed
+			AssertFalse(Lvl.Simy.IsHalted());
 			AssertFalse(dem.Input.HasItem());
 
 			world.SpawnItem(tlIn, -1);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, dem.Dir.Invert()) ]]);
 
-			await Lvl.TickOnceForTestingAsync(); // Item slides in (incorrect)
-			AssertFalse(Lvl.Clock.IsHalted());
+			await Lvl.Simy.TickOnceAsync(); // Item slides in (incorrect)
+			AssertFalse(Lvl.Simy.IsHalted());
 			AssertTrue(dem.Input.HasItem());
 
-			await Lvl.TickOnceForTestingAsync(); // Simulation fails miserablely
-			AssertTrue(Lvl.Clock.IsHalted());
+			await Lvl.Simy.TickOnceAsync(); // Simulation fails miserablely
+			AssertTrue(Lvl.Simy.IsHalted());
 		}
 
-		using (Lvl.Clock.PlaySimulationInDebug()) // Restart
+		using (Lvl.Simy.StartAndPause()) // Restart
 		{
 			world.SpawnItem(tlIn, -76);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, dem.Dir.Invert()) ]]);
 
-			await Lvl.TickOnceForTestingAsync(); // Item slides in
-			AssertFalse(Lvl.Clock.IsHalted());
+			await Lvl.Simy.TickOnceAsync(); // Item slides in
+			AssertFalse(Lvl.Simy.IsHalted());
 			AssertTrue(dem.Input.HasItem());
 
-			await Lvl.TickOnceForTestingAsync(); // Item gets consumed
-			AssertFalse(Lvl.Clock.IsHalted());
+			await Lvl.Simy.TickOnceAsync(); // Item gets consumed
+			AssertFalse(Lvl.Simy.IsHalted());
 			AssertFalse(dem.Input.HasItem());
 
 			world.SpawnItem(tlIn, -797);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, dem.Dir.Invert()) ]]);
 
-			await Lvl.TickOnceForTestingAsync(); // Item slides in
-			AssertFalse(Lvl.Clock.IsHalted());
+			await Lvl.Simy.TickOnceAsync(); // Item slides in
+			AssertFalse(Lvl.Simy.IsHalted());
 			AssertTrue(dem.Input.HasItem());
 
-			await Lvl.TickOnceForTestingAsync(); // Item gets consumed
-			AssertTrue(Lvl.Clock.IsHalted()); // Last item, so simulation should succeed.
+			await Lvl.Simy.TickOnceAsync(); // Item gets consumed
+			AssertTrue(Lvl.Simy.IsHalted()); // Last item, so simulation should succeed.
 		}
 	}
 
@@ -829,7 +828,7 @@ public class UnitTests : ArTest.TestSuit
 		var tl1 = world.InstallEmptyTile(combi.InRightTile.GLocation + combi.Dir.Invert().ToGrid());
 		var tlOut = world.InstallEmptyTile(combi.OutTile.GLocation + combi.Dir.ToGrid());
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			world.SpawnItem(tl0, 774);
 			world.SpawnItem(tl1, -539);
@@ -838,9 +837,9 @@ public class UnitTests : ArTest.TestSuit
 				new CmdSlide(tl1, combi.Dir),
 			]]);
 
-			await Lvl.TickOnceForTestingAsync(); // Items slide in
-			await Lvl.TickOnceForTestingAsync(); // Nothing happens
-			await Lvl.TickOnceForTestingAsync(); // Result slides out
+			await Lvl.Simy.TickOnceAsync(); // Items slide in
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // Result slides out
 			AssertTrue(tlOut.HasItem());
 			AssertEq(tlOut.Item.Value, 774 + -539);
 		}
@@ -855,7 +854,7 @@ public class UnitTests : ArTest.TestSuit
 		var tl1 = world.InstallEmptyTile(combi.InRightTile.GLocation + combi.Dir.Invert().ToGrid());
 		var tlOut = world.InstallEmptyTile(combi.OutTile.GLocation + combi.Dir.ToGrid());
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			world.SpawnItem(tl0, 774);
 			world.SpawnItem(tl1, -539);
@@ -865,15 +864,15 @@ public class UnitTests : ArTest.TestSuit
 				new CmdSlide(tl1, combi.Dir),
 			]]);
 
-			await Lvl.TickOnceForTestingAsync(); // Items slide in
-			await Lvl.TickOnceForTestingAsync(); // Nothing happens
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Items slide in
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
 			tlOut.DestroyItem();
-			await Lvl.TickOnceForTestingAsync(); // Result slides out immediately
+			await Lvl.Simy.TickOnceAsync(); // Result slides out immediately
 			AssertTrue(tlOut.HasItem());
 			AssertEq(tlOut.Item.Value, 774 + -539);
 		}
@@ -887,7 +886,7 @@ public class UnitTests : ArTest.TestSuit
 		var tl0 = world.InstallEmptyTile(combi.InLeftTile.GLocation + combi.Dir.Invert().ToGrid());
 		var tl1 = world.InstallEmptyTile(combi.InRightTile.GLocation + combi.Dir.Invert().ToGrid());
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			world.SpawnItem(tl0, 774);
 			world.SpawnItem(tl1, -539);
@@ -896,13 +895,13 @@ public class UnitTests : ArTest.TestSuit
 				new CmdSlide(tl1, combi.Dir),
 			]]);
 
-			await Lvl.TickOnceForTestingAsync(); // Items slide in
-			await Lvl.TickOnceForTestingAsync(); // Nothing happens
-			await Lvl.TickOnceForTestingAsync(); // Nothing happens
-			await Lvl.TickOnceForTestingAsync(); // Nothing happens
-			await Lvl.TickOnceForTestingAsync(); // Nothing happens
-			await Lvl.TickOnceForTestingAsync(); // Nothing happens
-			await Lvl.TickOnceForTestingAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // Items slide in
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
 		}
 	}
 
@@ -916,13 +915,13 @@ public class UnitTests : ArTest.TestSuit
 		var tlOut0 = world.InstallEmptyTile(clo.OutTile0.GLocation + clo.Dir.ToGrid());
 		var tlOut1 = world.InstallEmptyTile(clo.OutTile1.GLocation + clo.Dir.ToGrid());
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			world.SpawnItem(tlIn, 508);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, clo.Dir) ]]);
-			await Lvl.TickOnceForTestingAsync(); // Item slides in
-			await Lvl.TickOnceForTestingAsync(); // Nothing happens
-			await Lvl.TickOnceForTestingAsync(); // Two items slide out \_(0_0)_/
+			await Lvl.Simy.TickOnceAsync(); // Item slides in
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // Two items slide out \_(0_0)_/
 			AssertTrue(tlOut0.HasItem());
 			AssertEq(tlOut0.Item.Value, 508);
 			AssertTrue(tlOut1.HasItem());
@@ -940,39 +939,39 @@ public class UnitTests : ArTest.TestSuit
 		var tlOut0 = world.InstallEmptyTile(clo.OutTile0.GLocation + clo.Dir.ToGrid());
 		var tlOut1 = world.InstallEmptyTile(clo.OutTile1.GLocation + clo.Dir.ToGrid());
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			world.SpawnItem(tlIn, 508);
 			world.SpawnItem(tlOut0, 964); // In the way
 			world.SpawnItem(tlOut1, 212); // In the way
 			injy.PendFullSequence([[ new CmdSlide(tlIn, clo.Dir) ]]);
-			await Lvl.TickOnceForTestingAsync(); // Item slides in
-			await Lvl.TickOnceForTestingAsync(); // Nothing happens
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Item slides in
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
 			
 			tlOut0.DestroyItem();
-			await Lvl.TickOnceForTestingAsync(); // Item slides out of out0
+			await Lvl.Simy.TickOnceAsync(); // Item slides out of out0
 			AssertTrue(tlOut0.HasItem());
 			AssertEq(tlOut0.Item.Value, 508);
 
 			tlOut1.DestroyItem();
-			await Lvl.TickOnceForTestingAsync(); // Item slides out of out1
+			await Lvl.Simy.TickOnceAsync(); // Item slides out of out1
 			AssertTrue(tlOut1.HasItem());
 			AssertEq(tlOut0.Item.Value, 508);
 			
-			await Lvl.Clock.EndTickAsync();
+			await Lvl.Simy.EndTickAsync();
 			tlOut0.DestroyItem();
 			tlOut1.DestroyItem();
 			world.SpawnItem(tlIn, -900);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, clo.Dir) ]]);
 			
-			await Lvl.TickOnceForTestingAsync(); // Item slides in
-			await Lvl.TickOnceForTestingAsync(); // Nothing happens
-			await Lvl.TickOnceForTestingAsync(); // 2 pop out baby
+			await Lvl.Simy.TickOnceAsync(); // Item slides in
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // 2 pop out baby
 			AssertTrue(tlOut0.HasItem());
 			AssertEq(tlOut0.Item.Value, -900);
 			AssertTrue(tlOut1.HasItem());
@@ -987,41 +986,41 @@ public class UnitTests : ArTest.TestSuit
 		var injy = world.PlaceInjector();
 
 		var tlIn = world.InstallEmptyTile(clo.InTile.GLocation + clo.Dir.Invert().ToGrid());
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			world.SpawnItem(tlIn, 508);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, clo.Dir) ]]);
-			await Lvl.TickOnceForTestingAsync(); // Item slides in
-			await Lvl.TickOnceForTestingAsync(); // Nothing happens
-			await Lvl.TickOnceForTestingAsync(); // Clogged, or straight up disabled.
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Item slides in
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // Clogged, or straight up disabled.
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
 		}
 
 		var tlOut1 = world.InstallEmptyTile(clo.OutTile1.GLocation + clo.Dir.ToGrid());
-		using (Lvl.Clock.PlaySimulationInDebug()) // One output connected, other one missing
+		using (Lvl.Simy.StartAndPause()) // One output connected, other one missing
 		{
 			world.SpawnItem(tlIn, 508);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, clo.Dir) ]]);
-			await Lvl.TickOnceForTestingAsync(); // Item slides in
-			await Lvl.TickOnceForTestingAsync(); // Nothing happens
-			await Lvl.TickOnceForTestingAsync(); // Should slide out anyway
+			await Lvl.Simy.TickOnceAsync(); // Item slides in
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // Should slide out anyway
 			AssertTrue(tlOut1.HasItem());
 			AssertTrue(tlOut1.Item.IsMidAnimation());
 		}
 
 		world.DeleteTile(tlOut1.GLocation);
 		var tlOut0 = world.InstallEmptyTile(clo.OutTile0.GLocation + clo.Dir.ToGrid());
-		using (Lvl.Clock.PlaySimulationInDebug()) // The other output this time.
+		using (Lvl.Simy.StartAndPause()) // The other output this time.
 		{
 			world.SpawnItem(tlIn, 508);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, clo.Dir) ]]);
-			await Lvl.TickOnceForTestingAsync(); // Item slides in
-			await Lvl.TickOnceForTestingAsync(); // Nothing happens
-			await Lvl.TickOnceForTestingAsync(); // Should slide out anyway
+			await Lvl.Simy.TickOnceAsync(); // Item slides in
+			await Lvl.Simy.TickOnceAsync(); // Nothing happens
+			await Lvl.Simy.TickOnceAsync(); // Should slide out anyway
 			AssertTrue(tlOut0.HasItem());
 			AssertTrue(tlOut0.Item.IsMidAnimation());
 		}
@@ -1042,15 +1041,15 @@ public class UnitTests : ArTest.TestSuit
 		var tlIn = world.InstallEmptyTile(teleIn.InTile.GLocation + teleIn.Dir.ToGrid());
 		var tlOut = world.InstallEmptyTile(teleOut.OutTile.GLocation + teleOut.Dir.ToGrid());
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			var it = world.SpawnItem(tlIn, -410);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, teleIn.Dir.Invert()) ]]);
 
-			await Lvl.TickOnceForTestingAsync(); // Item slides in
-			await Lvl.TickOnceForTestingAsync(); // 1...
-			await Lvl.TickOnceForTestingAsync(); // 2!
-			await Lvl.TickOnceForTestingAsync(); // Item slides out from the other side
+			await Lvl.Simy.TickOnceAsync(); // Item slides in
+			await Lvl.Simy.TickOnceAsync(); // 1...
+			await Lvl.Simy.TickOnceAsync(); // 2!
+			await Lvl.Simy.TickOnceAsync(); // Item slides out from the other side
 			AssertTrue(tlOut.HasItem());
 			AssertRefEq(tlOut.Item, it);
 			AssertTrue(tlOut.Item.IsMidAnimation());
@@ -1065,17 +1064,17 @@ public class UnitTests : ArTest.TestSuit
 
 		var tlIn = world.InstallEmptyTile(teleIn.InTile.GLocation + teleIn.Dir.ToGrid());
 
-		using (Lvl.Clock.PlaySimulationInDebug())
+		using (Lvl.Simy.StartAndPause())
 		{
 			var it = world.SpawnItem(tlIn, 189);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, teleIn.Dir.Invert()) ]]);
 
-			await Lvl.TickOnceForTestingAsync(); // Item slides in
-			await Lvl.TickOnceForTestingAsync(); // And never leaves...
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Item slides in
+			await Lvl.Simy.TickOnceAsync(); // And never leaves...
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
 		}
 
 		var teleOut = world.PlaceTeleOutput(new Vector2I(5, 1), Direction.East, 2);
@@ -1085,17 +1084,17 @@ public class UnitTests : ArTest.TestSuit
 		teleIn.UnassignOutput(); // Making sure this works...
 		AssertFalse(teleIn.IsConnectedTo(teleOut));
 
-		using (Lvl.Clock.PlaySimulationInDebug()) // Double checking...
+		using (Lvl.Simy.StartAndPause()) // Double checking...
 		{
 			var it = world.SpawnItem(tlIn, -457);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, teleIn.Dir.Invert()) ]]);
 
-			await Lvl.TickOnceForTestingAsync(); // Item slides in
-			await Lvl.TickOnceForTestingAsync(); // And never leaves...
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			await Lvl.TickOnceForTestingAsync(); // Clogged
-			await Lvl.TickOnceForTestingAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Item slides in
+			await Lvl.Simy.TickOnceAsync(); // And never leaves...
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
+			await Lvl.Simy.TickOnceAsync(); // Clogged
 		}
 	}
 }

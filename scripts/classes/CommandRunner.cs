@@ -41,6 +41,13 @@ public class CommandRunner
 
 	public class OnTickPender(CommandRunner runner)
 	{
+		public readonly struct Perm(CommandRunner runner)
+		{
+			private readonly CommandRunner m_Runner = runner;
+			public bool IsFine(OnTickPender proxy) => m_Runner == proxy.m_Runner;
+		}
+
+		// Commands have to be stored separately since Pend gets called mid iteration of the command groups.
 		public readonly List<List<Command>> Groups = [];
 		public Unit? PenderUnit { get; private set; }
 		private readonly CommandRunner m_Runner = runner;
@@ -68,13 +75,10 @@ public class CommandRunner
 		public void QueueBlockedSlideCmdByAnotherItem(WorldPanel world, CmdSlide cmd) 
 			=> m_Runner.QueueBlockedSlideCmdByAnotherItem(world, cmd);
 		
-		/// <summary>
-		/// </summary>
-		/// <param name="proofRunner">Used to make it impossible to call this from the Command side</param>
-		public void _SetPenderUnit(CommandRunner proofRunner, Unit newUnit)
+		public void _SetPenderUnit(Perm perm, Unit newUnit)
 		{
 			Debug.AssertNotNull(newUnit);
-			Debug.AssertRefEq(proofRunner, m_Runner);
+			Debug.Assert(perm.IsFine(this));
 			PenderUnit = newUnit;
 		}
 	}
@@ -165,7 +169,7 @@ public class CommandRunner
 					// Commands that were forced to end can be done before first tick so...
 					if (!cw.Cmd.IsDone() && !cw.HasRanThisTick() && cw.AllDepsDone())
 					{
-						ticker.Pender._SetPenderUnit(this, cw.PenderUnit);
+						ticker.Pender._SetPenderUnit(new(this), cw.PenderUnit);
 						cw.OnTick(ticker);
 						bGoingNextGroup = true;
 					}

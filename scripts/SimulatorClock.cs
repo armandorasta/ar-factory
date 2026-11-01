@@ -33,9 +33,9 @@ public partial class SimulatorClock : Godot.Node
 
 	private void InitTimer()
 	{
+		AddChild(m_TickTimer);
 		m_TickTimer.OneShot = true;
 		m_TickTimer.Paused = true;
-		AddChild(m_TickTimer);
 		m_TickTimer.Timeout += OnTickTimer_TimeOut;
 	}
 
@@ -58,7 +58,6 @@ public partial class SimulatorClock : Godot.Node
 
 	public void Start(bool bPauseOnEntry = false)
 	{
-		// When it's off, both values for bPauseOnEntry work because of the tests...
 		SetState(bPauseOnEntry ? State.Debug : State.Play);
 		OnStart();
 		m_TickTimer.Paused = false;
@@ -168,6 +167,14 @@ public partial class SimulatorClock : Godot.Node
 		}
 	}
 
+	public void Reset()
+	{
+		m_TickTimer.Paused = true;
+		m_TickTimer.Stop();
+		m_TickCount = 0;
+		SetState(State.Off);
+	}
+
 
 	#region .Signal Handlers
 
@@ -177,6 +184,9 @@ public partial class SimulatorClock : Godot.Node
 		m_ParentSimy.OnEdge();
 		BeginTick();
 	}
+
+	#endregion
+
 
 	/// <summary>
 	/// Called at the very start of the tick JUST before <see cref="TickOnce"/>.
@@ -196,9 +206,6 @@ public partial class SimulatorClock : Godot.Node
 			throw new InvalidProgramException("New PlayMode?");
 		}
 	}
-
-	#endregion
-
 
 	private void SetState(State newPlayMode)
 	{

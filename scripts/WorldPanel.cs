@@ -135,23 +135,12 @@ public partial class WorldPanel : Godot.Panel
 
 	public void DeleteUnit(Unit u)
 	{
-		u.Reset();
-		
-		var limVec = u.Dir is Direction.East or Direction.West
-			? u.Dimensions
-			: new Vector2I(u.Dimensions.Y, u.Dimensions.X);
-		for (int y = 0; y < limVec.Y; ++y)
-		{
-			for (int x = 0; x < limVec.X; ++x)
-			{
-				DeleteTile(u.GLocation + new Vector2I(x, y));
-			}
-		}
-
-		RemoveChild(u);
 		u.QueueFree();
 		m_Units.Remove(u);
 	}
+
+	public IEnumerable<Tile> GetTilesIter() => m_Tiles.Where(tl => tl is not null)!;
+	public IEnumerable<Unit> GetUnitsIter() => m_Units;
 
 
 	#region .Tile Methods
@@ -509,67 +498,7 @@ public partial class WorldPanel : Godot.Panel
 	#endregion // Essential Functions
 	#region .Simulation Related
 
-	public void OnTick(Simulator.PendProxy pender)
-	{
-		foreach (var tl in m_Tiles)
-		{
-			tl?.GetItemMaybeNull()?.ResetMovementFlag();
-		}
-
-		foreach (var u in m_Units)
-		{
-			u.PreprocessTick();
-		}
-
-		foreach (var u in m_Units)
-		{
-			pender.PenderUnit = u;
-			u.HandlePendingNewCommands(pender);
-		}
-	}
-
-	public enum TickState
-	{
-		NothingSus,
-		RanOutOfItems,
-		SuccessfulRun,
-	}
-
-	public TickState CheckForErrorsThisTick()
-	{
-		var suppliers = m_Units.Where(u => u is UNSupplier).Select(u => (u as UNSupplier)!);
-		var demanders = m_Units.Where(u => u is UNDemander).Select(u => (u as UNDemander)!);
-
-		if (demanders.Any(_ => true) // No success ever if there are no demanders obviously...
-			&& demanders.All(d => d.IsDoneWithOutputSeq() && !d.HasPendingCmds()))
-		{
-			return TickState.SuccessfulRun;
-		}
-		
-		// We will check if there are any suppliers in the first place, because we don't want to crash the  simulation 
-		// for invalid levels, aka the ones constructed in tests...
-		if (suppliers.Any(_ => true) 
-			&& suppliers.All(s => s.IsDoneWithInputSeq()) 
-			&& m_Tiles.All(tl => tl is null || !tl.HasItem()))
-		{
-			return TickState.RanOutOfItems;
-		}
-
-		return TickState.NothingSus;
-	}
-
-	public void CleanUpAfterSim()
-	{
-		foreach (var u in m_Units)
-		{
-			u.Reset();
-		}
-		
-		foreach (var tl in m_Tiles)
-		{
-			tl?.DestroyItem(true, true);
-		}
-	}
+	
 
 	#endregion
 	#region .Godot Overrides
@@ -592,6 +521,9 @@ public partial class WorldPanel : Godot.Panel
 		{
 			DrawLine(new(0.0f, i*CellWidth), new(Size.X, i*CellWidth), new(0.0f, 0.18f, 0.0f));
 		}
+		
+		// TODO: change this so the units draw the tiles instead.
+		// Probably gonna need to add a empty unit for empty tiles... or just a separate collection for them.
 		foreach (var tl in m_Tiles)
 		{
 			tl?.DebugDraw(this);

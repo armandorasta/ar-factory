@@ -6,6 +6,11 @@ using Godot;
 
 namespace ArFactory;
 
+/// <summary>
+/// Some semantics for clarity. 
+/// For now units own the tiles they engolf, so anything from outside touching those tiles is instant UB. 
+/// This means the unit is reponsible for deleting those tiles when it's deleted.
+/// </summary>
 public abstract partial class Unit : Node2D
 {
 	protected enum TickType
@@ -15,7 +20,7 @@ public abstract partial class Unit : Node2D
 	}
 
 
-	[Godot.Signal] delegate void MouseInputEventHandler(Godot.InputEventMouse ev);
+	public readonly Vector2I InvalidGLocation = new(-1, -1);
 
 
 	// Nodes
@@ -36,9 +41,10 @@ public abstract partial class Unit : Node2D
 	private Vector2I m_Dims;
 	private int m_Rate;
 	private readonly List<Command> m_PendingCmds = [];
-	
+
 	private bool m_bLocked = false;
 	private bool m_bCanBeLocked = false;
+	private bool m_bFloating = false;
 
 	/// <summary>
 	/// Keeps track of <see cref="Rate"/> every tick.
@@ -54,7 +60,7 @@ public abstract partial class Unit : Node2D
 
 	public static bool CanFitIn(WorldPanel world, Vector2I gloc, Vector2I dims, Direction dir)
 	{
-		var bLeftRight = dir == Direction.East || dir == Direction.West;
+		var bLeftRight = dir is Direction.East or Direction.West;
 		var adjustedDims = bLeftRight ? dims : new(dims.Y, dims.X);
 		if (!world.GetGridRect().Encloses(new(gloc, adjustedDims)))
 		{
@@ -73,17 +79,23 @@ public abstract partial class Unit : Node2D
 		return true;
 	}
 
+	public static bool CanFitIn(WorldPanel world, Vector2I gloc, Unit u)
+	{
+		return CanFitIn(world, gloc, u.Dimensions, u.Dir);
+	}
+
 	#region .Godot Overrides
 	public override void _Ready()
 	{
 		this.Sprite = GetNodeOrNull<Sprite2D>("Sprite2D");
 	}
 
-	public override void _Input(Godot.InputEvent ev)
+	public override void _ExitTree()
 	{
-		if (ev is InputEventMouse mev)
+		if (!IsFloating())
 		{
-			EmitSignal(SignalName.MouseInput, mev);
+			Reset(); // Pending commands are forced to finish.
+			Deconstruct();
 		}
 	}
 
@@ -97,9 +109,11 @@ public abstract partial class Unit : Node2D
 			Godot.HorizontalAlignment.Left, World.CellWidth, 16, Godot.Colors.Black);
 		if (m_bLocked)
 		{
-			DrawString(WorldPanel.DebugFont, 0.5f*World.CellWidth * Vector2.One, "L", HorizontalAlignment.Center, -1, 30,
-				Godot.Colors.Red);
+			DrawString(WorldPanel.DebugFont, 0.5f*World.CellWidth * Vector2.One, "L", HorizontalAlignment.Center,
+				-1, 30, Godot.Colors.Red);
 		}
+
+		// TODO: Draw the owned tiles here not in world panel!
 	}
 
 	#endregion // .Godot Overrides
@@ -107,7 +121,7 @@ public abstract partial class Unit : Node2D
 
 	// This function is called on the `_Ready` function of sub-classes.
 	protected void BaseInit(
-		WorldPanel world, TickType tickType, int workRate, Vector2I gloc, Vector2I dims, Direction dir, 
+		WorldPanel world, TickType tickType, int workRate, Vector2I gloc, Vector2I dims, Direction dir,
 		bool bLockable = false)
 	{
 		Debug.Assert(Unit.CanFitIn(world, gloc, dims, dir));
@@ -125,23 +139,12 @@ public abstract partial class Unit : Node2D
 		Position = world.GridToPos(gloc);
 
 		// TODO: Add back sprite code
+
 		Sprite?.Hide();
 		// Sprite.ApplyScale(World.CellWidth/128.0f * (Vector2)Dims);
 		// Sprite.Translate(0.5f*World.CellWidth * Vector2.One);
 
-		for (var y = 0; y < dims.Y; ++y)
-		{
-			for (var x = 0; x < dims.X; ++x)
-			{
-				var myLoc = gloc + new Vector2I(x, y);
-				world.InstallTile(Tile.CreateSolid(), myLoc);
-			}
-		}
-
-		BuildTilesAsIfFacingEast();
-		Debug.Assert(tickType != TickType.OnDemand || m_TickTiles.Count > 0);
-
-		SetDir(dir);
+		Construct();
 	}
 
 	protected void InjectorBaseInit(WorldPanel world, int workRate)
@@ -153,10 +156,10 @@ public abstract partial class Unit : Node2D
 	}
 
 	#region Abstract Interface
-	
+
 	/// <summary>
 	/// Used to specify:
-	/// what tiles the unit will occupy, 
+	/// what tiles the unit will occupy,
 	/// where the inputs and outputs are and their directions.
 	/// <b>The tiles should be built as if the unit is facing east.</b>
 	/// </summary>
@@ -164,7 +167,7 @@ public abstract partial class Unit : Node2D
 
 	/// <summary>
  	/// Used to add commands to the queue using `pend_cmd`.
-	/// Checks like <see cref="IsWorkTick"/>, <see cref="HasPendingCmds"/> and <see cref="IsJustAwaitingOutSlideAnim"/> 
+	/// Checks like <see cref="IsWorkTick"/>, <see cref="HasPendingCmds"/> and <see cref="IsJustAwaitingOutSlideAnim"/>
 	/// are used quite often here.
 	/// </summary>
 	public abstract void PendNewCommands(Simulator.PendProxy pender);
@@ -177,7 +180,7 @@ public abstract partial class Unit : Node2D
 	{
 		var bui = new StringBuilder("Unit[");
 		bui.Append(string.Join(", ", [
-			GLocation, 
+			GLocation,
 			$"{m_Dims.X}x{m_Dims.Y}",
 			m_Dir,
 			$"{m_Rate}s/t",
@@ -207,17 +210,79 @@ public abstract partial class Unit : Node2D
 		QueueRedraw();
 	}
 
+	public bool IsFloating() => m_bFloating;
+
+	/// <summary>
+	/// Only works when floating.
+	/// </summary>
+	public void SetGLocation(Vector2I gloc)
+	{
+		Debug.Assert(IsFloating());
+		if (IsFloating())
+		{
+			m_GL = gloc;
+		}
+	}
+
+	/// <summary>
+	/// Must fit not have any other tiles in the way.
+	/// </summary>
+	public void Construct()
+	{
+		Debug.Assert(Unit.CanFitIn(World, GLocation, Dimensions, Dir));
+
+		for (var y = 0; y < Dimensions.Y; ++y)
+		{
+			for (var x = 0; x < Dimensions.X; ++x)
+			{
+				var mygloc = GLocation + new Vector2I(x, y);
+				World.InstallTile(Tile.CreateSolid(), mygloc);
+			}
+		}
+		BuildTilesAsIfFacingEast();
+		Debug.Assert(m_TickType != TickType.OnDemand || m_TickTiles.Count > 0);
+
+		var dir = Dir;
+		m_Dir = Direction.East;
+		SetDir(dir);
+
+		m_bFloating = false;
+		QueueRedraw();
+	}
+
+	/// <summary>
+	/// Must not be floating already, has pending commands (just call <see cref="Reset"/>), or have any items within.
+	/// </summary>
+	public void Deconstruct()
+	{
+		Debug.Assert(!IsFloating());
+		Debug.Assert(!HasPendingCmds());
+
+		var limVec = Dir is Direction.East or Direction.West ? Dimensions : new Vector2I(Dimensions.Y, Dimensions.X);
+		for (var y = 0; y < limVec.Y; ++y)
+		{
+			for (var x = 0; x < limVec.X; ++x)
+			{
+				var mygloc = GLocation + new Vector2I(x, y);
+				Debug.Assert(!World.GetTileNonNull(mygloc).IsReserved());
+				World.DeleteTile(mygloc);
+			}
+		}
+
+		m_bFloating = true;
+		QueueRedraw();
+	}
 
 	/// <summary>
 	/// Returns enclosing Rect2I in grid-space.
 	/// </summary>
 	public Rect2I GetRect2I() => new(m_GL, m_Dims);
-	
+
 	/// <summary>
 	/// Returns enclosing Rect2 in world-space.
 	/// </summary>
 	public Rect2 GetRect2() => new(World.CellWidth * (Vector2)m_GL, World.CellWidth * (Vector2)m_Dims);
-	
+
 	/// <summary>
 	/// Checks if <paramref name="gloc"/> is within the world in grid-space.
 	/// </summary>
@@ -225,20 +290,20 @@ public abstract partial class Unit : Node2D
 	public Tile GetTile(Vector2I gloc) => World.GetTileNonNull(m_GL + gloc);
 
 	/// <summary>
-	/// Returns true if the machine is expected to operate during this tick, <see cref="m_Rate"/> determines how often 
+	/// Returns true if the machine is expected to operate during this tick, <see cref="m_Rate"/> determines how often
 	/// this function returns true, ex. when <see cref="m_Rate"/> is 1, it returns true every single tick.
 	/// </summary>
 	private bool IsWorkTick() => m_Count > 0 && m_Count % m_Rate == 0;
 
 	/// <summary>
-	/// Returns true if the command queue still has commands to be executed. You usually pend all the commands you want 
+	/// Returns true if the command queue still has commands to be executed. You usually pend all the commands you want
 	/// executed at once when the queue is empty, then wait until the whole sequence
 	/// is executed.
 	/// </summary>
 	public bool HasPendingCmds() => !m_PendingCmds.All(c => c.IsDone());
 
 	/// <summary>
-	/// Checks if there's either no commands left, or there are only slide commands that are just animating the slide 
+	/// Checks if there's either no commands left, or there are only slide commands that are just animating the slide
 	/// for the user.
 	/// </summary>
 	protected bool IsSafeToPendCmds() => !HasPendingCmds() || AllCmdsAreEndingSlidingCmds();
@@ -249,7 +314,7 @@ public abstract partial class Unit : Node2D
 	/// </summary>
 	protected bool AllCmdsAreEndingSlidingCmds()
 		=> m_PendingCmds.All(c => c is CmdSlide sc && sc.CanSlideNextTick(World));
-	
+
 	#region Direction Related Methods
 
 	/// <summary>
@@ -278,7 +343,7 @@ public abstract partial class Unit : Node2D
 	}
 
 	/// <summary>
-	/// Returns true if the unit can face that direction, by default units can only face east and west, but this 
+	/// Returns true if the unit can face that direction, by default units can only face east and west, but this
 	/// behaviour can be changed by overriding this function.
 	/// </summary>
 	/// TODO: See this `static` business...
@@ -334,7 +399,7 @@ public abstract partial class Unit : Node2D
 	}
 
 	/// <summary>
-	/// Rotates the unit by 90 degrees clockwise, by default this operation is not supported, but this can be changed 
+	/// Rotates the unit by 90 degrees clockwise, by default this operation is not supported, but this can be changed
 	/// by overriding <see cref="CanFaceDir"/>.
 	/// </summary>
 	public void Rotate90()
@@ -376,7 +441,7 @@ public abstract partial class Unit : Node2D
 	}
 
 	/// <summary>
-	/// Rotates the unit by 270 degrees clockwise (90 degress counter-clockwise), by default this operation is not 
+	/// Rotates the unit by 270 degrees clockwise (90 degress counter-clockwise), by default this operation is not
 	/// supported, but this can be changed by overriding <see cref="CanFaceDir"/>.
 	/// </summary>
 	public void Rotate270()
@@ -393,12 +458,12 @@ public abstract partial class Unit : Node2D
 		Rotate90();
 	}
 
-	
+
 	#endregion Direction Related Methods
 	#region Building Methods
 
 	/// <summary>
-	/// Returns the adjusted tile. 
+	/// Returns the adjusted tile.
 	/// Input tiles let items slide in from a specified direction.
 	/// </summary>
 	/// <param name="bKeepTrack">
@@ -425,7 +490,7 @@ public abstract partial class Unit : Node2D
 	}
 
 	/// <summary>
-	/// Returns the adjusted tile. 
+	/// Returns the adjusted tile.
 	/// Output tiles are meant to generate tiles and slide them out in a specified direction.
 	/// </summary>
 	/// <param name="bKeepTrack">

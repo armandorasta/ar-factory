@@ -13,7 +13,7 @@ public class TileTests : ArTest.TestSuit
 		var levelScene = GD.Load<Godot.PackedScene>(SceneManager.EditorScenePath);
 		m_Lv = levelScene.Instantiate<Editor>();
 		AddNode(Lvl);
-		Lvl.Clock.SetTickRate(50);
+		Lvl.Simy.Clock.SetTickRate(50);
 	}
 
 	public override void BeforeEach()
@@ -24,13 +24,12 @@ public class TileTests : ArTest.TestSuit
 
 	public override void AfterEach()
 	{
-		AssertTrue(Lvl.Clock.IsHalted());
+		AssertTrue(Lvl.Simy.IsHalted());
 	}
 
 	public override void AfterAll()
 	{
 		Lvl.QueueFree();
-		RemoveNode(Lvl);
 	}
 
 	[ArTest.Test] public void TestDefaultConstructor()

@@ -14,6 +14,9 @@ public partial class Editor : Godot.Node2D
 		Placement,
 		ConnectingSliders,
 		PlacingMatchingTeleOutput,
+		
+		MoveTool,
+		PlacingMovedUnit,
 
 		Play,
 		Debug,
@@ -30,6 +33,8 @@ public partial class Editor : Godot.Node2D
 	public Godot.Label TicksLabel => m_TicksLabel!;
 	public Godot.HSlider SpeedSlider => m_SpeedSlider!;
 	public Godot.Label TickSpeedLabel => m_TickSpeedLabel!;
+	private Godot.MarginContainer UnitPlacerMarCon => m_UnitPlacerMarCon!;
+	private Godot.GridContainer UnitPlacerGCon => m_UnitPlacerGCon!;
 
 	#region Actual Nodes
 	private Cam? m_Cam;
@@ -42,28 +47,30 @@ public partial class Editor : Godot.Node2D
 	private Godot.Label? m_TicksLabel;
 	private Godot.HSlider? m_SpeedSlider;
 	private Godot.Label? m_TickSpeedLabel;
+	private Godot.MarginContainer? m_UnitPlacerMarCon;
+	private Godot.GridContainer? m_UnitPlacerGCon;
 	#endregion
 
 	// Publics
 	public float DefaultTickMillis = 300.0f;
-	public Simulator Simy => m_Simy;
+	public Simulator Simy => m_Simy!;
 
 	// Privates
 	private State m_CurrState = State.Off;
 	private float m_TickMillis;
-	private readonly Simulator m_Simy = new();
+	private Simulator? m_Simy; // Not actually nullable.
 
 	// Editor stuff
 	private record struct UnitPlacement(Godot.ButtonGroup ButtGroup, Godot.Button? Butt, Direction Dir);
-	private record ToolBoxButtInfo(Vector2I Dims, bool bEastWest, Func<Vector2I, Direction, Unit> PlacementFunc);
+	private record UnitPickerButtInfo(Vector2I Dims, bool bEastWest, Func<Vector2I, Direction, Unit> PlacementFunc);
 
-	public Godot.Label PlacementDirLabel => m_PlacementDirLabel!;
-	private Godot.Label? m_PlacementDirLabel;
-
+	public Godot.Label CursorLabel => m_CursorLabel!;
+	private Godot.Label? m_CursorLabel;
 	private UnitPlacement m_CurrUnitPlacement = new();
-	private readonly Dictionary<string, ToolBoxButtInfo> m_ToolboxButtInfos = [];
-
+	private readonly Dictionary<string, UnitPickerButtInfo> m_UnitPickerButtInfos = [];
 	private Unit? m_ConnecterUnit;
+	
+	private Godot.ButtonGroup m_ToolboxButtGroup = new() { AllowUnpress = true };
 
 
 	#region .Init
@@ -76,12 +83,12 @@ public partial class Editor : Godot.Node2D
 	public override void _Ready()
 	{
 		GetAllNodes();
-		WorldCam.Position = World!.Size * 0.5f;
-		WorldCam.MaxZoom = 1.0f;
-		WorldCam.MinZoom = 0.3f;
+		InitSimy();
+		InitWorldCam();
 		InitSimButts();
 		InitSimSpeedSlider();
-		InitTools();
+		InitUnitPicker();
+		InitToolbox();
 		InitDirPlacementLabel();
 		SetState(State.Off, true);
 	}
@@ -90,14 +97,30 @@ public partial class Editor : Godot.Node2D
 	{
 		m_Cam = GetNode<Cam>("WorldPanel/Cam");
 		m_World = GetNode<WorldPanel>("WorldPanel");
-		m_PlayButt = GetNode<Godot.Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PlayButt");
-		m_HaltButt = GetNode<Godot.Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PauseButt");
-		m_DebugButt = GetNode<Godot.Button>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/DebugButt");
-		m_ToolsHBox = GetNode<Godot.HBoxContainer>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/ToolsHBox");
-		m_PlayHBox = GetNode<Godot.HBoxContainer>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox");
-		m_TicksLabel = GetNode<Godot.Label>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TicksLabel");
-		m_SpeedSlider = GetNode<Godot.HSlider>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/SpeedHSlider");
-		m_TickSpeedLabel = GetNode<Godot.Label>("WorldPanel/HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TickSpeedLabel");
+		m_PlayButt = GetNode<Godot.Button>("HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PlayButt");
+		m_HaltButt = GetNode<Godot.Button>("HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PauseButt");
+		m_DebugButt = GetNode<Godot.Button>("HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/DebugButt");
+		m_ToolsHBox = GetNode<Godot.HBoxContainer>("HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/ToolsHBox");
+		m_PlayHBox = GetNode<Godot.HBoxContainer>("HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox");
+		m_TicksLabel = GetNode<Godot.Label>("HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TicksLabel");
+		m_SpeedSlider = GetNode<Godot.HSlider>("HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/SpeedHSlider");
+		m_TickSpeedLabel = GetNode<Godot.Label>("HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TickSpeedLabel");
+		m_UnitPlacerMarCon = GetNode<Godot.MarginContainer>("HUDLayer/UnitPlacerMarCon");
+		m_UnitPlacerGCon = GetNode<Godot.GridContainer>("HUDLayer/UnitPlacerMarCon/Pan/MarginContainer/GCon");
+	}
+
+	private void InitSimy()
+	{
+		m_Simy = new(World);
+		m_Simy.SimulationStarted += OnSimulationStart;
+		m_Simy.SimulationEnded += OnSimulationEnd;
+	}
+
+	private void InitWorldCam()
+	{
+		WorldCam.Position = (Vector2)GetWindow().Size * 0.5f;
+		WorldCam.MaxZoom = 1.0f;
+		WorldCam.MinZoom = 0.3f;
 	}
 
 	private void InitSimButts()
@@ -110,48 +133,73 @@ public partial class Editor : Godot.Node2D
 	private void InitSimSpeedSlider()
 	{
 		SpeedSlider.ValueChanged += OnSpeedSlider_ValueChanged;
-		SpeedSlider.Value = m_Simy.GetTickRate();
+		SpeedSlider.Value = Simy.Clock.GetTickRate();
 	}
 
-	private void InitTools()
+	private void InitUnitPicker()
 	{
 		m_CurrUnitPlacement.ButtGroup = new() { AllowUnpress = true };
-		m_CurrUnitPlacement.ButtGroup.Pressed += OnToolsHBox_Pressed;
-		AddTool("||>", Vector2I.One, true, (l, d) => World.PlaceSupplier(l, d, 1, [1, 2, 3, 4, 5, 6]));
-		AddTool(">>>", Vector2I.One, false, (l, d) => World.PlaceSlider(l, d, 1));
-		AddTool("xX", Vector2I.One, true, (l, d) => World.PlaceBin(l));
-		AddTool("?:", new Vector2I(1, 2), true, (l, d) => World.PlaceBranch(l, d, 2, CmdIf.CheckType.Greater, 0));
-		AddTool("1>2", Vector2I.One, true, (l, d) => World.PlaceUpdater(l, d, 2, UNUpdater.UpdateType.Double));
-		AddTool(">||", Vector2I.One, true, (l, d) => World.PlaceDemander(l, d, [2, 4, 6, 8, 10, 12]));
-		AddTool(">^<", new Vector2I(1, 2), true, (l, d) => World.PlaceCombiner(l, d, 2, BinaryOperation.Add));
-		AddTool("1>11", new Vector2I(1, 2), true, (l, d) => World.PlaceCloner(l, d, 2));
+		m_CurrUnitPlacement.ButtGroup.Pressed += OnUnitPicker_Pressed;
+		AddUnitToPicker("||>", Vector2I.One, true, (l, d) => World.PlaceSupplier(l, d, 1, [1, 2, 3, 4, 5, 6]));
+		AddUnitToPicker(">>>", Vector2I.One, false, (l, d) => World.PlaceSlider(l, d, 1));
+		AddUnitToPicker("xX", Vector2I.One, true, (l, d) => World.PlaceBin(l));
+		AddUnitToPicker("?:", new Vector2I(1, 2), true, (l, d) => World.PlaceBranch(l, d, 2, CmdIf.CheckType.Greater, 0));
+		AddUnitToPicker("1>2", Vector2I.One, true, (l, d) => World.PlaceUpdater(l, d, 2, UNUpdater.UpdateType.Double));
+		AddUnitToPicker(">||", Vector2I.One, true, (l, d) => World.PlaceDemander(l, d, [2, 4, 6, 8, 10, 12]));
+		AddUnitToPicker(">^<", new Vector2I(1, 2), true, (l, d) => World.PlaceCombiner(l, d, 2, BinaryOperation.Add));
+		AddUnitToPicker("1>11", new Vector2I(1, 2), true, (l, d) => World.PlaceCloner(l, d, 2));
 		
-		AddTool("1>>", Vector2I.One, false, (l, d) => 
+		AddUnitToPicker("1>>", Vector2I.One, false, (l, d) =>
 		{
 			m_ConnecterUnit = World.PlaceTeleInput(l, d, 1);
-			PlacementDirLabel.Text = $"Out: {m_CurrUnitPlacement.Dir}";
+			CursorLabel.Text = $"Out: {m_CurrUnitPlacement.Dir}";
 			SetState(State.PlacingMatchingTeleOutput);
 			return m_ConnecterUnit;
 		});
 	}
 
-	private void InitDirPlacementLabel()
+	private void AddUnitToPicker(
+		string text, Vector2I dims, bool bEastWest, Func<Vector2I, Direction, Unit> placementFunc)
 	{
-		m_PlacementDirLabel = new Godot.Label();
-		AddChild(PlacementDirLabel);
+		var butt = new Godot.Button
+		{
+
+			Text = text,
+			CustomMinimumSize = new Vector2I(0, 90),
+			ButtonGroup = m_CurrUnitPlacement.ButtGroup,
+			ToggleMode = true,
+			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+		};
+		UnitPlacerGCon.AddChild(butt);
+		m_UnitPickerButtInfos.Add(butt.Name, new(dims, bEastWest, placementFunc));
 	}
 
-	private void AddTool(string text, Vector2I dims, bool bEastWest, Func<Vector2I, Direction, Unit> placementFunc)
+	private void InitDirPlacementLabel()
+	{
+		m_CursorLabel = new Godot.Label();
+		AddChild(CursorLabel);
+	}
+
+	private void InitToolbox()
+	{
+		AddToolToToolbox("MOVE", State.MoveTool);
+	}
+
+	private void AddToolToToolbox(string text, State onClickState)
 	{
 		var butt = new Godot.Button
 		{
 			Text = text,
 			CustomMinimumSize = new Vector2I(60, 0),
-			ButtonGroup = m_CurrUnitPlacement.ButtGroup,
 			ToggleMode = true,
+			ButtonGroup = m_ToolboxButtGroup,
 		};
 		ToolsHBox.AddChild(butt);
-		m_ToolboxButtInfos.Add(butt.Name, new(dims, bEastWest, placementFunc));
+		butt.Pressed += () => 
+		{
+			CursorLabel.Text = onClickState.ToString();
+			SetState(onClickState);
+		};
 	}
 
 	#endregion // Init
@@ -218,7 +266,7 @@ public partial class Editor : Godot.Node2D
 							case 1: // Connect to lock
 								GD.Print("Connecting...");
 								m_ConnecterUnit = slid;
-								PlacementDirLabel.Text = "Connecting...";
+								CursorLabel.Text = "Connecting...";
 								SetState(State.ConnectingSliders);
 								break;
 							
@@ -295,7 +343,7 @@ public partial class Editor : Godot.Node2D
 						var mousePos = GetLocalMousePosition();
 						if (World.GetWorldRect().HasPoint(mousePos))
 						{
-							var info = m_ToolboxButtInfos[m_CurrUnitPlacement.Butt!.Name];
+							var info = m_UnitPickerButtInfos[m_CurrUnitPlacement.Butt!.Name];
 							Vector2I mgloc = World.GetMouseGridLocation();
 							if (Unit.CanFitIn(World, mgloc, info.Dims, m_CurrUnitPlacement.Dir))
 							{
@@ -309,7 +357,7 @@ public partial class Editor : Godot.Node2D
 			{
 				if (kev.Keycode == Godot.Key.R && kev.IsPressed() && !kev.CtrlPressed && !kev.ShiftPressed)
 				{
-					var info = m_ToolboxButtInfos[m_CurrUnitPlacement.Butt!.Name];
+					var info = m_UnitPickerButtInfos[m_CurrUnitPlacement.Butt!.Name];
 					if (info.bEastWest)
 					{
 						m_CurrUnitPlacement.Dir = m_CurrUnitPlacement.Dir switch
@@ -322,7 +370,7 @@ public partial class Editor : Godot.Node2D
 					{
 						m_CurrUnitPlacement.Dir = m_CurrUnitPlacement.Dir.Rotate90();
 					}
-					PlacementDirLabel.Text = m_CurrUnitPlacement.Dir.ToString();
+					CursorLabel.Text = m_CurrUnitPlacement.Dir.ToString();
 				}
 			}
 			break;
@@ -397,7 +445,71 @@ public partial class Editor : Godot.Node2D
 				if (kev.Keycode == Godot.Key.R && kev.IsPressed() && !kev.CtrlPressed && !kev.ShiftPressed)
 				{
 					m_CurrUnitPlacement.Dir = m_CurrUnitPlacement.Dir.Rotate90();
-					PlacementDirLabel.Text = $"Out: {m_CurrUnitPlacement.Dir}";
+					CursorLabel.Text = $"Out: {m_CurrUnitPlacement.Dir}";
+				}
+			}
+			break;
+		}
+		case State.MoveTool:
+		{
+			if (ev is InputEventMouse mev && mev.IsPressed() && !mev.CtrlPressed && !mev.ShiftPressed)
+			{
+				if (mev.ButtonMask == MouseButtonMask.Left)
+				{
+					if (World.GetUnit(World.GetMouseGridLocation()) is { } u)
+					{
+						m_ConnecterUnit = u;
+						u.Deconstruct();
+						GD.Print($"Picked up a {u.GetType().Name}");
+						CursorLabel.Text = $"Moving a {u.GetType().Name}";
+						SetState(State.PlacingMovedUnit);
+					}
+				}
+				else if (mev.ButtonMask == MouseButtonMask.Right)
+				{
+					GD.Print("Cancelled move tool");
+					SetState(State.Off);
+					m_ToolboxButtGroup.GetPressedButton().ButtonPressed = false;
+				}
+			}
+			break;
+		}
+		case State.PlacingMovedUnit:
+		{
+			if (ev is InputEventMouseButton mev)
+			{
+				if (mev.ButtonIndex == MouseButton.Right)
+				{
+					if (mev.IsPressed())
+					{
+						GD.Print("Cancelled moving.");
+						m_ConnecterUnit!.Construct(); // Where it originally was.
+						CursorLabel.Text = State.MoveTool.ToString();
+						SetState(State.MoveTool);
+					}
+				}
+				else if (mev.ButtonIndex == MouseButton.Left)
+				{
+					if (mev.IsPressed() && !mev.CtrlPressed && !mev.ShiftPressed)
+					{
+						var mousePos = GetLocalMousePosition();
+						if (World.GetWorldRect().HasPoint(mousePos))
+						{
+							Vector2I mgloc = World.GetMouseGridLocation();
+							if (Unit.CanFitIn(World, mgloc, m_ConnecterUnit!))
+							{
+								GD.Print($"Moved a {m_ConnecterUnit!.GetType().Name} from {m_ConnecterUnit.GLocation} to {mgloc}");
+								m_ConnecterUnit!.SetGLocation(mgloc);
+								m_ConnecterUnit.Construct();
+								CursorLabel.Text = State.MoveTool.ToString();
+								SetState(State.MoveTool);
+							}
+							else
+							{
+								GD.Print("Nope, doesn't fit.");
+							}
+						}
+					}
 				}
 			}
 			break;
@@ -419,7 +531,6 @@ public partial class Editor : Godot.Node2D
 		men.IdPressed += id => pressFunc.Invoke((int)id);
 		men.PopupHide += () =>
 		{
-			RemoveChild(men);
 			men.QueueFree();
 		};
 		AddChild(men);
@@ -436,12 +547,14 @@ public partial class Editor : Godot.Node2D
 		case State.Placement:
 		case State.ConnectingSliders:
 		case State.PlacingMatchingTeleOutput:
-			PlacementDirLabel.Position = GetLocalMousePosition() + Vector2.One * 50;
+		case State.MoveTool:
+		case State.PlacingMovedUnit:
+			CursorLabel.Position = GetLocalMousePosition() + Vector2.One * 50;
 			break;
 
 		case State.Debug:
 		case State.Play:
-			DoPerFrame(dt);
+			Simy.DoPerFrame(dt);
 			break;
 		}
 	}
@@ -453,13 +566,13 @@ public partial class Editor : Godot.Node2D
 		Debug.Assert(m_CurrState is State.Off or State.Debug);
 		switch (m_CurrState) {
 		case State.Off:
-			m_Simy.PlaySimulation();
+			Simy.Start();
 			SetState(State.Play);
 			break;
 
 
 		case State.Debug:
-			m_Clock.ResumeSimulation();
+			Simy.Resume();
 			SetState(State.Play);
 			break;
 
@@ -471,7 +584,7 @@ public partial class Editor : Godot.Node2D
 
 	private void OnHaltButt_Pressed()
 	{
-		m_Clock.HaltSimulation();
+		Simy.Halt();
 		SetState(State.Off);
 	}
 
@@ -479,22 +592,22 @@ public partial class Editor : Godot.Node2D
 	{
 		switch (m_CurrState) {
 		case State.Off:
-			m_Clock.PlaySimulationInDebug();
+			Simy.StartAndPause();
 			SetState(State.Debug);
 			break;
 
 		case State.Play:
-			m_Clock.PauseSimulation();
+			Simy.Start();
 			SetState(State.Debug);
 			break;
 
 		case State.Debug:
-			if (!m_Clock.IsPaused()) // Spamming the debug key while the tick is in progress.
+			if (!Simy.IsPaused()) // Spamming the debug key while the tick is in progress.
 			{
 				return;
 			}
 
-			m_Clock.TickOnce();
+			Simy.TickOnce();
 			break;
 
 		default:
@@ -504,11 +617,11 @@ public partial class Editor : Godot.Node2D
 
 	private void OnSpeedSlider_ValueChanged(double newVal)
 	{
-		m_Clock.SetTickRate((float)newVal);
-		TickSpeedLabel.Text = $"{m_Clock.GetTickRate()} tick/s";
+		Simy.Clock.SetTickRate((float)newVal);
+		TickSpeedLabel.Text = $"{Simy.Clock.GetTickRate()} tick/s";
 	}
 
-	private void OnToolsHBox_Pressed(Godot.BaseButton baseButt)
+	private void OnUnitPicker_Pressed(Godot.BaseButton baseButt)
 	{
 		Debug.AssertIs(baseButt, typeof(Godot.Button));
 		var butt = (baseButt as Godot.Button)!;
@@ -516,7 +629,7 @@ public partial class Editor : Godot.Node2D
 		m_CurrUnitPlacement.Butt = butt;
 		m_CurrUnitPlacement.Dir = Direction.East;
 
-		PlacementDirLabel.Text = m_CurrUnitPlacement.Dir.ToString();
+		CursorLabel.Text = m_CurrUnitPlacement.Dir.ToString();
 	}
 
 	#endregion .Signal Handlers
@@ -525,38 +638,44 @@ public partial class Editor : Godot.Node2D
 	private void Reset()
 	{
 		World.Reset();
-		m_Runner.Reset();
+		Simy.Reset();
 	}
 
 	private void SyncButtStates()
 	{
+		// Hide everything first.
+		// I could the extra marshalling by using in-between booleans but who cares bruh, this only happens once in 
+		// a while.
+		PlayButt.Disabled = true;
+		HaltButt.Disabled = true;
+		DebugButt.Disabled = true;
+		PlayHBox.Hide();
+		ToolsHBox.Hide();
+		CursorLabel.Hide();
+		UnitPlacerMarCon.Hide();
+
 		switch (m_CurrState) {
 		case State.Off:
 			PlayButt.Disabled = false;
-			HaltButt.Disabled = true;
 			DebugButt.Disabled = false;
-			PlayHBox.Hide();
 			ToolsHBox.Show();
-			PlacementDirLabel.Hide();
+			UnitPlacerMarCon.Show();
 			break;
 
 		case State.Placement:
 		case State.ConnectingSliders:
 		case State.PlacingMatchingTeleOutput:
-			PlayButt.Disabled = true;
-			HaltButt.Disabled = true;
-			DebugButt.Disabled = true;
-			PlayHBox.Hide();
+		case State.MoveTool:
+		case State.PlacingMovedUnit:
 			ToolsHBox.Show();
-			PlacementDirLabel.Show();
+			UnitPlacerMarCon.Show();
+			CursorLabel.Show();
 			break;
 
 		case State.Play:
-			PlayButt.Disabled = true;
 			HaltButt.Disabled = false;
 			DebugButt.Disabled = false;
 			PlayHBox.Show();
-			ToolsHBox.Hide();
 			break;
 
 		case State.Debug:
@@ -564,7 +683,6 @@ public partial class Editor : Godot.Node2D
 			HaltButt.Disabled = false;
 			DebugButt.Disabled = false;
 			PlayHBox.Show();
-			ToolsHBox.Hide();
 			break;
 
 		default:
@@ -572,26 +690,16 @@ public partial class Editor : Godot.Node2D
 		}
 	}
 
-	/// <summary>
-	/// Adds a slide command blocked by another item in the way only, all other types crash the program in debug.
-	/// </summary>
-	public void QueueBlockedSlideCmdByAnotherItem(CmdSlide cmd)
-	{
-		m_Runner.QueueBlockedSlideCmdByAnotherItem(World, cmd);
-	}
-
 	private void OnSimulationStart()
 	{
 		Debug.Assert(m_CurrState is State.Off);
-		SetState(m_Clock.IsDebugging() ? State.Debug : State.Play);
+		SetState(Simy.IsDebugging() ? State.Debug : State.Play);
 		UpdateTickCountLabel();
 	}
 
 	private void OnSimulationEnd()
 	{
 		Debug.Assert(m_CurrState is State.Play or State.Debug);
-		World.CleanUpAfterSim();
-		m_Runner.Reset();
 		SetState(State.Off);
 	}
 
@@ -608,6 +716,6 @@ public partial class Editor : Godot.Node2D
 
 	private void UpdateTickCountLabel()
 	{
-		TicksLabel.Text = $"tick: {m_Clock.GetTicksSinceStart()}";
+		TicksLabel.Text = $"tick: {Simy.Clock.GetTicksSinceStart()}";
 	}
 }
