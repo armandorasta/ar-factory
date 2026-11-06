@@ -531,6 +531,7 @@ public partial class Editor : Godot.Node2D
 		men.IdPressed += id => pressFunc.Invoke((int)id);
 		men.PopupHide += () =>
 		{
+			RemoveChild(men);
 			men.QueueFree();
 		};
 		AddChild(men);

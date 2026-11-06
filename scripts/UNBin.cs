@@ -4,6 +4,8 @@ namespace ArFactory;
 
 public partial class UNBin : Unit
 {
+	public Tile OnlyTile => GetTileNonNull(Vector2I.Zero);
+
 	public void Setup(WorldPanel world, Vector2I gloc)
 	{
 		BaseInit(world, TickType.OnDemand, 1, gloc, Vector2I.One, Direction.East);

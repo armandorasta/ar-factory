@@ -3,32 +3,31 @@ using System.Threading.Tasks;
 
 namespace ArFactory;
 
-public partial class SimulatorClock : Godot.Node
+public partial class SimulatorClock : Godot.Node, IDestroyable
 {
-	private enum State
-	{
-		Off,
-		Play,
-		Debug,
-	}
-
 	public const float MinTickRate = 0.1f;
 	public const float MaxTickRate = 1000.0f;
 
+	public event Action? TickStarted;
+	public event Action? TickEnded;
 
 	public float DefaultTickMillis = 300.0f;
 
 	private State m_CurrState;
-	private Simulator m_ParentSimy;
 	private Godot.Timer m_TickTimer = new();
 	private int m_TickCount = 0; // Number of ticks since the start.
 	private float m_TickMillis;
 
-	public SimulatorClock(Simulator parentSimy)
+	public SimulatorClock()
 	{
 		this.m_TickMillis = DefaultTickMillis;
-		this.m_ParentSimy = parentSimy;
 		InitTimer();
+	}
+
+	public SimulatorClock(Simulator parentSimy) : this()
+	{
+		TickStarted += parentSimy.OnTick;
+		TickEnded += parentSimy.OnEdge;
 	}
 
 	private void InitTimer()
@@ -111,7 +110,7 @@ public partial class SimulatorClock : Godot.Node
 
 		m_TickTimer.Start(m_TickMillis * 0.001f);
 		m_TickCount += 1;
-		m_ParentSimy.OnTick();
+		TickStarted?.Invoke();
 	}
 
 	/// <summary>
@@ -175,13 +174,21 @@ public partial class SimulatorClock : Godot.Node
 		SetState(State.Off);
 	}
 
+	/// <summary>
+	/// Frees the inner timer, which is Godot.Timer. That's it, it doesn't call reset or anything.
+	/// </summary>
+	public void Destroy()
+	{
+		m_TickTimer.QueueFree();
+	}
+
 
 	#region .Signal Handlers
 
 	private void OnTickTimer_TimeOut()
 	{
 		Debug.Assert(m_CurrState is State.Play or State.Debug);
-		m_ParentSimy.OnEdge();
+		TickEnded?.Invoke();
 		BeginTick();
 	}
 
@@ -222,5 +229,12 @@ public partial class SimulatorClock : Godot.Node
 		m_TickTimer.Paused = true;
 		m_TickTimer.Stop();
 		m_TickCount = 0;
+	}
+
+	private enum State
+	{
+		Off,
+		Play,
+		Debug,
 	}
 }

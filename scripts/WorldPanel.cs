@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace ArFactory;
 
-public partial class WorldPanel : Godot.Panel
+public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 {
 	// Constants
 	public static readonly Vector2I MinDims = new(3, 3);
@@ -25,6 +25,13 @@ public partial class WorldPanel : Godot.Panel
 	public static readonly Godot.PackedScene UNBranchScene = GD.Load<Godot.PackedScene>("res://scenes/UNBranch.tscn");
 	public static readonly Godot.PackedScene UNTeleInputScene = GD.Load<Godot.PackedScene>("res://scenes/UNTeleInput.tscn");
 	public static readonly Godot.PackedScene UNTeleOutputScene = GD.Load<Godot.PackedScene>("res://scenes/UNTeleOutput.tscn");
+	public static readonly Godot.PackedScene UNPlatformScene = GD.Load<Godot.PackedScene>("res://scenes/UNPlatform.tscn");
+
+
+	// Nodes
+	public Godot.Sprite2D BGSprite => m_BGSprite!;
+
+	private Godot.Sprite2D? m_BGSprite;
 
 
 	// Other statics
@@ -35,12 +42,14 @@ public partial class WorldPanel : Godot.Panel
 	public Vector2I Dimensions => m_Dims;
 	public readonly float CellWidth = 100.0f;
 	public Tile? this[int x, int y] => GetTileOrNull(new(x, y));
+	public bool DebugDrawEnabled { get; set; } = true;
 
 
 	// Privates
-	private Vector2I m_Dims = new(50, 50);
+	private Vector2I m_Dims = new(15, 10);
 	private readonly List<Unit> m_Units = [];
 	private List<Tile?> m_Tiles = [];
+	private List<Tile> m_OrphanTiles = [];
 
 
 	#region .Essential Functions
@@ -91,14 +100,14 @@ public partial class WorldPanel : Godot.Panel
 	/// <summary>
 	/// Same as <seealso cref="IsWithin"/>, but also checks if a tile is allocated in that spot.
 	/// </summary>
-	public bool HasTile(Vector2I gloc) => IsWithin(gloc) && m_Tiles[GridToIndex(gloc)] != null;
+	public bool HasTileOn(Vector2I gloc) => IsWithin(gloc) && m_Tiles[GridToIndex(gloc)] != null;
 	/// <summary>
-	/// Gets the tile in the location specified, but also returns null for out of bounds locations.
+	/// Gets the tile in the location specified, but returns <see langword="null"/> for all invalid cases.
 	/// </summary>
 	public Tile? GetTileOrNull(Vector2I gloc) => IsWithin(gloc) ? m_Tiles[GridToIndex(gloc)] : null;
 	/// <summary>
-	/// Gets the tile in the location specified, and does no bounds checking whatsoever, meaning getting
-	/// tiles out of bounds is undefined behaviour.
+	/// Gets the tile in the location specified, and does no bounds checking whatsoever, meaning getting tiles out of 
+	/// bounds is undefined behaviour.
 	/// </summary>
 	public Tile? GetTile(Vector2I gloc) => m_Tiles[GridToIndex(gloc)];
 	/// <summary>
@@ -112,11 +121,30 @@ public partial class WorldPanel : Godot.Panel
 		return GetTile(gloc)!;
 #endif
 	}
+
+	public bool RecieveTile(Tile tl)
+	{
+		if (m_OrphanTiles.Contains(tl))
+		{
+			return false;
+		}
+
+		m_OrphanTiles.Add(tl);
+		return true;
+	}
+
+	public bool TakeAwayTile(Tile tl)
+	{
+		Debug.Assert(m_OrphanTiles.Contains(tl));
+		m_OrphanTiles.Remove(tl);
+		return true;
+	}
+
 	/// <summary>
 	/// Returns true if the tile is installed within this world, returns false if it's floating or
 	/// installed in another world somehow.
 	/// </summary>
-	public bool IsInstalled(Tile tl) => IsWithin(tl.GLocation) && object.ReferenceEquals(tl, GetTileOrNull(tl.GLocation));
+	public bool IsInstalled(Tile tl) => IsWithin(tl.GLocation) && object.ReferenceEquals(tl, GetTile(tl.GLocation));
 
 	/// <summary>
 	/// Returns the whichever unit that <paramref name="gloc"/> lands on.
@@ -135,7 +163,8 @@ public partial class WorldPanel : Godot.Panel
 
 	public void DeleteUnit(Unit u)
 	{
-		u.QueueFree();
+		RemoveChild(u);
+		u.Destroy();
 		m_Units.Remove(u);
 	}
 
@@ -146,17 +175,28 @@ public partial class WorldPanel : Godot.Panel
 	#region .Tile Methods
 
 	/// <summary>
-	/// Same as <c>InstallTile(new Tile(Vector2I.Zero), gloc, bOverride)</c>
+	/// Installs a free tile that allows items in from any direction.
 	/// </summary>
+	/// <param name="bOwned">
+	/// If false, the tile will be managed by the world, otherwise deleting the tile must be done by the owner.
+	/// </param>
 	/// <returns>The installed tile, or null when it fails</returns>
-	public Tile InstallEmptyTile(Vector2I gloc, bool bOverride = false)
+	public Tile AddEmptyTile(Vector2I gloc, ITileOwner? owner = null, bool bOverride = false)
 	{
-		return InstallTile(new Tile(), gloc, bOverride);
+		Debug.Assert(IsWithin(gloc));
+		Debug.Assert(bOverride || !HasTileOn(gloc));
+
+		var tl = InstallTile(Tile.CreateEmpty(), gloc, bOverride);
+		if (owner is not null)
+		{
+			tl.Owner = owner;
+		}
+		return tl;
 	}
 
 	/// <summary>
-	/// Adds the passed tile to the world, the location of the tile is not consider and is overriden
-	/// by <paramref name="gloc"/>.
+	/// Adds the passed tile to the world, the location of the tile is not consider and is overriden by 
+	/// <paramref name="gloc"/>.
 	/// </summary>
 	/// <param name="bOverride">Only matters in debug mode</param>
 	/// <returns>The installed tile, or null when it fails</returns>
@@ -164,12 +204,14 @@ public partial class WorldPanel : Godot.Panel
 	{
 		Debug.AssertNotNull(tl);
 		Debug.Assert(IsWithin(gloc));
-		Debug.Assert(bOverride || !HasTile(gloc));
+		Debug.Assert(bOverride || !HasTileOn(gloc));
 		DeleteTile(gloc, true);
 		m_Tiles[GridToIndex(gloc)] = tl;
 		tl._SetGLUnsafe(gloc);
-		// TODO: Replace this with something...
-		// tl.Connect(Tile.SignalName.NeedsRedraw, Callable.From(OnTile_NeedsRedraw));
+		if (!tl.IsOwned())
+		{
+			tl.Owner = this;
+		}
 		return tl;
 	}
 
@@ -180,9 +222,9 @@ public partial class WorldPanel : Godot.Panel
 	public void DeleteTile(Vector2I gloc, bool bMaybeNull = false)
 	{
 		Debug.Assert(IsWithin(gloc));
-		Debug.Assert(bMaybeNull || HasTile(gloc));
+		Debug.Assert(bMaybeNull || HasTileOn(gloc));
 		var i = GridToIndex(gloc);
-		m_Tiles[i]?.DestroyItem(true);
+		m_Tiles[i]?.Destroy();
 		m_Tiles[i] = null;
 	}
 
@@ -209,8 +251,8 @@ public partial class WorldPanel : Godot.Panel
 	{
 		Debug.Assert(IsWithin(gFrom));
 		Debug.Assert(IsWithin(gTo));
-		Debug.Assert(bMaybeNull || HasTile(gFrom));
-		Debug.Assert(bOverride || gFrom == gTo || !HasTile(gTo));
+		Debug.Assert(bMaybeNull || HasTileOn(gFrom));
+		Debug.Assert(bOverride || gFrom == gTo || !HasTileOn(gTo));
 		if (gFrom == gTo)
 		{
 			return GetTile(gFrom);
@@ -240,13 +282,15 @@ public partial class WorldPanel : Godot.Panel
 	public Tile? ExtractTile(Vector2I gloc, bool bMaybeNull = false)
 	{
 		Debug.Assert(IsWithin(gloc));
-		Debug.Assert(bMaybeNull || HasTile(gloc));
+		Debug.Assert(bMaybeNull || HasTileOn(gloc));
 		var i = GridToIndex(gloc);
-		var myTile = m_Tiles[i];
+		var tl = m_Tiles[i];
 		m_Tiles[i] = null;
-		// TODO: replace this.
-		// myTile.Disconnect(Tile.SignalName.NeedsRedraw, Callable.From(OnTile_NeedsRedraw));
-		return myTile;
+		if (tl is not null && tl.Owner == this)
+		{
+			tl.GetDisowned();
+		}
+		return tl;
 	}
 
 	/// <summary>
@@ -259,7 +303,7 @@ public partial class WorldPanel : Godot.Panel
 	{
 		Debug.Assert(IsWithin(gloc1));
 		Debug.Assert(IsWithin(gloc2));
-		Debug.Assert(bMaybeNull || HasTile(gloc1) && HasTile(gloc2));
+		Debug.Assert(bMaybeNull || HasTileOn(gloc1) && HasTileOn(gloc2));
 		if (gloc1 == gloc2)
 		{
 			// Should technically throw for out of bounds, but meh...
@@ -328,7 +372,7 @@ public partial class WorldPanel : Godot.Panel
 
 	public void DestroyItem(Vector2I gloc, bool bTileMaybeNull = false, bool bItemMaybeNull = false, bool bMaybeMidAnim = false)
 	{
-		Debug.Assert(bTileMaybeNull || HasTile(gloc));
+		Debug.Assert(bTileMaybeNull || HasTileOn(gloc));
 		if (GetTile(gloc) is { } tl)
 		{
 			tl.DestroyItem(bItemMaybeNull, bMaybeMidAnim);
@@ -351,7 +395,7 @@ public partial class WorldPanel : Godot.Panel
 		Debug.AssertNotNull(it); // No installing nulls!
 		Debug.Assert(it.GetParent() is null); // No associated world.
 		Debug.Assert(it.ParentTile is null);
-		Debug.Assert(HasTile(gloc));
+		Debug.Assert(HasTileOn(gloc));
 		Debug.Assert(!GetTileNonNull(gloc).IsReserved());
 
 		var tl = GetTile(gloc);
@@ -386,10 +430,10 @@ public partial class WorldPanel : Godot.Panel
 	public Item? CloneItem(Vector2I gSrc, Vector2I gDest, bool bOverride = false)
 	{
 		Debug.Assert(IsWithin(gSrc));
-		Debug.Assert(HasTile(gSrc));
+		Debug.Assert(HasTileOn(gSrc));
 		Debug.Assert(GetTileNonNull(gSrc).HasItem());
 		Debug.Assert(IsWithin(gDest));
-		Debug.Assert(HasTile(gDest));
+		Debug.Assert(HasTileOn(gDest));
 		Debug.Assert(bOverride || !GetTileNonNull(gDest).HasItem());
 		
 		var srcTl = GetTile(gSrc);
@@ -456,9 +500,9 @@ public partial class WorldPanel : Godot.Panel
 	{
 		Debug.Assert(IsWithin(gSrc));
 		Debug.Assert(IsWithin(gDest));
-		Debug.Assert(HasTile(gSrc));
-		Debug.Assert(HasTile(gDest));
-		Debug.Assert(GetTileNonNull(gSrc).IsReserved());
+		Debug.Assert(HasTileOn(gSrc));
+		Debug.Assert(HasTileOn(gDest));
+		Debug.Assert(GetTileNonNull(gSrc).HasItem());
 		Debug.Assert(bOverride || gSrc == gDest || !GetTileNonNull(gDest).IsReserved());
 		
 		if (gSrc == gDest)
@@ -484,7 +528,7 @@ public partial class WorldPanel : Godot.Panel
 
 	/// <summary>
 	/// <b>Tiles must be in this world, otherwise the behaviour is undefined.</b>
-	/// See <see cref="TeleportItemNoSync(Vector2I, Vector2I, bool, bool)"/>
+	/// See <see cref="TeleportItemNoSync(Vector2I, Vector2I, bool)"/>
 	/// </summary>
 	public Item? TeleportItemNoSync(Tile tlSrc, Tile tlDest, bool bOverride = false)
 	{
@@ -505,13 +549,31 @@ public partial class WorldPanel : Godot.Panel
 
 	public override void _Ready()
 	{
+		LoadNodes();
 		Reset();
-		SetDims(m_Dims, true);
+		
+		var dims = m_Dims;
+		m_Dims = Vector2I.Zero;
+		SetDims(dims);
 		// PlaceSomeUnits();
+	}
+
+	private void LoadNodes()
+	{
+		m_BGSprite = GetNode<Godot.Sprite2D>("BGSprite");
+	}
+
+	/// <summary>
+	/// Just calls <see cref="Reset"/>.
+	/// </summary>
+	public void Destroy()
+	{
+		Reset();
 	}
 
 	public override void _Draw()
 	{
+#if false
 		DrawRect(new(Vector2.Zero, Size), new(0.0f, 0.1f, 0.0f));
 		for (var i = 1; i < m_Dims.X; ++i)
 		{
@@ -521,12 +583,16 @@ public partial class WorldPanel : Godot.Panel
 		{
 			DrawLine(new(0.0f, i*CellWidth), new(Size.X, i*CellWidth), new(0.0f, 0.18f, 0.0f));
 		}
+#endif
 		
 		// TODO: change this so the units draw the tiles instead.
 		// Probably gonna need to add a empty unit for empty tiles... or just a separate collection for them.
 		foreach (var tl in m_Tiles)
 		{
-			tl?.DebugDraw(this);
+			if (DebugDrawEnabled)
+			{
+				tl?.DebugDraw(this);
+			}
 		}
 		foreach (var u in m_Units)
 		{
@@ -558,9 +624,9 @@ public partial class WorldPanel : Godot.Panel
 		PlaceSlider(new Vector2I(5, 7), Direction.North);
 	}
 
-	public UNCmdInjector PlaceInjector()
+	public UNInjector PlaceInjector()
 	{
-		var injy = new UNCmdInjector();
+		var injy = new UNInjector();
 		AddUnit(injy);
 		injy.Setup(this);
 		return injy;
@@ -646,14 +712,22 @@ public partial class WorldPanel : Godot.Panel
 		return teleIn;
 	}
 
+	public UNPlatform PlacePlatform(Vector2I gloc)
+	{
+		var plat = UNPlatformScene.Instantiate<UNPlatform>();
+		AddUnit(plat);
+		plat.Setup(this, gloc);
+		return plat;
+	}
+
 	#endregion // Placement Functions
 	#region .Other Methods
 
-	public void SetDims(Vector2I toWhat, bool bForce = false)
+	public void SetDims(Vector2I toWhat)
 	{
 		var oldDims = m_Dims;
 		var newDims = toWhat.Clamp(MinDims, MaxDims);
-		if (!bForce && oldDims == newDims)
+		if (oldDims == newDims)
 		{
 			return;
 		}
@@ -697,15 +771,18 @@ public partial class WorldPanel : Godot.Panel
 			DeleteUnit(m_Units[i]);
 		}
 		
-		foreach (var tl in m_Tiles)
+		for (var i = m_OrphanTiles.Count - 1; i >= 0; --i)
 		{
-			tl?.DestroyItem(true);
+			var tl = m_OrphanTiles[i];
+			DeleteTile(tl);
+			// We have to do this check because when AddEmptyTile throws, it sometimes creates
+			// if (tl.IsOwned() && tl.Owner == this)
+			// {
+			// }
 		}
-		m_Tiles.Clear();
-		for (var i = 0; i < m_Dims.X * m_Dims.Y; ++i)
-		{
-			m_Tiles.Add(null);
-		}
+
+		Debug.Assert(m_Tiles.All(tl => tl is null));
+		Debug.Assert(m_OrphanTiles.All(tl => tl is null));
 	}
 
 	/// <summary>
@@ -727,10 +804,4 @@ public partial class WorldPanel : Godot.Panel
 	}
 
 	#endregion
-	#region .Test Specific
-#if TEST
-#endif // TEST
-	#endregion .Test Specific
-
-
 }

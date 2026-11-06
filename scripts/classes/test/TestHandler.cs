@@ -174,7 +174,9 @@ public partial class TestHandler : Godot.Node
 			bPrintClassIntro = false;
 		}
 
-		tclass.GetMethod("BeforeAll")?.Invoke(instance, []);
+		try { tclass.GetMethod("BeforeAll")?.Invoke(instance, []); }
+		catch (Exception ex) { PrintException(ex, "BeforeAll"); }
+
 		bool bSkipFromNowOn = false;
 		foreach (var tmeth in tMethods)
 		{
@@ -207,10 +209,16 @@ public partial class TestHandler : Godot.Node
 				}
 			}
 
+			DoBeforeEachTest(tmeth);
+			try { tclass.GetMethod("BeforeEach")?.Invoke(instance, []); }
+			catch (Exception ex)
+			{
+				PrintException(ex, $"BeforeEach before {FormatTestName(tmeth)}");
+				bSkipFromNowOn = IsStopOnFirstFail;
+			}
+
 			try
 			{
-				DoBeforeEachTest(tmeth);
-				tclass.GetMethod("BeforeEach")?.Invoke(instance, []);
 				if (bAsync)
 				{
 					await (Task)tmeth.Invoke(instance, [])!;
@@ -219,24 +227,9 @@ public partial class TestHandler : Godot.Node
 				{
 					tmeth.Invoke(instance, []);
 				}
-
-				// Wait for the frame to end first.
-				await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-				// Then call the after test stuff.
-				tclass.GetMethod("AfterEach")?.Invoke(instance, []);
-				DoAfterEachTest(tmeth);
-
-				res.PassingTestCount += 1;
-				if (IsShowPassingTests)
-				{
-					GD.Print($"    {FormatTestName(tmeth)} {Green}passes!{Reset}");
-				}
 			}
 			catch (Exception ex)
 			{
-				// The thrown exception is always TargetInvocationException when the test itself throws it, but 
-				// sometimes the test awaits external stuff, that's where the exception is not that.
-				var targetEx = ex is TargetInvocationException ? ex.InnerException : ex;
 				if (bPrintClassIntro)
 				{
 					GD.Print("========================================================");
@@ -244,23 +237,41 @@ public partial class TestHandler : Godot.Node
 					bPrintClassIntro = false;
 				}
 
-				if (targetEx is TestAssertFailedException)
+				// The thrown exception is always TargetInvocationException when the test itself throws it, but 
+				// sometimes the test awaits external stuff, that's where the exception is not that.
+				if (ex.InnerException is TestAssertFailedException tex)
 				{
-					GD.Print(targetEx.Message.Indent(sc_IndentationStr));
+					GD.Print(tex.Message.Indent(sc_IndentationStr));
 				}
 				else
 				{
-					var errMsg = $"{FormatTestName(tmeth)} {Red}failed{Reset}" + 
-						$" because of Unexpected {Red}'{targetEx!.GetType()}'{Reset}:\n" +
-						$"{targetEx.Message}";
-					GD.Print(errMsg.Indent(sc_IndentationStr));
-					GD.Print(targetEx.StackTrace);
+					PrintException(ex, $"{FormatTestName(tmeth)}"); 
 				}
 
 				bSkipFromNowOn = IsStopOnFirstFail;
 			}
+
+			// Then call the after test stuff.
+			try { tclass.GetMethod("AfterEach")?.Invoke(instance, []); }
+			catch (Exception ex) 
+			{ 
+				PrintException(ex, $"AfterEach after {FormatTestName(tmeth)}"); 
+				bSkipFromNowOn = IsStopOnFirstFail;
+			}
+
+			// Wait for the frame to end first.
+			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+			DoAfterEachTest(tmeth);
+
+			res.PassingTestCount += 1;
+			if (IsShowPassingTests)
+			{
+				GD.Print($"    {FormatTestName(tmeth)} {Green}passes!{Reset}");
+			}
 		}
-		tclass.GetMethod("AfterAll")?.Invoke(instance, []);
+
+		try { tclass.GetMethod("AfterAll")?.Invoke(instance, []); }
+		catch (Exception ex) { PrintException(ex, "AfterAll"); }
 
 		if (res.TestCount == 0 && res.IgnoredTestCount == 0)
 		{
@@ -288,6 +299,17 @@ public partial class TestHandler : Godot.Node
 
 		return res;
 	}
+
+	private static void PrintException(Exception ex, string messagePrefix)
+	{
+		var targetEx = ex is TargetInvocationException ? ex.InnerException : ex;
+		var errMsg = $"{messagePrefix} {Red}failed{Reset}" +
+			$" because of Unexpected {Red}'{targetEx!.GetType()}'{Reset}:\n" +
+			$"{targetEx.Message}";
+		GD.Print(errMsg.Indent(sc_IndentationStr));
+		GD.Print(targetEx!.StackTrace);
+	}
+
 
 	private void DoBeforeEachTest(MethodInfo meth)
 	{

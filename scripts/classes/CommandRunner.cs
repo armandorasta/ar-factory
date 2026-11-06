@@ -4,85 +4,8 @@ using System.Linq;
 
 namespace ArFactory;
 
-public class CommandRunner
+public class CommandRunner : IDestroyable
 {
-	public class CmdWrapper(Unit penderUnit, Command cmd, IEnumerable<Command> dep)
-	{
-		public readonly Unit PenderUnit = penderUnit;
-		public readonly Command Cmd = cmd;
-		private readonly List<Command> m_DepCmds = [.. dep];
-		private bool m_bRanThisTick = false;
-
-		public bool AllDepsDone() => m_DepCmds.All(c => c.IsDone());
-		public bool HasRanThisTick() => m_bRanThisTick;
-		public override string ToString() => Cmd.ToString();
-
-		public void OnTick(Simulator.OnTickMediator ticker)
-		{
-			Debug.Assert(!m_bRanThisTick);
-			Cmd.HandleOnTick(ticker);
-			m_bRanThisTick = true;
-			if (!Cmd.IsSmooth())
-			{
-				Cmd.CountThisTick();
-			}
-		}
-
-		public void OnEdge(Simulator.OnEdgeMediator ticker)
-		{
-			Debug.Assert(m_bRanThisTick);
-			Debug.Assert(Cmd.IsSmooth());
-			Cmd.HandleOnEdge(ticker);
-			Cmd.CountThisTick();
-		}
-
-		public void ResetRunFlag() => m_bRanThisTick = false;
-	}
-
-	public class OnTickPender(CommandRunner runner)
-	{
-		public readonly struct Perm(CommandRunner runner)
-		{
-			private readonly CommandRunner m_Runner = runner;
-			public bool IsFine(OnTickPender proxy) => m_Runner == proxy.m_Runner;
-		}
-
-		// Commands have to be stored separately since Pend gets called mid iteration of the command groups.
-		public readonly List<List<Command>> Groups = [];
-		public Unit? PenderUnit { get; private set; }
-		private readonly CommandRunner m_Runner = runner;
-
-		public void Pend(IEnumerable<IEnumerable<Command>> newSequence, int startIndex = 0)
-		{
-			Debug.Assert(0 <= startIndex && startIndex <= Groups.Count);
-			Debug.AssertNotNull(PenderUnit);
-
-			var i = startIndex;
-			foreach (var ng in newSequence)
-			{
-				if (i < Groups.Count)
-				{
-					Groups[i].AddRange(ng);
-				}
-				else
-				{
-					Groups.Add([.. ng]);
-				}
-				++i;
-			}
-		}
-
-		public void QueueBlockedSlideCmdByAnotherItem(WorldPanel world, CmdSlide cmd) 
-			=> m_Runner.QueueBlockedSlideCmdByAnotherItem(world, cmd);
-		
-		public void _SetPenderUnit(Perm perm, Unit newUnit)
-		{
-			Debug.AssertNotNull(newUnit);
-			Debug.Assert(perm.IsFine(this));
-			PenderUnit = newUnit;
-		}
-	}
-
 	private static readonly Type[] s_CmdPiorities =
 	[
 		typeof(CmdIf),
@@ -114,17 +37,15 @@ public class CommandRunner
 		throw new InvalidProgramException($"GetCmdPiority: Invalid command type '{tp}'");
 	}
 
-
 	private readonly List<List<CmdWrapper>> m_Groups = [];
 	private readonly List<CmdSlide> m_BlockedSlideCmdsByItems = [];
-	private readonly List<CmdWrapper> m_OnEdgeQueue = [];
 
 	/// <summary>
 	/// Checks if the runner no longer needs to execute anything, either because it already executed
 	/// everything else (always the case in blocking mode), or it failed somewhere (only in non-blocking
 	/// mode).
 	/// </summary>
-	public bool IsDone() => m_Groups.Count == 0;
+	public bool IsDone() => m_Groups.Count is 0;
 
 	public void PendFullSequence(Unit penderUnit, IEnumerable<IEnumerable<Command>> newSequence, int startIndex = 0)
 	{
@@ -258,9 +179,17 @@ public class CommandRunner
 		m_BlockedSlideCmdsByItems.Clear();
 	}
 
+	/// <summary>
+	/// Same as <see cref="Reset"/>. Just resets the runner like it was when it was created.
+	/// </summary>
+	public void Destroy()
+	{
+		Reset();
+	}
+
 	public void QueueBlockedSlideCmdByAnotherItem(WorldPanel world, CmdSlide cmd)
 	{
-		Debug.Assert(world.HasTile(cmd.GridFrom));
+		Debug.Assert(world.HasTileOn(cmd.GridFrom));
 		Debug.Assert(world.GetTileNonNull(cmd.GridFrom).HasItem()); // Is there an actual item?
 		Debug.Assert(world.GetTileNonNull(cmd.GetGridTo()).IsReserved()); // And is it blocked?
 		Debug.Assert(!m_BlockedSlideCmdsByItems.Contains(cmd));
@@ -292,4 +221,85 @@ public class CommandRunner
 		}
 		m_BlockedSlideCmdsByItems.Clear();
 	}
+
+	#region .Inner Classes
+
+	public class CmdWrapper(Unit penderUnit, Command cmd, IEnumerable<Command> dep)
+	{
+		public readonly Unit PenderUnit = penderUnit;
+		public readonly Command Cmd = cmd;
+		private readonly List<Command> m_DepCmds = [.. dep];
+		private bool m_bRanThisTick = false;
+
+		public bool AllDepsDone() => m_DepCmds.All(c => c.IsDone());
+		public bool HasRanThisTick() => m_bRanThisTick;
+		public override string ToString() => Cmd.ToString();
+
+		public void OnTick(Simulator.OnTickMediator ticker)
+		{
+			Debug.Assert(!m_bRanThisTick);
+			Cmd.HandleOnTick(ticker);
+			m_bRanThisTick = true;
+			if (!Cmd.IsSmooth())
+			{
+				Cmd.CountThisTick();
+			}
+		}
+
+		public void OnEdge(Simulator.OnEdgeMediator ticker)
+		{
+			Debug.Assert(m_bRanThisTick);
+			Debug.Assert(Cmd.IsSmooth());
+			Cmd.HandleOnEdge(ticker);
+			Cmd.CountThisTick();
+		}
+
+		public void ResetRunFlag() => m_bRanThisTick = false;
+	}
+
+	public class OnTickPender(CommandRunner runner)
+	{
+		public readonly struct Perm(CommandRunner runner)
+		{
+			private readonly CommandRunner m_Runner = runner;
+			public bool IsFine(OnTickPender proxy) => m_Runner == proxy.m_Runner;
+		}
+
+		// Commands have to be stored separately since Pend gets called mid iteration of the command groups.
+		public readonly List<List<Command>> Groups = [];
+		public Unit? PenderUnit { get; private set; }
+		private readonly CommandRunner m_Runner = runner;
+
+		public void Pend(IEnumerable<IEnumerable<Command>> newSequence, int startIndex = 0)
+		{
+			Debug.Assert(0 <= startIndex && startIndex <= Groups.Count);
+			Debug.AssertNotNull(PenderUnit);
+
+			var i = startIndex;
+			foreach (var ng in newSequence)
+			{
+				if (i < Groups.Count)
+				{
+					Groups[i].AddRange(ng);
+				}
+				else
+				{
+					Groups.Add([.. ng]);
+				}
+				++i;
+			}
+		}
+
+		public void QueueBlockedSlideCmdByAnotherItem(WorldPanel world, CmdSlide cmd) 
+			=> m_Runner.QueueBlockedSlideCmdByAnotherItem(world, cmd);
+		
+		public void _SetPenderUnit(Perm perm, Unit newUnit)
+		{
+			Debug.AssertNotNull(newUnit);
+			Debug.Assert(perm.IsFine(this));
+			PenderUnit = newUnit;
+		}
+	}
+
+	#endregion // .Inner Classes
 }

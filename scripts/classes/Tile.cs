@@ -3,7 +3,7 @@ using Godot;
 
 namespace ArFactory;
 
-public class Tile
+public class Tile : IDestroyable
 {
 	[Flags]
 	private enum WallType : Int32
@@ -33,8 +33,38 @@ public class Tile
 		}	
 	}
 
+	/// <summary>
+	/// This accessor crashes the program in debug mode if the owner is null, use <see cref="GetOwnerMaybeNull"/> if that
+	/// behaviour is not desired.
+	/// </summary>
+	public ITileOwner Owner
+	{ 
+		get 
+		{
+			Debug.AssertNotNull(m_Owner);
+			return m_Owner!;
+		}
+		set
+		{
+			if (m_Owner is not null)
+			{
+				if (m_Owner.TakeAwayTile(this) is false)
+				{
+					Debug.Assert(false);
+				}
+			}
+
+			m_Owner = value;
+			if (value.RecieveTile(this) is false)
+			{
+				Debug.Assert(false);
+			}
+		}
+	}
+
 
 	// Privates
+	public ITileOwner? m_Owner;
 	private Vector2I m_GL = Vector2I.Zero;
 	private Int32 m_WallFlags; // High to low: west -> south -> east -> north.
 	private Item? m_Item;
@@ -44,9 +74,14 @@ public class Tile
 
 	#region .Factory Methods
 
+	public static Tile CreateEmpty()
+	{
+		return new Tile();
+	}
+
 	public static Tile CreateSolid()
 	{
-		return new Tile()
+		return CreateEmpty()
 			.SetWall(Direction.North, WallType.Solid)
 			.SetWall(Direction.East , WallType.Solid)
 			.SetWall(Direction.South, WallType.Solid)
@@ -54,6 +89,13 @@ public class Tile
 	}
 
 	#endregion // .Factory Methods
+
+
+	private Tile()
+	{
+	}
+
+
 	#region .Public Methods
 
 	/// <summary>
@@ -85,6 +127,20 @@ public class Tile
 	/// Items are not allowed to slide into reserved tiles. <br/>
 	/// </summary>
 	public virtual void Reserve() { m_bReserved = true; }
+
+	public bool IsOwned() => m_Owner is not null;
+	public ITileOwner? GetOwnerMaybeNull() => m_Owner;
+	public void GetDisowned()
+	{
+		if (m_Owner is not null)
+		{ 
+			if (!m_Owner.TakeAwayTile(this))
+			{
+				Debug.Assert(false);
+			}
+			m_Owner = null;
+		}
+	}
 
 	/// <summary>
 	/// Rotates the unit 90 degrees clockwise.
@@ -196,7 +252,7 @@ public class Tile
 		Debug.Assert(bOverride || !HasItem());
 		DestroyItem(true);
 		m_Item = newItem;
-		m_Item.SetParentTileUnsafe(this);
+		m_Item._SetParentTileUnsafe(this);
 	}
 
 	/// <summary>
@@ -209,12 +265,9 @@ public class Tile
 	public void DestroyItem(bool bMaybeNull = false, bool bMaybeMidAnim = false)
 	{
 		Debug.Assert(bMaybeNull || HasItem());
-		if (m_Item is not null)
-		{
-			Debug.Assert(bMaybeMidAnim || !m_Item.IsMidAnimation());
-			m_Item.QueueFree();
-			m_Item = null;
-		}
+		Debug.Assert(bMaybeMidAnim || m_Item is null || !m_Item.IsMidAnimation());
+		m_Item?.Destroy();
+		m_Item = null;
 	}
 
 	/// <summary>
@@ -223,13 +276,9 @@ public class Tile
 	public Item? ExtractItem(bool bMaybeNull = false)
 	{
 		Debug.Assert(bMaybeNull || HasItem());
-		var extractedIt = m_Item!;
-		if (extractedIt is not null)
-		{
-			extractedIt.GetParent().RemoveChild(extractedIt);
-			extractedIt.OnExtractItem();
-			m_Item = null; // Has to happen after the above call.
-		}
+		var extractedIt = m_Item;
+		extractedIt?._OnExtractItem();
+		m_Item = null; // Has to happen after the above call.
 		return extractedIt;
 	}
 
@@ -282,7 +331,7 @@ public class Tile
 
 			var myScale = 0.15f;
 			if (IsInput(d) && 
-				!(world.HasTile(GLocation + gdir) && world.GetTileNonNull(GLocation + gdir).IsOutput(d.Invert())))
+				!(world.HasTileOn(GLocation + gdir) && world.GetTileNonNull(GLocation + gdir).IsOutput(d.Invert())))
 			{
 				myScale *= 0.5f;
 				myCol.A = 0.3f;
@@ -299,6 +348,16 @@ public class Tile
 		var itStr = m_Item != null ? $" with item {m_Item.Value}" : "";
 		return $"Tile[{GLocation}]{itStr}";
 	}
+
+	/// <summary>
+	/// Distances itself from its owner and destorys the item and QueueFree's everything.
+	/// </summary>
+	public void Destroy()
+	{
+		GetDisowned();
+		DestroyItem(bMaybeMidAnim: true, bMaybeNull: true);
+	}
+
 	#endregion // .Private Methods
 }
 

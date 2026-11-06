@@ -4,6 +4,7 @@ using Godot;
 namespace ArFactory.Tests;
 using static ArTest.Asserts;
 
+
 public class WorldPanelTests : ArTest.TestSuit
 {
 	public Editor Lvl => m_Lv!;
@@ -14,13 +15,13 @@ public class WorldPanelTests : ArTest.TestSuit
 		var levelScene = GD.Load<Godot.PackedScene>(SceneManager.EditorScenePath);
 		m_Lv = levelScene.Instantiate<Editor>();
 		AddNode(m_Lv);
-		m_Lv.Simy.Clock.SetTickRate(100);
+		Lvl.Simy.Clock.SetTickRate(300);
 	}
 
 	public override void BeforeEach()
 	{
+		Lvl.Simy.Reset();
 		Lvl.World.Reset();
-		Lvl.World.SetDims(new(15, 10));
 	}
 
 	public override void AfterEach()
@@ -30,44 +31,37 @@ public class WorldPanelTests : ArTest.TestSuit
 
 	public override void AfterAll()
 	{
+		RemoveNode(Lvl);
 		Lvl.QueueFree();
 	}
 
 	[ArTest.Test] public void TestInstallTile_vanilla()
 	{
 		var world = Lvl.World;
-		AssertFalse(world.HasTile(Vector2I.One));
+		AssertFalse(world.HasTileOn(Vector2I.One));
 		AssertNull(world[1, 1]);
 
-		var tl = new Tile();
+		var tl = world.AddEmptyTile(Vector2I.Zero);
+		tl = world.ExtractTile(tl.GLocation)!;
 		var reTl = world.InstallTile(tl, Vector2I.One);
 		AssertRefEq(tl, reTl);
 		AssertRefEq(world[1, 1], tl);
 		AssertEq(tl.GLocation, Vector2I.One);
-		AssertTrue(world.HasTile(Vector2I.One));
-	}
-	
-	[ArTest.Test] public void TestInstallTile_overriding_with_flag()
-	{
-		var world = Lvl.World;
-		var tl = world.InstallEmptyTile(Vector2I.One);
-		var newTl = world.InstallEmptyTile(Vector2I.One, true); // Should override the old one.
-		AssertRefNotEq(tl, newTl);
-		AssertRefEq(world[1, 1], newTl);
+		AssertTrue(world.HasTileOn(Vector2I.One));
 	}
 
 	[ArTest.Test] public void TestInstallTile_INVALID_CASE_out_of_bounds()
 	{
 		var world = Lvl.World;
 		// Installing out of bounds will crash the program.
-		AssertThrow(() => world.InstallEmptyTile(Vector2I.One * 1000));
+		AssertThrow(() => world.AddEmptyTile(Vector2I.One * 1000));
 	}
 
 	[ArTest.Test] public void TestInstallTile_INVALID_CASE_overriding_without_passing_flag()
 	{
 		var world = Lvl.World;
-		world.InstallEmptyTile(Vector2I.One);
-		AssertThrow(() => world.InstallEmptyTile(Vector2I.One));
+		world.AddEmptyTile(Vector2I.One);
+		AssertThrow(() => world.AddEmptyTile(Vector2I.One));
 	}
 
 	[ArTest.Test] public void TestDeleteTile_vanilla()
@@ -75,9 +69,9 @@ public class WorldPanelTests : ArTest.TestSuit
 		// Items will not be tested here, as tile tests don't depend on item tests.
 
 		var world = Lvl.World;
-		world.InstallEmptyTile(Vector2I.One);
+		world.AddEmptyTile(Vector2I.One);
 		world.DeleteTile(Vector2I.One);
-		AssertFalse(world.HasTile(Vector2I.One));
+		AssertFalse(world.HasTileOn(Vector2I.One));
 		AssertNull(world.GetTile(Vector2I.One));
 	}
 	
@@ -102,11 +96,11 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestMoveTile_vanilla()
 	{
 		var world = Lvl.World;
-		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		var tl = world.AddEmptyTile(Vector2I.Zero);
 		var movedTl = world.MoveTile(tl, Vector2I.One);
 		AssertRefEq(tl, movedTl);
-		AssertFalse(world.HasTile(Vector2I.Zero));
-		AssertTrue(world.HasTile(Vector2I.One));
+		AssertFalse(world.HasTileOn(Vector2I.Zero));
+		AssertTrue(world.HasTileOn(Vector2I.One));
 		AssertEq(tl.GLocation, Vector2I.One);
 	}
 
@@ -119,22 +113,22 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestExtractTile_vanilla()
 	{
 		var world = Lvl.World;
-		var installedTl = world.InstallEmptyTile(new Vector2I(3, 4));
+		var installedTl = world.AddEmptyTile(new Vector2I(3, 4));
 		var extractedTl = world.ExtractTile(installedTl.GLocation);
 		AssertRefEq(installedTl, extractedTl);
-		AssertFalse(world.HasTile(installedTl.GLocation));
+		AssertFalse(world.HasTileOn(installedTl.GLocation));
 	}
 
 	[ArTest.Test] public void TestExtractTile_floating_tile_gloc()
 	{
 		var world = Lvl.World;
-		var installedTl = world.InstallEmptyTile(new Vector2I(3, 4));
+		var installedTl = world.AddEmptyTile(new Vector2I(3, 4));
 		var extractedTl = world.ExtractTile(installedTl.GLocation)!;
 
 		extractedTl!._SetGLUnsafe(Vector2I.Zero); // Should be ignored and overriden.
 		var anotherTl = world.InstallTile(extractedTl, new Vector2I(1, 2));
-		AssertTrue(world.HasTile(new Vector2I(1, 2)));
-		AssertFalse(world.HasTile(new Vector2I(3, 4))); // Ignore the tile's grid-loc
+		AssertTrue(world.HasTileOn(new Vector2I(1, 2)));
+		AssertFalse(world.HasTileOn(new Vector2I(3, 4))); // Ignore the tile's grid-loc
 		AssertRefEq(anotherTl, extractedTl);
 		world.DeleteTile(anotherTl);
 	}
@@ -158,17 +152,17 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestIsInstalled()
 	{
 		var world = Lvl.World;
-		var tl = new Tile();
-		AssertFalse(world.IsInstalled(tl));
-		
-		world.InstallTile(tl, Vector2I.One);
+		var tl = world.AddEmptyTile(new Vector2I(3, 1));
 		AssertTrue(world.IsInstalled(tl));
+
+		var exTl = world.ExtractTile(tl.GLocation);
+		AssertFalse(world.IsInstalled(tl));
 	}
 
 	[ArTest.Test] public void TestSpawnItem_vanilla()
 	{
 		var world = Lvl.World;
-		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		var tl = world.AddEmptyTile(Vector2I.Zero);
 		AssertFalse(tl.HasItem());
 
 		var it = world.SpawnItem(tl, 7)!;
@@ -181,7 +175,7 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestSpawnItem_Deleting_a_tile_with_an_item_in_it()
 	{
 		var world = Lvl.World;
-		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		var tl = world.AddEmptyTile(Vector2I.Zero);
 		var it = world.SpawnItem(tl, 7)!;
 		world.DeleteTile(tl);
 		AssertTrue(it.IsQueuedForDeletion());
@@ -190,7 +184,7 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestSpawnItem_INVALID_CASE_on_top_of_another_item()
 	{
 		var world = Lvl.World;
-		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		var tl = world.AddEmptyTile(Vector2I.Zero);
 		var it = world.SpawnItem(tl, 7)!;
 		AssertThrow(() => world.SpawnItem(tl, 8));
 	}
@@ -204,8 +198,8 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestInstallItem_vanilla()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(Vector2I.One);
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(Vector2I.One);
 		world.SpawnItem(tl0, 7);
 		var extractedIt = tl0.ExtractItem()!;
 
@@ -219,8 +213,8 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestInstallItem_INVALID_CASE_non_existant_tile()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(Vector2I.One);
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(Vector2I.One);
 
 		world.SpawnItem(tl1, 901);
 		var it1 = AddNode(tl1.ExtractItem()!);
@@ -230,8 +224,8 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestInstallItem_INVALID_CASE_out_of_bounds()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(Vector2I.One);
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(Vector2I.One);
 		
 		world.SpawnItem(tl1, 577);
 		var it1 = AddNode(tl1.ExtractItem()!);
@@ -241,8 +235,8 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestCloneItem_vanilla()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(new(1, 2));
-		var tl1 = world.InstallEmptyTile(new(3, 4));
+		var tl0 = world.AddEmptyTile(new(1, 2));
+		var tl1 = world.AddEmptyTile(new(3, 4));
 		var it0 = world.SpawnItem(tl0, 5)!;
 		var cloneIt = world.CloneItem(tl0, tl1);
 		AssertTrue(tl0.HasItem());
@@ -256,8 +250,8 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestCloneItem_overriding_with_flag()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(new(1, 2));
-		var tl1 = world.InstallEmptyTile(new(3, 4));
+		var tl0 = world.AddEmptyTile(new(1, 2));
+		var tl1 = world.AddEmptyTile(new(3, 4));
 		var it0 = world.SpawnItem(tl0, 5)!;
 		var cloneIt = world.CloneItem(tl0, tl1)!;
 		tl0.Item.SetValue(6); // Both items had the same value...
@@ -274,16 +268,16 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestCloneItem_INVALID_CASE_cloning_null()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(new(1, 2));
-		var tl1 = world.InstallEmptyTile(new(3, 4));
+		var tl0 = world.AddEmptyTile(new(1, 2));
+		var tl1 = world.AddEmptyTile(new(3, 4));
 		AssertThrow(() => world.CloneItem(tl0, tl1));
 	}
 
 	[ArTest.Test] public void TestCloneItem_INVALID_CASE_cloning_null_into_item()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(new(1, 2));
-		var tl1 = world.InstallEmptyTile(new(3, 4));
+		var tl0 = world.AddEmptyTile(new(1, 2));
+		var tl1 = world.AddEmptyTile(new(3, 4));
 		world.SpawnItem(tl1, 235);
 		AssertThrow(() => world.CloneItem(tl0, tl1));
 	}
@@ -291,8 +285,8 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestCloneItem_INVALID_CASE_from_non_existant_tile()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(new(1, 2));
-		var tl1 = world.InstallEmptyTile(new(3, 4));
+		var tl0 = world.AddEmptyTile(new(1, 2));
+		var tl1 = world.AddEmptyTile(new(3, 4));
 		var it0 = world.SpawnItem(tl0, 5)!;
 
 		AssertThrow(() => world.CloneItem(Vector2I.Zero, tl1.GLocation));
@@ -301,21 +295,21 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestCloneItem_INVALID_CASE_to_non_existant_tile()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var tl0 = world.AddEmptyTile(new(1, 2));
 		AssertThrow(() => world.CloneItem(tl0.GLocation, Vector2I.Zero));
 	}
 
 	[ArTest.Test] public void TestCloneItem_INVALID_CASE_from_out_of_bounds()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var tl0 = world.AddEmptyTile(new(1, 2));
 		AssertThrow(() => world.CloneItem(Vector2I.One * 1000, tl0.GLocation));
 	}
 
 	[ArTest.Test] public void TestCloneItem_INVALID_CASE_to_out_of_bounds()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var tl0 = world.AddEmptyTile(new(1, 2));
 		var it0 = world.SpawnItem(tl0, 5)!;
 		AssertThrow(() => world.CloneItem(it0.GLocation, Vector2I.One * 1000));
 	}
@@ -323,7 +317,7 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestCloneItem_INVALID_CASE_into_self()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var tl0 = world.AddEmptyTile(new(1, 2));
 		var it0 = world.SpawnItem(tl0, 5)!;
 		AssertThrow(() => world.CloneItem(tl0, tl0));
 	}
@@ -331,8 +325,8 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestTelportItem_vanilla()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(new(1, 2));
-		var tl1 = world.InstallEmptyTile(new(3, 4));
+		var tl0 = world.AddEmptyTile(new(1, 2));
+		var tl1 = world.AddEmptyTile(new(3, 4));
 		var it0 = world.SpawnItem(tl0, 5)!;
 		var teleIt = world.TeleportItem(tl0, tl1);
 		AssertFalse(tl0.HasItem());
@@ -344,8 +338,8 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestTeleportItem_overriding_with_flag()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(new(1, 2));
-		var tl1 = world.InstallEmptyTile(new(3, 4));
+		var tl0 = world.AddEmptyTile(new(1, 2));
+		var tl1 = world.AddEmptyTile(new(3, 4));
 		var it0 = world.SpawnItem(tl0, 5)!;
 		world.SpawnItem(tl1, 2);
 		var teleIt = world.TeleportItem(tl0, tl1, true);
@@ -358,7 +352,7 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestTeleportItem_into_self()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var tl0 = world.AddEmptyTile(new(1, 2));
 		var it0 = world.SpawnItem(tl0, 5)!;
 		world.TeleportItem(tl0, tl0);
 		AssertTrue(tl0.HasItem());
@@ -368,16 +362,16 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestTeleportItem_INVALID_CASE_teleporting_null()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(new(1, 2));
-		var tl1 = world.InstallEmptyTile(new(3, 4));
+		var tl0 = world.AddEmptyTile(new(1, 2));
+		var tl1 = world.AddEmptyTile(new(3, 4));
 		AssertThrow(() => world.TeleportItem(tl0, tl1));
 	}
 
 	[ArTest.Test] public void TestTeleportItem_INVALID_CASE_null_into_item()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(new(1, 2));
-		var tl1 = world.InstallEmptyTile(new(3, 4));
+		var tl0 = world.AddEmptyTile(new(1, 2));
+		var tl1 = world.AddEmptyTile(new(3, 4));
 		world.SpawnItem(tl1, 235);
 		AssertThrow(() => world.TeleportItem(tl0, tl1));
 	}
@@ -385,14 +379,14 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestTeleportItem_INVALID_CASE_from_non_existant_tile()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var tl0 = world.AddEmptyTile(new(1, 2));
 		AssertThrow(() => world.TeleportItem(Vector2I.Zero, tl0.GLocation));
 	}
 
 	[ArTest.Test] public void TestTeleportItem_INVALID_CASE_to_non_existant_tile()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var tl0 = world.AddEmptyTile(new(1, 2));
 		var it0 = world.SpawnItem(tl0, 5)!;
 		AssertThrow(() => world.CloneItem(tl0.GLocation, Vector2I.Zero));
 	}
@@ -400,14 +394,14 @@ public class WorldPanelTests : ArTest.TestSuit
 	[ArTest.Test] public void TestTeleportItem_INVALID_CASE_from_out_of_bounds()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var tl0 = world.AddEmptyTile(new(1, 2));
 		AssertThrow(() => world.CloneItem(Vector2I.One * 1000, tl0.GLocation));
 	}
 
 	[ArTest.Test] public void TestTeleportItem_INVALID_CASE_to_out_of_bounds()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(new(1, 2));
+		var tl0 = world.AddEmptyTile(new(1, 2));
 		var it0 = world.SpawnItem(tl0, 5)!;
 		AssertThrow(() => world.CloneItem(it0.GLocation, Vector2I.One * 1000));
 	}
@@ -418,10 +412,10 @@ public class WorldPanelTests : ArTest.TestSuit
 		var world = Lvl.World;
 		var tls = new Tile[]
 		{
-			world.InstallEmptyTile(new(1, 2)),
-			world.InstallEmptyTile(new(3, 3)),
-			world.InstallEmptyTile(new(0, 7)),
-			world.InstallEmptyTile(new(2, 0)),
+			world.AddEmptyTile(new(1, 2)),
+			world.AddEmptyTile(new(3, 3)),
+			world.AddEmptyTile(new(0, 7)),
+			world.AddEmptyTile(new(2, 0)),
 		};
 
 		// All tiles fit

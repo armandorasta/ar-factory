@@ -18,8 +18,8 @@ public class TileTests : ArTest.TestSuit
 
 	public override void BeforeEach()
 	{
+		Lvl.Simy.Reset();
 		Lvl.World.Reset();
-		Lvl.World.SetDims(new(15, 10));
 	}
 
 	public override void AfterEach()
@@ -29,23 +29,13 @@ public class TileTests : ArTest.TestSuit
 
 	public override void AfterAll()
 	{
+		RemoveNode(Lvl);
 		Lvl.QueueFree();
-	}
-
-	[ArTest.Test] public void TestDefaultConstructor()
-	{
-		var world = Lvl.World;
-		var tl = new Tile();
-		AssertTrue(tl.IsClear(Direction.North));
-		AssertTrue(tl.IsClear(Direction.East));
-		AssertTrue(tl.IsClear(Direction.South));
-		AssertTrue(tl.IsClear(Direction.West));
-		AssertFalse(tl.IsReserved());
 	}
 
 	[ArTest.Test] public void Test_SetWall_and_GetWall()
 	{
-		var tl = Lvl.World.InstallEmptyTile(Vector2I.Zero);
+		var tl = Lvl.World.AddEmptyTile(Vector2I.Zero);
 		AssertTrue(tl.IsClear(Direction.North));
 		AssertTrue(tl.IsClear(Direction.East));
 		AssertTrue(tl.IsClear(Direction.South));
@@ -87,7 +77,7 @@ public class TileTests : ArTest.TestSuit
 
 	[ArTest.Test] public void Test_SetWall_and_GetWall_INVALID_CASE_overriding_without_flag()
 	{
-		var tl = Lvl.World.InstallEmptyTile(Vector2I.Zero);
+		var tl = Lvl.World.AddEmptyTile(Vector2I.Zero);
 		tl.MakeOutput(Direction.North);
 		tl.ClearWall(Direction.North);
 		tl.MakeOutput(Direction.North); // Should work still
@@ -98,7 +88,7 @@ public class TileTests : ArTest.TestSuit
 	[ArTest.Test] public void TestRotation()
 	{
 		var world = Lvl.World;
-		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		var tl = world.AddEmptyTile(Vector2I.Zero);
 		tl.MakeSolid(Direction.North).MakeInput(Direction.East).MakeOutput(Direction.South);
 
 		tl.Rotate90();
@@ -158,7 +148,7 @@ public class TileTests : ArTest.TestSuit
 
 	[ArTest.Test] public void TestCanItemEnter()
 	{
-		var tl = Lvl.World.InstallEmptyTile(Vector2I.Zero);
+		var tl = Lvl.World.AddEmptyTile(Vector2I.Zero);
 		tl.MakeSolid(Direction.North);
 		AssertFalse(tl.CanItemEnter(Direction.North));
 
@@ -181,7 +171,7 @@ public class TileTests : ArTest.TestSuit
 
 	[ArTest.Test] public void TestCanItemExit()
 	{
-		var tl = Lvl.World.InstallEmptyTile(Vector2I.Zero);
+		var tl = Lvl.World.AddEmptyTile(Vector2I.Zero);
 		tl.MakeSolid(Direction.North);
 		tl.MakeOutput(Direction.East);
 		tl.MakeInput(Direction.South);
@@ -203,7 +193,7 @@ public class TileTests : ArTest.TestSuit
 	[ArTest.Test] public void TestDestroyItem_vanilla()
 	{
 		var world = Lvl.World;
-		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		var tl = world.AddEmptyTile(Vector2I.Zero);
 
 		var it = world.SpawnItem(tl, 8)!;
 		tl.DestroyItem();
@@ -214,7 +204,7 @@ public class TileTests : ArTest.TestSuit
 	[ArTest.Test] public void TestDestroyItem_with_no_item_with_flag()
 	{
 		var world = Lvl.World;
-		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		var tl = world.AddEmptyTile(Vector2I.Zero);
 		tl.DestroyItem(true); // Should just do nothing and not cause any trouble in release.
 		AssertFalse(tl.HasItem());
 	}
@@ -222,14 +212,14 @@ public class TileTests : ArTest.TestSuit
 	[ArTest.Test] public void TestDestroyItem_INVALID_CASE_with_no_item_no_flag()
 	{
 		var world = Lvl.World;
-		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		var tl = world.AddEmptyTile(Vector2I.Zero);
 		AssertThrow(() => tl.DestroyItem());
 	}
 
 	[ArTest.Test] public void TestExtractItem_vanilla()
 	{
 		var world = Lvl.World;
-		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		var tl = world.AddEmptyTile(Vector2I.Zero);
 		var spawnedIt = world.SpawnItem(tl, 7);
 
 		var extractedIt = AddNode(tl.ExtractItem()!);
@@ -241,7 +231,7 @@ public class TileTests : ArTest.TestSuit
 	[ArTest.Test] public void TestExtractItem_no_item_with_flag()
 	{
 		var world = Lvl.World;
-		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		var tl = world.AddEmptyTile(Vector2I.Zero);
 
 		var extractedIt = tl.ExtractItem(true);
 		AssertNull(extractedIt);
@@ -251,7 +241,7 @@ public class TileTests : ArTest.TestSuit
 	[ArTest.Test] public void TestExtractItem_no_item_no_flag()
 	{
 		var world = Lvl.World;
-		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		var tl = world.AddEmptyTile(Vector2I.Zero);
 		AssertThrow(() => tl.ExtractItem());
 	}
 }

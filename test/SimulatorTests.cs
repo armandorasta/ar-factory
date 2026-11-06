@@ -16,22 +16,23 @@ public class SimulatorTests : ArTest.TestSuit
 		var levelScene = GD.Load<Godot.PackedScene>(SceneManager.EditorScenePath);
 		m_Lv = levelScene.Instantiate<Editor>();
 		AddNode(m_Lv);
-		m_Lv.Simy.Clock.SetTickRate(100);
+		Lvl.Simy.Clock.SetTickRate(300);
 	}
 
 	public override void BeforeEach()
 	{
-		Lvl.World.Reset();
-		Lvl.World.SetDims(new(15, 10));
 	}
 
 	public override void AfterEach()
 	{
 		AssertTrue(Lvl.Simy.IsHalted());
+		Lvl.Simy.Reset();
+		Lvl.World.Reset();
 	}
 
 	public override void AfterAll()
 	{
+		RemoveNode(Lvl);
 		Lvl.QueueFree();
 	}
 

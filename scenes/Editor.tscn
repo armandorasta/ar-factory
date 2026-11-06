@@ -3,6 +3,9 @@
 [ext_resource type="Script" uid="uid://b4jpngaeplurr" path="res://scripts/Editor.cs" id="1_6vs76"]
 [ext_resource type="Script" uid="uid://b32qsjvwapht7" path="res://scripts/WorldPanel.cs" id="2_kl8ac"]
 [ext_resource type="Script" uid="uid://dli18m8xc1m77" path="res://scripts/Cam.cs" id="3_qifjx"]
+[ext_resource type="Texture2D" uid="uid://cnh1gw0ji7fow" path="res://resources/15x10_checkboard_100px_per_sq.png" id="4_wmxca"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_wmxca"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0wfyh"]
 bg_color = Color(0.23046875, 0.23046875, 0.23046875, 1)
@@ -50,11 +53,17 @@ script = ExtResource("1_6vs76")
 offset_right = 1200.0
 offset_bottom = 720.0
 mouse_filter = 1
+theme_override_styles/panel = SubResource("StyleBoxEmpty_wmxca")
 script = ExtResource("2_kl8ac")
 
 [node name="Cam" type="Camera2D" parent="WorldPanel" unique_id=330737528]
 position = Vector2(530, 248)
 script = ExtResource("3_qifjx")
+
+[node name="BGSprite" type="Sprite2D" parent="WorldPanel" unique_id=520358531]
+show_behind_parent = true
+texture = ExtResource("4_wmxca")
+centered = false
 
 [node name="HUDLayer" type="CanvasLayer" parent="." unique_id=1773833209]
 

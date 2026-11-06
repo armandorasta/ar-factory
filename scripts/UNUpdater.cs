@@ -28,13 +28,13 @@ public partial class UNUpdater : Unit
 	}
 
 
+	public UpdateType UpType;
+
 	public Label UpTypeLabel => m_UpTypeLabel!;
 	private Label? m_UpTypeLabel;
 	
-	public UpdateType UpType;
-
-	public Tile Output => GetTile(Vector2I.Zero);
-	public Tile Input => GetTile(Vector2I.Zero);
+	public Tile Output => GetTileNonNull(Vector2I.Zero);
+	public Tile Input => GetTileNonNull(Vector2I.Zero);
 
 	public override void _Ready()
 	{

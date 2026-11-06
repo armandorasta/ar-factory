@@ -11,15 +11,8 @@ namespace ArFactory;
 /// For now units own the tiles they engolf, so anything from outside touching those tiles is instant UB. 
 /// This means the unit is reponsible for deleting those tiles when it's deleted.
 /// </summary>
-public abstract partial class Unit : Node2D
+public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 {
-	protected enum TickType
-	{
-		Steady,   // Always counts ticks, even when no item is fed, like sliders.
-		OnDemand, // Counts ticks only when all item slots are filled, like updaters.
-	}
-
-
 	public readonly Vector2I InvalidGLocation = new(-1, -1);
 
 
@@ -70,7 +63,7 @@ public abstract partial class Unit : Node2D
 		{
 			for (int x = 0; x < adjustedDims.X; ++x)
 			{
-				if (world.HasTile(gloc + new Vector2I(x, y)))
+				if (world.HasTileOn(gloc + new Vector2I(x, y)))
 				{
 					return false;
 				}
@@ -84,19 +77,22 @@ public abstract partial class Unit : Node2D
 		return CanFitIn(world, gloc, u.Dimensions, u.Dir);
 	}
 
+
 	#region .Godot Overrides
+	
 	public override void _Ready()
 	{
 		this.Sprite = GetNodeOrNull<Sprite2D>("Sprite2D");
 	}
 
-	public override void _ExitTree()
+	public virtual void Destroy()
 	{
 		if (!IsFloating())
 		{
-			Reset(); // Pending commands are forced to finish.
+			CancelPendingCmds();
 			Deconstruct();
 		}
+		QueueFree();
 	}
 
 	/// <summary>
@@ -104,16 +100,19 @@ public abstract partial class Unit : Node2D
 	/// </summary>
 	public override void _Draw()
 	{
-		DrawRect(new(Vector2.Zero, World.CellWidth*(Vector2)Dimensions), Godot.Colors.Black, false, -2.0f);
-		DrawString(WorldPanel.DebugFont, new Vector2(0.0f, 15.0f), GetType().Name,
-			Godot.HorizontalAlignment.Left, World.CellWidth, 16, Godot.Colors.Black);
-		if (m_bLocked)
+		if (World.DebugDrawEnabled)
 		{
-			DrawString(WorldPanel.DebugFont, 0.5f*World.CellWidth * Vector2.One, "L", HorizontalAlignment.Center,
-				-1, 30, Godot.Colors.Red);
+			DrawRect(new(Vector2.Zero, World.CellWidth*(Vector2)Dimensions), Godot.Colors.Black, false, -2.0f);
+			DrawString(WorldPanel.DebugFont, new Vector2(0.0f, 15.0f), GetType().Name,
+				Godot.HorizontalAlignment.Left, World.CellWidth, 16, Godot.Colors.Black);
+			if (m_bLocked)
+			{
+				DrawString(WorldPanel.DebugFont, 0.5f*World.CellWidth * Vector2.One, "L", HorizontalAlignment.Center,
+					-1, 30, Godot.Colors.Red);
+			}
+			
+			// TODO: Draw the owned tiles here not in world panel!
 		}
-
-		// TODO: Draw the owned tiles here not in world panel!
 	}
 
 	#endregion // .Godot Overrides
@@ -144,6 +143,7 @@ public abstract partial class Unit : Node2D
 		// Sprite.ApplyScale(World.CellWidth/128.0f * (Vector2)Dims);
 		// Sprite.Translate(0.5f*World.CellWidth * Vector2.One);
 
+		m_Dir = dir;
 		Construct();
 	}
 
@@ -236,9 +236,14 @@ public abstract partial class Unit : Node2D
 			for (var x = 0; x < Dimensions.X; ++x)
 			{
 				var mygloc = GLocation + new Vector2I(x, y);
-				World.InstallTile(Tile.CreateSolid(), mygloc);
+				var tl = World.AddEmptyTile(mygloc, this);
+				tl.MakeSolid(Direction.North)
+					.MakeSolid(Direction.East)
+					.MakeSolid(Direction.South)
+					.MakeSolid(Direction.West);
 			}
 		}
+
 		BuildTilesAsIfFacingEast();
 		Debug.Assert(m_TickType != TickType.OnDemand || m_TickTiles.Count > 0);
 
@@ -287,7 +292,14 @@ public abstract partial class Unit : Node2D
 	/// Checks if <paramref name="gloc"/> is within the world in grid-space.
 	/// </summary>
 	public bool IsWithin(Vector2I gloc) => GetRect2I().HasPoint(gloc);
-	public Tile GetTile(Vector2I gloc) => World.GetTileNonNull(m_GL + gloc);
+	
+	public Tile? GetTile(Vector2I gloc) => World.GetTileOrNull(m_GL + gloc);
+	public Tile GetTileNonNull(Vector2I gloc) => World.GetTileNonNull(m_GL + gloc);
+	public bool RecieveTile(Tile tl) // Called whenever Deconstruct is called.
+	{
+		return IsWithin(tl.GLocation);
+	}
+	public bool TakeAwayTile(Tile tl) => true; // Called whenever Deconstruct is called.
 
 	/// <summary>
 	/// Returns true if the machine is expected to operate during this tick, <see cref="m_Rate"/> determines how often
@@ -333,7 +345,7 @@ public abstract partial class Unit : Node2D
 		{
 			for (; vec.X < m_Dims.Y; ++vec.X)
 			{
-				if (World.HasTile(m_GL + vec))
+				if (World.HasTileOn(m_GL + vec))
 				{
 					return false;
 				}
@@ -378,7 +390,7 @@ public abstract partial class Unit : Node2D
 
 		if (m_Dims == Vector2I.One)
 		{
-			GetTile(Vector2I.Zero).Rotate180();
+			GetTileNonNull(Vector2I.Zero).Rotate180();
 			m_Dir = m_Dir.Invert();
 			return;
 		}
@@ -390,8 +402,8 @@ public abstract partial class Unit : Node2D
 			for (var x = 0; x < m_Dims.X; ++x)
 			{
 				var vec = new Vector2I(x, y);
-				GetTile(vec).Rotate180();
-				GetTile(maxGL - vec).Rotate180();
+				GetTileNonNull(vec).Rotate180();
+				GetTileNonNull(maxGL - vec).Rotate180();
 				World.SwapTiles(m_GL + vec, m_GL + (maxGL - vec));
 			}
 		}
@@ -409,7 +421,7 @@ public abstract partial class Unit : Node2D
 
 		if (m_Dims == Vector2I.One)
 		{
-			GetTile(Vector2I.Zero).Rotate90();
+			GetTileNonNull(Vector2I.Zero).Rotate90();
 			m_Dir = m_Dir.Rotate90();
 			return;
 		}
@@ -433,7 +445,8 @@ public abstract partial class Unit : Node2D
 			tl.Rotate90();
 			var x = i % m_Dims.X;
 			var y = i / m_Dims.X;
-			World.InstallTile(tl, m_GL + new Vector2I(maxY - y, x));
+			var mygloc = m_GL + new Vector2I(maxY - y, x);
+			World.InstallTile(tl, mygloc);
 		}
 
 		m_Dims = new(m_Dims.Y, m_Dims.X);
@@ -449,7 +462,7 @@ public abstract partial class Unit : Node2D
 		if (m_Dims == Vector2I.One)
 		{
 			Debug.Assert(CanFaceDir(m_Dir.Rotate270()));
-			GetTile(Vector2I.Zero).Rotate270();
+			GetTileNonNull(Vector2I.Zero).Rotate270();
 			m_Dir = m_Dir.Rotate270();
 			return;
 		}
@@ -472,13 +485,13 @@ public abstract partial class Unit : Node2D
 	public Tile AddInput(Vector2I gloc, Direction dir, bool bKeepTrack = false)
 	{
 		Debug.Assert(IsWithin(m_GL + gloc));
-		Debug.Assert(GetTile(gloc).IsSolid(dir));
+		Debug.Assert(GetTileNonNull(gloc).IsSolid(dir));
 		Debug.Assert(m_TickType == TickType.OnDemand || !bKeepTrack);
 
 		// Must be facing out of the unit.
 		Debug.Assert(!IsWithin(m_GL + gloc + dir.ToGrid()));
 
-		var tl = GetTile(gloc);
+		var tl = GetTileNonNull(gloc);
 		tl.MakeInput(dir, true);
 		if (bKeepTrack)
 		{
@@ -499,13 +512,13 @@ public abstract partial class Unit : Node2D
 	public Tile AddOutput(Vector2I gloc, Direction dir, bool bKeepTrack = false)
 	{
 		Debug.Assert(IsWithin(m_GL + gloc));
-		Debug.Assert(GetTile(gloc).IsSolid(dir));
+		Debug.Assert(GetTileNonNull(gloc).IsSolid(dir));
 		Debug.Assert(m_TickType == TickType.OnDemand || !bKeepTrack);
 
 		// Must be facing out of the unit.
 		Debug.Assert(!IsWithin(m_GL + gloc + dir.ToGrid()));
 
-		var tl = GetTile(gloc);
+		var tl = GetTileNonNull(gloc);
 		tl.MakeOutput(dir, true);
 		if (bKeepTrack)
 		{
@@ -537,7 +550,7 @@ public abstract partial class Unit : Node2D
 		case TickType.OnDemand:
 			if (IsWorkTick()) // Checking last tick btw.
 			{
-				// Reset after work tick.
+				// Reset after work tick, IsWorkTick always returns false for 0; this forces a one tick break.
 				m_Count = 0;
 			}
 
@@ -586,7 +599,7 @@ public abstract partial class Unit : Node2D
 		m_PendingCmds.AddRange(sequence.SelectMany(c => c));
 	}
 
-	public void ClearPendingCmds()
+	public void CancelPendingCmds()
 	{
 		foreach (var cmd in m_PendingCmds)
 		{
@@ -603,10 +616,16 @@ public abstract partial class Unit : Node2D
 	public virtual void Reset()
 	{
 		m_Count = 1;
-		ClearPendingCmds();
+		CancelPendingCmds();
 	}
 
 
 	#endregion // Simulation
 	#endregion // Public Interface
+
+	protected enum TickType
+	{
+		Steady,   // Always counts ticks, even when no item is fed, like sliders.
+		OnDemand, // Counts ticks only when all item slots are filled, like updaters.
+	}
 }

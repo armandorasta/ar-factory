@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 
 namespace ArFactory;
@@ -50,5 +51,13 @@ public static class DirectionExtensions
 			Direction.West => new(-1, 0),
 			_ => new(int.MinValue, int.MinValue),
 		};
+	}
+
+	public static IEnumerable<Direction> GetEnumerator(this Direction dir)
+	{
+		yield return dir;
+		yield return (Direction)(((int)dir + 1) % 4);
+		yield return (Direction)(((int)dir + 2) % 4);
+		yield return (Direction)(((int)dir + 3) % 4);
 	}
 }

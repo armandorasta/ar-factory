@@ -137,7 +137,7 @@ public partial class UNSlider : Unit
 		public override void OnSignal(UNSlider parent)
 		{
 			ToggleParentDir(parent);
-			parent.ClearPendingCmds();
+			parent.CancelPendingCmds();
 		}
 	}
 
@@ -176,6 +176,8 @@ public partial class UNSlider : Unit
 		}
 	}
 
+	public Tile OnlyTile => GetTileNonNull(Vector2I.Zero);
+
 	private SliderExtension? m_Ext;
 
 	public void Setup(WorldPanel world, Vector2I gloc, int workRate, Direction dir)
@@ -185,6 +187,7 @@ public partial class UNSlider : Unit
 
 	public override void _ExitTree()
 	{
+		base._ExitTree();
 		m_Ext?.OnRemoval(this);
 	}
 

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace ArFactory;
 
-public partial class UNCmdInjector : Unit
+public partial class UNInjector : Unit
 {
 	private readonly List<List<Command>> m_CmdSequenceNextTick = [];
 
@@ -45,5 +45,5 @@ public partial class UNCmdInjector : Unit
 	}
 
 	public override string ToString() 
-		=> Utilz.ReplaceBaseNameInToString(base.ToString(), "CmdInjector");
+		=> Utilz.ReplaceBaseNameInToString(base.ToString(), "Injector");
 }

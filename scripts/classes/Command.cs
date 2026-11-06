@@ -49,14 +49,14 @@ public abstract class Command
 
 	protected static bool HasTileWithItemNotMidAnim(WorldPanel world, Vector2I gloc)
 	{
-		return world.HasTile(gloc) 
+		return world.HasTileOn(gloc) 
 			&& world.GetTileNonNull(gloc).HasItem() 
 			&& !world.GetTileNonNull(gloc).Item.IsMidAnimation();
 	}
 
 	protected static bool HasTileUnreserved(WorldPanel world, Vector2I gloc)
 	{
-		return world.HasTile(gloc) && !world.GetTileNonNull(gloc).IsReserved();
+		return world.HasTileOn(gloc) && !world.GetTileNonNull(gloc).IsReserved();
 	}
 
 

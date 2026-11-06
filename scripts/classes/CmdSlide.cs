@@ -46,7 +46,7 @@ public class CmdSlide : Command
 	{
 		Debug.AssertEq(m_StateFunc, HandleDefault);
 		Debug.Assert(TrackedItemRef is null); // Set in PrepTrackedItemForSlidingAnim.
-		Debug.Assert(world.HasTile(GetGridTo()));
+		Debug.Assert(world.HasTileOn(GetGridTo()));
 
 		if (!world.GetTileNonNull(GetGridTo()).IsReserved())
 		{

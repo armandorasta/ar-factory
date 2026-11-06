@@ -14,7 +14,7 @@ public class CommandTests : ArTest.TestSuit
 		var levelScene = GD.Load<Godot.PackedScene>(SceneManager.EditorScenePath);
 		m_Lvl = levelScene.Instantiate<Editor>();
 		AddNode(Lvl);
-		Lvl.Simy.Clock.SetTickRate(100);
+		Lvl.Simy.Clock.SetTickRate(300);
 	}
 
 	public override void BeforeEach()
@@ -30,13 +30,14 @@ public class CommandTests : ArTest.TestSuit
 
 	public override void AfterAll()
 	{
+		RemoveNode(Lvl);
 		Lvl.QueueFree();
 	}
 
 	[ArTest.Test] public async Task TestCmdSpawn_vanilla()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
 		var injy0 = world.PlaceInjector();
 
 		using (Lvl.Simy.StartAndPause())
@@ -58,7 +59,7 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdSpawn_INVALID_CASE_on_existing_tile()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
 		var injy0 = world.PlaceInjector();
 
 		using (Lvl.Simy.StartAndPause())
@@ -71,7 +72,7 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdSpawn_INVALID_CASE_double()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
 		var injy0 = world.PlaceInjector();
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -84,7 +85,7 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdSpawn_INVALID_CASES_out_of_bounds()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
 		var injy0 = world.PlaceInjector();
 
 		// Out of bounds spawn
@@ -98,7 +99,7 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdKill_vanilla()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
 		var injy0 = world.PlaceInjector();
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -110,38 +111,58 @@ public class CommandTests : ArTest.TestSuit
 		}
 	}
 
-	[ArTest.Test] public async Task TestCmdKill_INVALID_CASES()
+	[ArTest.Test] public async Task TestCmdKill_INVALID_CASES_on_non_existing_tile()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(1, 0));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(1, 0));
 		var injy0 = world.PlaceInjector();
-	
-		// Kill on non-existing tile
+
 		using (Lvl.Simy.StartAndPause())
 		{
 			injy0.PendParallel([new CmdKill(new Vector2I(2, 3))]);
 			await AssertThrow(Lvl.Simy.TickOnceAsync);
 			AssertTrue(injy0.HasPendingCmds());
 		}
+	}
 
-		// Killing nothing (existing tile tho).
+	[ArTest.Test] public async Task TestCmdKill_INVALID_CASES_on_empty_existing_tile()
+	{
+		var world = Lvl.World;
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(1, 0));
+		var injy0 = world.PlaceInjector();
+		
 		using (Lvl.Simy.StartAndPause())
 		{
 			injy0.PendParallel([new CmdKill(new Vector2I(0, 0))]);
 			await AssertThrow(Lvl.Simy.TickOnceAsync);
 			AssertTrue(injy0.HasPendingCmds());
 		}
+	}
 
-		// Out of bounds kill
+	[ArTest.Test] public async Task TestCmdKill_INVALID_CASES_out_of_bounds()
+	{
+		var world = Lvl.World;
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(1, 0));
+		var injy0 = world.PlaceInjector();
+		
 		using (Lvl.Simy.StartAndPause())
 		{
 			injy0.PendParallel([new CmdKill(new Vector2I(-1, -1))]);
 			await AssertThrow(Lvl.Simy.TickOnceAsync);
 			AssertTrue(injy0.HasPendingCmds());
 		}
+	}
 
-		// Killing mid-animation
+	[ArTest.Test] public async Task TestCmdKill_INVALID_CASES_mid_animation()
+	{
+		var world = Lvl.World;
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(1, 0));
+		var injy0 = world.PlaceInjector();
+		
 		using (Lvl.Simy.StartAndPause())
 		{
 			world.SpawnItem(tl0, 112);
@@ -157,7 +178,7 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdSleep()
 	{
 		var world = Lvl.World;
-		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		var tl = world.AddEmptyTile(Vector2I.Zero);
 		var injy = world.PlaceInjector();
 
 		using (Lvl.Simy.StartAndPause())
@@ -203,17 +224,17 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdSlide_vanilla()
 	{
 		var world = Lvl.World;
-		var tlEast0 = world.InstallEmptyTile(new(0, 0));
-		var tlEast1 = world.InstallEmptyTile(new(1, 0));
+		var tlEast0 = world.AddEmptyTile(new(0, 0));
+		var tlEast1 = world.AddEmptyTile(new(1, 0));
 
-		var tlSouth0 = world.InstallEmptyTile(new(2, 0));
-		var tlSouth1 = world.InstallEmptyTile(new(2, 1));
+		var tlSouth0 = world.AddEmptyTile(new(2, 0));
+		var tlSouth1 = world.AddEmptyTile(new(2, 1));
 
-		var tlNorth0 = world.InstallEmptyTile(new(3, 1));
-		var tlNorth1 = world.InstallEmptyTile(new(3, 0));
+		var tlNorth0 = world.AddEmptyTile(new(3, 1));
+		var tlNorth1 = world.AddEmptyTile(new(3, 0));
 
-		var tlWest0 = world.InstallEmptyTile(new(5, 0));
-		var tlWest1 = world.InstallEmptyTile(new(4, 0));
+		var tlWest0 = world.AddEmptyTile(new(5, 0));
+		var tlWest1 = world.AddEmptyTile(new(4, 0));
 
 		var injy0 = world.PlaceInjector();
 
@@ -289,8 +310,8 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdSlide_Destination_item_is_still_coming()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(new(0, 0));
-		var tl1 = world.InstallEmptyTile(new(1, 0));
+		var tl0 = world.AddEmptyTile(new(0, 0));
+		var tl1 = world.AddEmptyTile(new(1, 0));
 
 		var injy0 = world.PlaceInjector();
 		var injy1 = world.PlaceInjector();
@@ -361,7 +382,7 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = Lvl.World;
 		var injy0 = world.PlaceInjector();
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -408,8 +429,8 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = Lvl.World;
 		var injy0 = world.PlaceInjector();
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new Vector2I(1, 0));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new Vector2I(1, 0));
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -436,8 +457,8 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = Lvl.World;
 		var injy0 = world.PlaceInjector();
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new Vector2I(1, 0));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new Vector2I(1, 0));
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -468,8 +489,8 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = Lvl.World;
 		var injy0 = world.PlaceInjector();
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(1, 0));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(1, 0));
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -482,8 +503,8 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = Lvl.World;
 		var injy0 = world.PlaceInjector();
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(1, 0));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(1, 0));
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -496,8 +517,8 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = Lvl.World;
 		var injy0 = world.PlaceInjector();
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(1, 0));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(1, 0));
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -510,8 +531,8 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = Lvl.World;
 		var injy0 = world.PlaceInjector();
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(1, 0));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(1, 0));
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -527,8 +548,8 @@ public class CommandTests : ArTest.TestSuit
 	{
 		var world = Lvl.World;
 		var injy0 = world.PlaceInjector();
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(1, 0));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(1, 0));
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -541,7 +562,7 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdAwait_After_spawn()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
 		var injy0 = world.PlaceInjector();
 		
 		using (Lvl.Simy.StartAndPause())
@@ -565,8 +586,8 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdAwait_after_slide_on_dest()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(1, 0));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(1, 0));
 		var injy0 = world.PlaceInjector();
 
 		using (Lvl.Simy.StartAndPause())
@@ -594,7 +615,7 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdAwait_cross_unit()
 	{
 		var world = Lvl.World;
-		var tl = world.InstallEmptyTile(new(1, 0));
+		var tl = world.AddEmptyTile(new(1, 0));
 		var injy0 = world.PlaceInjector();
 		var injy1 = world.PlaceInjector();
 		
@@ -633,7 +654,7 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdVacate_Lone_vacate()
 	{
 		var world = Lvl.World;
-		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		var tl = world.AddEmptyTile(Vector2I.Zero);
 		var vac = new CmdVacate([tl]);
 		var injy0 = world.PlaceInjector();
 
@@ -654,8 +675,8 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdVacate_On_slide_dest()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(1, 0));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(1, 0));
 		var vac = new CmdVacate([tl0]);
 		var injy0 = world.PlaceInjector();
 
@@ -684,10 +705,10 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdVacate_Multiple_tiles()
 	{
 		var world = Lvl.World;
-		var tl00 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl10 = world.InstallEmptyTile(new(1, 0));
-		var tl01 = world.InstallEmptyTile(new(0, 1));
-		var tl11 = world.InstallEmptyTile(new(1, 1));
+		var tl00 = world.AddEmptyTile(Vector2I.Zero);
+		var tl10 = world.AddEmptyTile(new(1, 0));
+		var tl01 = world.AddEmptyTile(new(0, 1));
+		var tl11 = world.AddEmptyTile(new(1, 1));
 		var injy = world.PlaceInjector();
 
 		using (Lvl.Simy.StartAndPause())
@@ -732,7 +753,7 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdUpdate_vanilla()
 	{
 		var world = Lvl.World;
-		var tl = world.InstallEmptyTile(Vector2I.Zero);
+		var tl = world.AddEmptyTile(Vector2I.Zero);
 		var injy = world.PlaceInjector();
 
 		using (Lvl.Simy.StartAndPause())
@@ -755,8 +776,8 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdUpdate_INVALID_CASES()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(1, 0));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(1, 0));
 		var injy = world.PlaceInjector();
 
 		// Updating nothing (existing tile)
@@ -799,9 +820,9 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdClone_vanilla()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(1, 0));
-		var tl2 = world.InstallEmptyTile(new(1, 1));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(1, 0));
+		var tl2 = world.AddEmptyTile(new(1, 1));
 		var injy = world.PlaceInjector();
 
 		using (Lvl.Simy.StartAndPause())
@@ -823,9 +844,9 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdClone_INVALID_CASES()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(1, 0));
-		var tl2 = world.InstallEmptyTile(new(1, 1));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(1, 0));
+		var tl2 = world.AddEmptyTile(new(1, 1));
 		var injy = world.PlaceInjector();
 
 		// No item to clone (existing tile)
@@ -930,9 +951,9 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdCombine_vanilla()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(0, 1));
-		var tl2 = world.InstallEmptyTile(new(1, 0));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(0, 1));
+		var tl2 = world.AddEmptyTile(new(1, 0));
 		var injy = world.PlaceInjector();
 
 		using (Lvl.Simy.StartAndPause())
@@ -952,8 +973,8 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdCombine_Overlap()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(0, 1));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(0, 1));
 		var injy = world.PlaceInjector();
 
 		using (Lvl.Simy.StartAndPause())
@@ -972,9 +993,9 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdCombine_INVALID_CASES()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(0, 1));
-		var tl2 = world.InstallEmptyTile(new(1, 0));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(0, 1));
+		var tl2 = world.AddEmptyTile(new(1, 0));
 		var injy = world.PlaceInjector();
 
 		// Missing item (existing tile)
@@ -1050,8 +1071,8 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdTeleport_vanilla()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(0, 1));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(0, 1));
 		var injy = world.PlaceInjector();
 
 		using (Lvl.Simy.StartAndPause())
@@ -1070,7 +1091,7 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdTeleport_to_same_tile()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
 		var injy = world.PlaceInjector();
 
 		using (Lvl.Simy.StartAndPause())
@@ -1088,8 +1109,8 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdTeleport_INVALID_CASES()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(0, 1));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(0, 1));
 		var injy = world.PlaceInjector();
 
 		// Missing item (existing tile)
@@ -1173,7 +1194,7 @@ public class CommandTests : ArTest.TestSuit
 		AssertFalse(CmdIf.Apply(CmdIf.CheckType.LessEq, null, -1));
 
 		/// Empty tile: should return false for everything except NoItem and HasTile.
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
 		AssertFalse(CmdIf.Apply(CmdIf.CheckType.NoTile, tl0, -1));
 		AssertTrue(CmdIf.Apply(CmdIf.CheckType.HasTile, tl0, -1));
 		AssertTrue(CmdIf.Apply(CmdIf.CheckType.NoItem, tl0, -1));
@@ -1225,8 +1246,8 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdIf_vanilla()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(1, 0));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(1, 0));
 		var injy = world.PlaceInjector();
 
 		using (Lvl.Simy.StartAndPause())
@@ -1261,8 +1282,8 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdIf_no_else_branch()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(1, 0));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(1, 0));
 		var injy = world.PlaceInjector();
 
 		using (Lvl.Simy.StartAndPause())
@@ -1293,7 +1314,7 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdIf_empty_branches()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
 		var injy = world.PlaceInjector();
 
 		using (Lvl.Simy.StartAndPause())
@@ -1311,8 +1332,8 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdIf_else_branch()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(1, 0));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(1, 0));
 		var injy = world.PlaceInjector();
 
 		using (Lvl.Simy.StartAndPause())
@@ -1347,8 +1368,8 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdIf_on_null_tile()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(1, 0));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(1, 0));
 		var injy = world.PlaceInjector();
 
 		using (Lvl.Simy.StartAndPause())
@@ -1379,8 +1400,8 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdIf_on_out_of_bounds_tile()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new(1, 0));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new(1, 0));
 		var injy = world.PlaceInjector();
 
 		using (Lvl.Simy.StartAndPause())
@@ -1411,7 +1432,7 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdDemand_correct_value()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
 		var injy = world.PlaceInjector();
 		
 		using (Lvl.Simy.StartAndPause())
@@ -1428,7 +1449,7 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdDemand_incorrect_value()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
 		var injy = world.PlaceInjector();
 		
 		using (Lvl.Simy.StartAndPause())
@@ -1444,8 +1465,8 @@ public class CommandTests : ArTest.TestSuit
 	[ArTest.Test] public async Task TestCmdDemand_INVALID_CASE_item_mid_animation()
 	{
 		var world = Lvl.World;
-		var tl0 = world.InstallEmptyTile(Vector2I.Zero);
-		var tl1 = world.InstallEmptyTile(new Vector2I(1, 0));
+		var tl0 = world.AddEmptyTile(Vector2I.Zero);
+		var tl1 = world.AddEmptyTile(new Vector2I(1, 0));
 		var injy0 = world.PlaceInjector();
 		var injy1 = world.PlaceInjector();
 		

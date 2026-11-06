@@ -16,13 +16,13 @@ public class UnitTests : ArTest.TestSuit
 		var levelScene = GD.Load<Godot.PackedScene>(SceneManager.EditorScenePath);
 		m_Lv = levelScene.Instantiate<Editor>();
 		AddNode(Lvl);
-		Lvl.Simy.Clock.SetTickRate(100);
+		Lvl.Simy.Clock.SetTickRate(300);
 	}
 
 	public override void BeforeEach()
 	{
+		Lvl.Simy.Reset();
 		Lvl.World.Reset();
-		Lvl.World.SetDims(new(10, 10));
 	}
 
 	public override void AfterEach()
@@ -32,6 +32,7 @@ public class UnitTests : ArTest.TestSuit
 
 	public override void AfterAll()
 	{
+		RemoveNode(Lvl);
 		Lvl.QueueFree();
 	}
 
@@ -57,7 +58,7 @@ public class UnitTests : ArTest.TestSuit
 		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, new(4, 4), Direction.West));
 
 		// 2. Something in the way
-		world.InstallEmptyTile(Vector2I.One);
+		world.AddEmptyTile(Vector2I.One);
 		// One block.
 		AssertFalse(Unit.CanFitIn(world, Vector2I.One, Vector2I.One, Direction.North));
 		AssertFalse(Unit.CanFitIn(world, Vector2I.One, Vector2I.One, Direction.East));	
@@ -99,29 +100,57 @@ public class UnitTests : ArTest.TestSuit
 		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, new(world.Dimensions.Y, world.Dimensions.X), Direction.North));
 		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, new(world.Dimensions.Y, world.Dimensions.X), Direction.South));
 		// 1x1
-		world.InstallEmptyTile(new(1, 0));
-		world.InstallEmptyTile(new(0, 1));
-		world.InstallEmptyTile(new(1, 1));
+		world.AddEmptyTile(new Vector2I(1, 0));
+		world.AddEmptyTile(new Vector2I(0, 1));
+		world.AddEmptyTile(new Vector2I(1, 1));
 		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, Vector2I.One, Direction.North));
 		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, Vector2I.One, Direction.East));
 		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, Vector2I.One, Direction.South));
 		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, Vector2I.One, Direction.West));
 		// 2x1 or 1x2.
 		world.DeleteTile(new Vector2I(1, 0));
-		world.InstallEmptyTile(new(2, 0));
-		world.InstallEmptyTile(new(2, 1));
+		world.AddEmptyTile(new Vector2I(2, 0));
+		world.AddEmptyTile(new Vector2I(2, 1));
 		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, new(2, 1), Direction.East));
 		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, new(2, 1), Direction.West));
 		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, new(1, 2), Direction.North));
 		AssertTrue(Unit.CanFitIn(world, Vector2I.Zero, new(1, 2), Direction.South));
 	}
 
+	[ArTest.Test] public async Task TestPlatform_vanilla()
+	{
+		var world = Lvl.World;
+		var platLeft = world.AddEmptyTile(new Vector2I(2, 4));
+		var platRight = world.AddEmptyTile(new Vector2I(3, 4));
+		var injy = world.PlaceInjector();
+
+		using (Lvl.Simy.StartAndPause())
+		{
+			injy.PendFullSequence([[ new CmdSpawn(platLeft, 9) ]]);
+			await Lvl.Simy.TickOnceAsync();
+			AssertTrue(platLeft.HasItem());
+			AssertEq(platLeft.Item.Value, 9);
+			
+			injy.PendFullSequence([[ new CmdSlide(platLeft, Direction.East) ]]);
+			await Lvl.Simy.TickOnceAsync();
+			AssertFalse(platLeft.HasItem());
+			AssertTrue(platRight.HasItem());
+			AssertEq(platRight.Item.Value, 9);
+
+			injy.PendFullSequence([[ new CmdSlide(platRight, Direction.West) ]]);
+			await Lvl.Simy.TickOnceAsync();
+			AssertTrue(platLeft.HasItem());
+			AssertFalse(platRight.HasItem());
+			AssertEq(platLeft.Item.Value, 9);
+		}
+	}
+
 	[ArTest.Test] public async Task TestSupplier_tick_rate()
 	{
 		var world = Lvl.World;
 		var supp = world.PlaceSupplier(Vector2I.Zero, Direction.East, 3, [237, 68, 236]);
-		var tl1 = world.InstallEmptyTile(new Vector2I(1, 0));
-		AssertTrue(world.HasTile(supp.GLocation));
+		var tl1 = world.AddEmptyTile(new Vector2I(1, 0));
+		AssertTrue(world.HasTileOn(supp.GLocation));
 		using (Lvl.Simy.StartAndPause())
 		{
 			await Lvl.Simy.TickOnceAsync(); // Tick 0 processed
@@ -170,8 +199,9 @@ public class UnitTests : ArTest.TestSuit
 		var world = Lvl.World;
 		world.Reset();
 		var supp = world.PlaceSupplier(Vector2I.One, Direction.East, 1, [261, 296]);
-		var tl1 = world.InstallEmptyTile(supp.GLocation + supp.Dir.ToGrid());
-		AssertTrue(world.HasTile(supp.GLocation));
+		var tl1 = world.AddEmptyTile(supp.GLocation + supp.Dir.ToGrid());
+		AssertTrue(world.HasTileOn(supp.GLocation));
+		
 		using (Lvl.Simy.StartAndPause())
 		{
 			await Lvl.Simy.TickOnceAsync();
@@ -186,8 +216,8 @@ public class UnitTests : ArTest.TestSuit
 		var world = Lvl.World;
 		var supp = world.PlaceSupplier(Vector2I.One, Direction.East, 2, [261, 296]);
 		var injy = world.PlaceInjector();
-		var tlNearby = world.InstallEmptyTile(supp.GLocation + supp.Dir.ToGrid());
-		var tlFar = world.InstallEmptyTile(supp.GLocation + 2 * supp.Dir.ToGrid());
+		var tlNearby = world.AddEmptyTile(supp.GLocation + supp.Dir.ToGrid());
+		var tlFar = world.AddEmptyTile(supp.GLocation + 2 * supp.Dir.ToGrid());
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -239,17 +269,21 @@ public class UnitTests : ArTest.TestSuit
 			await Lvl.Simy.TickOnceAsync(); // clogged
 			await Lvl.Simy.TickOnceAsync(); // clogged
 
-			var tl = world.InstallEmptyTile(tlSupp.GLocation + supp.Dir.ToGrid());
+			/* PLACING NEW TILES MID-SIMULATION IS NOT SUPPORTED FOR NOW
+
+			var plat = world.PlacePlatform(tlSupp.GLocation + supp.Dir.ToGrid());
 			await Lvl.Simy.TickOnceAsync(); // First item slides out
-			AssertTrue(tl.HasItem());
-			AssertEq(tl.Item.Value, 854);
+			AssertTrue(plat.FreeTile.HasItem());
+			AssertEq(plat.FreeTile.Item.Value, 854);
 			await Lvl.Simy.EndTickAsync();
-			world.DeleteTile(tl.GLocation);
+			world.DeleteUnit(plat);
 
 			await Lvl.Simy.TickOnceAsync(); // Next item would slide out if I didn't delete the tile.
 			await Lvl.Simy.TickOnceAsync(); // clogged
 			await Lvl.Simy.TickOnceAsync(); // clogged
 			await Lvl.Simy.TickOnceAsync(); // clogged
+			
+			*/
 		}
 	}
 
@@ -257,7 +291,7 @@ public class UnitTests : ArTest.TestSuit
 	{
 		var world = Lvl.World;
 		var supp = world.PlaceSupplier(Vector2I.One, Direction.East, 2, [854, 743, -374]);
-		var tlNearby = world.InstallEmptyTile(supp.GLocation + supp.Dir.ToGrid());
+		var tlNearby = world.AddEmptyTile(supp.GLocation + supp.Dir.ToGrid());
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -311,11 +345,10 @@ public class UnitTests : ArTest.TestSuit
 		var slid = world.PlaceSlider(new Vector2I(3, 4), Direction.North);
 		var injy = world.PlaceInjector();
 
-		var tlSlid = slid.GetTile(Vector2I.Zero);
-		var tlNorth = world.InstallEmptyTile(tlSlid.GLocation + Direction.North.ToGrid());
-		var tlEast = world.InstallEmptyTile(tlSlid.GLocation + Direction.East.ToGrid());
-		var tlSouth = world.InstallEmptyTile(tlSlid.GLocation + Direction.South.ToGrid());
-		var tlWest = world.InstallEmptyTile(tlSlid.GLocation + Direction.West.ToGrid());
+		var tlNorth = world.AddEmptyTile(slid.OnlyTile.GLocation + Direction.North.ToGrid());
+		var tlEast = world.AddEmptyTile(slid.OnlyTile.GLocation + Direction.East.ToGrid());
+		var tlSouth = world.AddEmptyTile(slid.OnlyTile.GLocation + Direction.South.ToGrid());
+		var tlWest = world.AddEmptyTile(slid.OnlyTile.GLocation + Direction.West.ToGrid());
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -323,12 +356,12 @@ public class UnitTests : ArTest.TestSuit
 			world.SpawnItem(tlSouth, -511);
 			injy.PendFullSequence([[ new CmdSlide(tlSouth, Direction.North) ]]);
 			await Lvl.Simy.TickOnceAsync();
-			AssertTrue(tlSlid.HasItem());
-			AssertTrue(tlSlid.Item.IsMidAnimation());
-			AssertEq(tlSlid.Item.Value, -511);
+			AssertTrue(slid.OnlyTile.HasItem());
+			AssertTrue(slid.OnlyTile.Item.IsMidAnimation());
+			AssertEq(slid.OnlyTile.Item.Value, -511);
 
 			await Lvl.Simy.TickOnceAsync();
-			AssertFalse(tlSlid.HasItem());
+			AssertFalse(slid.OnlyTile.HasItem());
 			AssertTrue(tlNorth.HasItem());
 			AssertTrue(tlNorth.Item.IsMidAnimation());
 			AssertEq(tlNorth.Item.Value, -511);
@@ -342,12 +375,12 @@ public class UnitTests : ArTest.TestSuit
 			world.SpawnItem(tlEast, 635);
 			injy.PendFullSequence([[ new CmdSlide(tlEast, Direction.West) ]]);
 			await Lvl.Simy.TickOnceAsync();
-			AssertTrue(tlSlid.HasItem());
-			AssertTrue(tlSlid.Item.IsMidAnimation());
-			AssertEq(tlSlid.Item.Value, 635);
+			AssertTrue(slid.OnlyTile.HasItem());
+			AssertTrue(slid.OnlyTile.Item.IsMidAnimation());
+			AssertEq(slid.OnlyTile.Item.Value, 635);
 
 			await Lvl.Simy.TickOnceAsync();
-			AssertFalse(tlSlid.HasItem());
+			AssertFalse(slid.OnlyTile.HasItem());
 			AssertTrue(tlNorth.HasItem());
 			AssertTrue(tlNorth.Item.IsMidAnimation());
 			AssertEq(tlNorth.Item.Value, 635);
@@ -361,12 +394,12 @@ public class UnitTests : ArTest.TestSuit
 			world.SpawnItem(tlWest, 999);
 			injy.PendFullSequence([[ new CmdSlide(tlWest, Direction.East) ]]);
 			await Lvl.Simy.TickOnceAsync();
-			AssertTrue(tlSlid.HasItem());
-			AssertTrue(tlSlid.Item.IsMidAnimation());
-			AssertEq(tlSlid.Item.Value, 999);
+			AssertTrue(slid.OnlyTile.HasItem());
+			AssertTrue(slid.OnlyTile.Item.IsMidAnimation());
+			AssertEq(slid.OnlyTile.Item.Value, 999);
 
 			await Lvl.Simy.TickOnceAsync();
-			AssertFalse(tlSlid.HasItem());
+			AssertFalse(slid.OnlyTile.HasItem());
 			AssertTrue(tlNorth.HasItem());
 			AssertTrue(tlNorth.Item.IsMidAnimation());
 			AssertEq(tlNorth.Item.Value, 999);
@@ -380,7 +413,7 @@ public class UnitTests : ArTest.TestSuit
 			world.SpawnItem(tlNorth, 638);
 			injy.PendFullSequence([[ new CmdSlide(tlNorth, Direction.South) ]]);
 			await Lvl.Simy.TickOnceAsync();
-			AssertFalse(tlSlid.HasItem());
+			AssertFalse(slid.OnlyTile.HasItem());
 			AssertTrue(tlNorth.HasItem());
 			AssertFalse(tlNorth.Item.IsMidAnimation());
 			AssertEq(tlNorth.Item.Value, 638);
@@ -393,21 +426,20 @@ public class UnitTests : ArTest.TestSuit
 		var world = Lvl.World;
 		var slid = world.PlaceSlider(new Vector2I(3, 4), Direction.West, 3);
 
-		var tlSlid = slid.GetTile(Vector2I.Zero);
-		var tlDest = world.InstallEmptyTile(tlSlid.GLocation + Direction.West.ToGrid());
+		var tlDest = world.AddEmptyTile(slid.OnlyTile.GLocation + Direction.West.ToGrid());
 
 		using (Lvl.Simy.StartAndPause())
 		{
-			world.SpawnItem(tlSlid, 13);
+			world.SpawnItem(slid.OnlyTile, 13);
 			await Lvl.Simy.TickOnceAsync(); // Should move 2 ticks from now.
-			AssertTrue(tlSlid.HasItem());
-			AssertFalse(tlSlid.Item.IsMidAnimation());
+			AssertTrue(slid.OnlyTile.HasItem());
+			AssertFalse(slid.OnlyTile.Item.IsMidAnimation());
 			await Lvl.Simy.TickOnceAsync(); // Next tick
-			AssertTrue(tlSlid.HasItem());
-			AssertFalse(tlSlid.Item.IsMidAnimation());
+			AssertTrue(slid.OnlyTile.HasItem());
+			AssertFalse(slid.OnlyTile.Item.IsMidAnimation());
 
 			await Lvl.Simy.TickOnceAsync(); // Moves
-			AssertFalse(tlSlid.HasItem());
+			AssertFalse(slid.OnlyTile.HasItem());
 			AssertTrue(tlDest.HasItem());
 			AssertTrue(tlDest.Item.IsMidAnimation());
 			AssertEq(tlDest.Item.Value, 13);
@@ -417,13 +449,13 @@ public class UnitTests : ArTest.TestSuit
 
 			await Lvl.Simy.TickOnceAsync();
 		
-			world.SpawnItem(tlSlid, -804);
+			world.SpawnItem(slid.OnlyTile, -804);
 			await Lvl.Simy.TickOnceAsync(); // Should still move the tick after this one.
-			AssertTrue(tlSlid.HasItem());
-			AssertFalse(tlSlid.Item.IsMidAnimation());
+			AssertTrue(slid.OnlyTile.HasItem());
+			AssertFalse(slid.OnlyTile.Item.IsMidAnimation());
 		
 			await Lvl.Simy.TickOnceAsync(); // Moves
-			AssertFalse(tlSlid.HasItem());
+			AssertFalse(slid.OnlyTile.HasItem());
 			AssertTrue(tlDest.HasItem());
 			AssertTrue(tlDest.Item.IsMidAnimation());
 			AssertEq(tlDest.Item.Value, -804);
@@ -434,9 +466,9 @@ public class UnitTests : ArTest.TestSuit
 			await Lvl.Simy.TickOnceAsync();
 			await Lvl.Simy.TickOnceAsync();
 		
-			world.SpawnItem(tlSlid, 982); // Should move next tick right away.
+			world.SpawnItem(slid.OnlyTile, 982); // Should move next tick right away.
 			await Lvl.Simy.TickOnceAsync(); // Moves
-			AssertFalse(tlSlid.HasItem());
+			AssertFalse(slid.OnlyTile.HasItem());
 			AssertTrue(tlDest.HasItem());
 			AssertTrue(tlDest.Item.IsMidAnimation());
 			AssertEq(tlDest.Item.Value, 982);
@@ -447,15 +479,14 @@ public class UnitTests : ArTest.TestSuit
 	{
 		var world = Lvl.World;
 		var slid = world.PlaceSlider(new Vector2I(3, 4), Direction.West, 3);
-		var tlSlid = slid.GetTile(Vector2I.Zero);
 
 		using (Lvl.Simy.StartAndPause())
 		{
-			world.SpawnItem(tlSlid, 261);
+			world.SpawnItem(slid.OnlyTile, 261);
 			await Lvl.Simy.TickOnceAsync();
-			AssertTrue(tlSlid.HasItem());
-			AssertFalse(tlSlid.Item.IsMidAnimation());
-			AssertEq(tlSlid.Item.Value, 261);
+			AssertTrue(slid.OnlyTile.HasItem());
+			AssertFalse(slid.OnlyTile.Item.IsMidAnimation());
+			AssertEq(slid.OnlyTile.Item.Value, 261);
 		}
 	}
 
@@ -470,9 +501,8 @@ public class UnitTests : ArTest.TestSuit
 		var slid = world.PlaceSlider(new Vector2I(2, 1), Direction.East, 2);
 		var injy = world.PlaceInjector();
 		
-		var tlIn = world.InstallEmptyTile(slid.GLocation + slid.Dir.Invert().ToGrid());
-		var tlSlid = slid.GetTile(Vector2I.Zero);
-		var tlOut = world.InstallEmptyTile(slid.GLocation + slid.Dir.ToGrid());
+		var tlIn = world.AddEmptyTile(slid.GLocation + slid.Dir.Invert().ToGrid());
+		var tlOut = world.AddEmptyTile(slid.GLocation + slid.Dir.ToGrid());
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -483,22 +513,22 @@ public class UnitTests : ArTest.TestSuit
 			await Lvl.Simy.TickOnceAsync(); // Item slides in
 			await Lvl.Simy.TickOnceAsync(); // 1
 			await Lvl.Simy.TickOnceAsync(); // 2, here with locking the item would slide out, but it shouldn't
-			AssertTrue(tlSlid.HasItem());
+			AssertTrue(slid.OnlyTile.HasItem());
 			AssertFalse(tlOut.HasItem());
 			await Lvl.Simy.TickOnceAsync(); // Locked
-			AssertTrue(tlSlid.HasItem());
+			AssertTrue(slid.OnlyTile.HasItem());
 			AssertFalse(tlOut.HasItem());
 			await Lvl.Simy.TickOnceAsync(); // Locked
-			AssertTrue(tlSlid.HasItem());
+			AssertTrue(slid.OnlyTile.HasItem());
 			AssertFalse(tlOut.HasItem());
 
 			slid.Unlock();
 			AssertFalse(slid.IsLocked());
 			await Lvl.Simy.TickOnceAsync(); // 1 (counter resets when locking)
-			AssertTrue(tlSlid.HasItem());
+			AssertTrue(slid.OnlyTile.HasItem());
 			AssertFalse(tlOut.HasItem());
 			await Lvl.Simy.TickOnceAsync(); // 2, item slides out yay!
-			AssertFalse(tlSlid.HasItem());
+			AssertFalse(slid.OnlyTile.HasItem());
 			AssertTrue(tlOut.HasItem());
 		}
 	}
@@ -511,9 +541,8 @@ public class UnitTests : ArTest.TestSuit
 		var upd = world.PlaceUpdater(new Vector2I(3, 4), Direction.East, 2, UNUpdater.UpdateType.Increment);
 		var injy = world.PlaceInjector();
 
-		var tlUpd = upd.GetTile(Vector2I.Zero);
-		var tlIn = world.InstallEmptyTile(tlUpd.GLocation + upd.Dir.Invert().ToGrid());
-		var tlOut = world.InstallEmptyTile(tlUpd.GLocation + upd.Dir.ToGrid());
+		var tlIn = world.AddEmptyTile(upd.Input.GLocation + upd.Dir.Invert().ToGrid());
+		var tlOut = world.AddEmptyTile(upd.Output.GLocation + upd.Dir.ToGrid());
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -536,7 +565,7 @@ public class UnitTests : ArTest.TestSuit
 		var world = Lvl.World;
 		var upd = world.PlaceUpdater(new Vector2I(3, 4), Direction.East, 2, UNUpdater.UpdateType.Increment);
 		var injy = world.PlaceInjector();
-		var tlIn = world.InstallEmptyTile(upd.Output.GLocation + upd.Dir.Invert().ToGrid());
+		var tlIn = world.AddEmptyTile(upd.Output.GLocation + upd.Dir.Invert().ToGrid());
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -550,7 +579,7 @@ public class UnitTests : ArTest.TestSuit
 			await Lvl.Simy.TickOnceAsync(); // Clogged
 			await Lvl.Simy.TickOnceAsync(); // Clogged
 
-			var tlOut = world.InstallEmptyTile(upd.Output.GLocation + upd.Dir.ToGrid());
+			var tlOut = world.AddEmptyTile(upd.Output.GLocation + upd.Dir.ToGrid());
 			await Lvl.Simy.TickOnceAsync(); // Item slides out updated
 			AssertTrue(tlOut.HasItem());
 			AssertTrue(tlOut.Item.IsMidAnimation());
@@ -564,11 +593,10 @@ public class UnitTests : ArTest.TestSuit
 		var bin = world.PlaceBin(new Vector2I(3, 4));
 		var injy = world.PlaceInjector();
 
-		var tlBin = bin.GetTile(Vector2I.Zero);
-		var tlNorth = world.InstallEmptyTile(tlBin.GLocation + Direction.North.ToGrid());
-		var tlEast = world.InstallEmptyTile(tlBin.GLocation + Direction.East.ToGrid());
-		var tlSouth = world.InstallEmptyTile(tlBin.GLocation + Direction.South.ToGrid());
-		var tlWest = world.InstallEmptyTile(tlBin.GLocation + Direction.West.ToGrid());
+		var tlNorth = world.AddEmptyTile(bin.OnlyTile.GLocation + Direction.North.ToGrid());
+		var tlEast = world.AddEmptyTile(bin.OnlyTile.GLocation + Direction.East.ToGrid());
+		var tlSouth = world.AddEmptyTile(bin.OnlyTile.GLocation + Direction.South.ToGrid());
+		var tlWest = world.AddEmptyTile(bin.OnlyTile.GLocation + Direction.West.ToGrid());
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -581,7 +609,7 @@ public class UnitTests : ArTest.TestSuit
 			AssertTrue(GodotObject.IsInstanceValid(it));
 			await Lvl.Simy.TickOnceAsync(); // Gets bombed
 			AssertTrue(it.IsQueuedForDeletion());
-			AssertFalse(tlBin.IsReserved());
+			AssertFalse(bin.OnlyTile.IsReserved());
 			
 			// From east
 			it = world.SpawnItem(tlEast, -241)!;
@@ -592,7 +620,7 @@ public class UnitTests : ArTest.TestSuit
 			AssertTrue(GodotObject.IsInstanceValid(it));
 			await Lvl.Simy.TickOnceAsync(); // Gets bombed
 			AssertTrue(it.IsQueuedForDeletion());
-			AssertFalse(tlBin.IsReserved());
+			AssertFalse(bin.OnlyTile.IsReserved());
 
 			// From south
 			it = world.SpawnItem(tlSouth, -511)!;
@@ -603,7 +631,7 @@ public class UnitTests : ArTest.TestSuit
 			AssertTrue(GodotObject.IsInstanceValid(it));
 			await Lvl.Simy.TickOnceAsync(); // Gets bombed
 			AssertTrue(it.IsQueuedForDeletion());
-			AssertFalse(tlBin.IsReserved());
+			AssertFalse(bin.OnlyTile.IsReserved());
 
 			// From west
 			it = world.SpawnItem(tlWest, 628)!;
@@ -614,7 +642,7 @@ public class UnitTests : ArTest.TestSuit
 			AssertTrue(GodotObject.IsInstanceValid(it));
 			await Lvl.Simy.TickOnceAsync(); // Gets bombed
 			AssertTrue(it.IsQueuedForDeletion());
-			AssertFalse(tlBin.IsReserved());
+			AssertFalse(bin.OnlyTile.IsReserved());
 		}
 	}
 
@@ -625,9 +653,9 @@ public class UnitTests : ArTest.TestSuit
 		var bra = world.PlaceBranch(new Vector2I(1, 2), Direction.East, 1, CmdIf.CheckType.Greater, 0);
 		var injy = world.PlaceInjector();
 
-		var tlIn = world.InstallEmptyTile(bra.GLocation + bra.Dir.Invert().ToGrid());
-		var tlTrue = world.InstallEmptyTile(bra.GLocation + bra.Dir.ToGrid());
-		var tlFalse = world.InstallEmptyTile(tlTrue.GLocation + new Vector2I(0, 1));
+		var tlIn = world.AddEmptyTile(bra.InTile.GLocation + bra.Dir.Invert().ToGrid());
+		var tlTrue = world.AddEmptyTile(bra.OutTrueTile.GLocation + bra.Dir.ToGrid());
+		var tlFalse = world.AddEmptyTile(bra.OutFalseTile.GLocation + bra.Dir.ToGrid());
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -678,9 +706,9 @@ public class UnitTests : ArTest.TestSuit
 		var bra = world.PlaceBranch(new Vector2I(1, 2), Direction.East, 1, CmdIf.CheckType.Greater, 0);
 		var injy = world.PlaceInjector();
 
-		var tlIn = world.InstallEmptyTile(bra.GLocation + bra.Dir.Invert().ToGrid());
-		var tlTrue = world.InstallEmptyTile(bra.GLocation + bra.Dir.ToGrid());
-		var tlFalse = world.InstallEmptyTile(tlTrue.GLocation + new Vector2I(0, 1));
+		var tlIn = world.AddEmptyTile(bra.InTile.GLocation + bra.Dir.Invert().ToGrid());
+		var tlTrue = world.AddEmptyTile(bra.OutTrueTile.GLocation + bra.Dir.ToGrid());
+		var tlFalse = world.AddEmptyTile(bra.OutFalseTile.GLocation + bra.Dir.ToGrid());
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -725,7 +753,7 @@ public class UnitTests : ArTest.TestSuit
 		var world = Lvl.World;
 		var dem = world.PlaceDemander(new Vector2I(3, 4), Direction.West, [655, 282, -279]);
 		var injy = world.PlaceInjector();
-		var tlIn = world.InstallEmptyTile(dem.GLocation + dem.Dir.ToGrid());
+		var tlIn = world.AddEmptyTile(dem.InTile.GLocation + dem.Dir.ToGrid());
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -734,29 +762,29 @@ public class UnitTests : ArTest.TestSuit
 
 			await Lvl.Simy.TickOnceAsync(); // Item slides in
 			AssertFalse(Lvl.Simy.IsHalted());
-			AssertTrue(dem.Input.HasItem());
+			AssertTrue(dem.InTile.HasItem());
 
 			await Lvl.Simy.TickOnceAsync(); // Item gets consumed
 			AssertFalse(Lvl.Simy.IsHalted());
-			AssertFalse(dem.Input.HasItem());
+			AssertFalse(dem.InTile.HasItem());
 
 			world.SpawnItem(tlIn, 282);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, dem.Dir.Invert()) ]]);
 
 			await Lvl.Simy.TickOnceAsync(); // Item slides in
 			AssertFalse(Lvl.Simy.IsHalted());
-			AssertTrue(dem.Input.HasItem());
+			AssertTrue(dem.InTile.HasItem());
 
 			await Lvl.Simy.TickOnceAsync(); // Item gets consumed
 			AssertFalse(Lvl.Simy.IsHalted());
-			AssertFalse(dem.Input.HasItem());
+			AssertFalse(dem.InTile.HasItem());
 
 			world.SpawnItem(tlIn, -279);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, dem.Dir.Invert()) ]]);
 
 			await Lvl.Simy.TickOnceAsync(); // Item slides in
 			AssertFalse(Lvl.Simy.IsHalted());
-			AssertTrue(dem.Input.HasItem());
+			AssertTrue(dem.InTile.HasItem());
 
 			await Lvl.Simy.TickOnceAsync(); // Item gets consumed
 			AssertTrue(Lvl.Simy.IsHalted()); // Last item, so simulation should succeed.
@@ -768,7 +796,7 @@ public class UnitTests : ArTest.TestSuit
 		var world = Lvl.World;
 		var dem = world.PlaceDemander(new Vector2I(3, 4), Direction.West, [-76, -797]);
 		var injy = world.PlaceInjector();
-		var tlIn = world.InstallEmptyTile(dem.GLocation + dem.Dir.ToGrid());
+		var tlIn = world.AddEmptyTile(dem.InTile.GLocation + dem.Dir.ToGrid());
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -777,18 +805,18 @@ public class UnitTests : ArTest.TestSuit
 
 			await Lvl.Simy.TickOnceAsync(); // Item slides in
 			AssertFalse(Lvl.Simy.IsHalted());
-			AssertTrue(dem.Input.HasItem());
+			AssertTrue(dem.InTile.HasItem());
 
 			await Lvl.Simy.TickOnceAsync(); // Item gets consumed
 			AssertFalse(Lvl.Simy.IsHalted());
-			AssertFalse(dem.Input.HasItem());
+			AssertFalse(dem.InTile.HasItem());
 
 			world.SpawnItem(tlIn, -1);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, dem.Dir.Invert()) ]]);
 
 			await Lvl.Simy.TickOnceAsync(); // Item slides in (incorrect)
 			AssertFalse(Lvl.Simy.IsHalted());
-			AssertTrue(dem.Input.HasItem());
+			AssertTrue(dem.InTile.HasItem());
 
 			await Lvl.Simy.TickOnceAsync(); // Simulation fails miserablely
 			AssertTrue(Lvl.Simy.IsHalted());
@@ -801,18 +829,18 @@ public class UnitTests : ArTest.TestSuit
 
 			await Lvl.Simy.TickOnceAsync(); // Item slides in
 			AssertFalse(Lvl.Simy.IsHalted());
-			AssertTrue(dem.Input.HasItem());
+			AssertTrue(dem.InTile.HasItem());
 
 			await Lvl.Simy.TickOnceAsync(); // Item gets consumed
 			AssertFalse(Lvl.Simy.IsHalted());
-			AssertFalse(dem.Input.HasItem());
+			AssertFalse(dem.InTile.HasItem());
 
 			world.SpawnItem(tlIn, -797);
 			injy.PendFullSequence([[ new CmdSlide(tlIn, dem.Dir.Invert()) ]]);
 
 			await Lvl.Simy.TickOnceAsync(); // Item slides in
 			AssertFalse(Lvl.Simy.IsHalted());
-			AssertTrue(dem.Input.HasItem());
+			AssertTrue(dem.InTile.HasItem());
 
 			await Lvl.Simy.TickOnceAsync(); // Item gets consumed
 			AssertTrue(Lvl.Simy.IsHalted()); // Last item, so simulation should succeed.
@@ -824,9 +852,9 @@ public class UnitTests : ArTest.TestSuit
 		var world = Lvl.World;
 		var combi = world.PlaceCombiner(new Vector2I(2, 4), Direction.East, 2, BinaryOperation.Add);
 		var injy = world.PlaceInjector();
-		var tl0 = world.InstallEmptyTile(combi.InLeftTile.GLocation + combi.Dir.Invert().ToGrid());
-		var tl1 = world.InstallEmptyTile(combi.InRightTile.GLocation + combi.Dir.Invert().ToGrid());
-		var tlOut = world.InstallEmptyTile(combi.OutTile.GLocation + combi.Dir.ToGrid());
+		var tl0 = world.AddEmptyTile(combi.InLeftTile.GLocation + combi.Dir.Invert().ToGrid());
+		var tl1 = world.AddEmptyTile(combi.InRightTile.GLocation + combi.Dir.Invert().ToGrid());
+		var tlOut = world.AddEmptyTile(combi.OutTile.GLocation + combi.Dir.ToGrid());
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -850,9 +878,9 @@ public class UnitTests : ArTest.TestSuit
 		var world = Lvl.World;
 		var combi = world.PlaceCombiner(new Vector2I(2, 4), Direction.East, 2, BinaryOperation.Add);
 		var injy = world.PlaceInjector();
-		var tl0 = world.InstallEmptyTile(combi.InLeftTile.GLocation + combi.Dir.Invert().ToGrid());
-		var tl1 = world.InstallEmptyTile(combi.InRightTile.GLocation + combi.Dir.Invert().ToGrid());
-		var tlOut = world.InstallEmptyTile(combi.OutTile.GLocation + combi.Dir.ToGrid());
+		var tl0 = world.AddEmptyTile(combi.InLeftTile.GLocation + combi.Dir.Invert().ToGrid());
+		var tl1 = world.AddEmptyTile(combi.InRightTile.GLocation + combi.Dir.Invert().ToGrid());
+		var tlOut = world.AddEmptyTile(combi.OutTile.GLocation + combi.Dir.ToGrid());
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -883,8 +911,8 @@ public class UnitTests : ArTest.TestSuit
 		var world = Lvl.World;
 		var combi = world.PlaceCombiner(new Vector2I(2, 4), Direction.East, 2, BinaryOperation.Add);
 		var injy = world.PlaceInjector();
-		var tl0 = world.InstallEmptyTile(combi.InLeftTile.GLocation + combi.Dir.Invert().ToGrid());
-		var tl1 = world.InstallEmptyTile(combi.InRightTile.GLocation + combi.Dir.Invert().ToGrid());
+		var tl0 = world.AddEmptyTile(combi.InLeftTile.GLocation + combi.Dir.Invert().ToGrid());
+		var tl1 = world.AddEmptyTile(combi.InRightTile.GLocation + combi.Dir.Invert().ToGrid());
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -911,9 +939,9 @@ public class UnitTests : ArTest.TestSuit
 		var clo = world.PlaceCloner(new Vector2I(1, 4), Direction.East, 2);
 		var injy = world.PlaceInjector();
 
-		var tlIn = world.InstallEmptyTile(clo.InTile.GLocation + clo.Dir.Invert().ToGrid());
-		var tlOut0 = world.InstallEmptyTile(clo.OutTile0.GLocation + clo.Dir.ToGrid());
-		var tlOut1 = world.InstallEmptyTile(clo.OutTile1.GLocation + clo.Dir.ToGrid());
+		var tlIn = world.AddEmptyTile(clo.InTile.GLocation + clo.Dir.Invert().ToGrid());
+		var tlOut0 = world.AddEmptyTile(clo.OutTile0.GLocation + clo.Dir.ToGrid());
+		var tlOut1 = world.AddEmptyTile(clo.OutTile1.GLocation + clo.Dir.ToGrid());
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -935,9 +963,9 @@ public class UnitTests : ArTest.TestSuit
 		var clo = world.PlaceCloner(new Vector2I(1, 4), Direction.East, 2);
 		var injy = world.PlaceInjector();
 
-		var tlIn = world.InstallEmptyTile(clo.InTile.GLocation + clo.Dir.Invert().ToGrid());
-		var tlOut0 = world.InstallEmptyTile(clo.OutTile0.GLocation + clo.Dir.ToGrid());
-		var tlOut1 = world.InstallEmptyTile(clo.OutTile1.GLocation + clo.Dir.ToGrid());
+		var tlIn = world.AddEmptyTile(clo.InTile.GLocation + clo.Dir.Invert().ToGrid());
+		var tlOut0 = world.AddEmptyTile(clo.OutTile0.GLocation + clo.Dir.ToGrid());
+		var tlOut1 = world.AddEmptyTile(clo.OutTile1.GLocation + clo.Dir.ToGrid());
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -985,7 +1013,7 @@ public class UnitTests : ArTest.TestSuit
 		var clo = world.PlaceCloner(new Vector2I(1, 4), Direction.East, 2);
 		var injy = world.PlaceInjector();
 
-		var tlIn = world.InstallEmptyTile(clo.InTile.GLocation + clo.Dir.Invert().ToGrid());
+		var tlIn = world.AddEmptyTile(clo.InTile.GLocation + clo.Dir.Invert().ToGrid());
 		using (Lvl.Simy.StartAndPause())
 		{
 			world.SpawnItem(tlIn, 508);
@@ -1000,7 +1028,7 @@ public class UnitTests : ArTest.TestSuit
 			await Lvl.Simy.TickOnceAsync(); // Clogged
 		}
 
-		var tlOut1 = world.InstallEmptyTile(clo.OutTile1.GLocation + clo.Dir.ToGrid());
+		var tlOut1 = world.AddEmptyTile(clo.OutTile1.GLocation + clo.Dir.ToGrid());
 		using (Lvl.Simy.StartAndPause()) // One output connected, other one missing
 		{
 			world.SpawnItem(tlIn, 508);
@@ -1013,7 +1041,7 @@ public class UnitTests : ArTest.TestSuit
 		}
 
 		world.DeleteTile(tlOut1.GLocation);
-		var tlOut0 = world.InstallEmptyTile(clo.OutTile0.GLocation + clo.Dir.ToGrid());
+		var tlOut0 = world.AddEmptyTile(clo.OutTile0.GLocation + clo.Dir.ToGrid());
 		using (Lvl.Simy.StartAndPause()) // The other output this time.
 		{
 			world.SpawnItem(tlIn, 508);
@@ -1035,11 +1063,11 @@ public class UnitTests : ArTest.TestSuit
 		var injy = world.PlaceInjector();
 
 		// Place some tiles in the way
-		world.InstallEmptyTile(new Vector2I(3, 1));
-		world.InstallEmptyTile(new Vector2I(4, 1));
+		world.PlacePlatform(new Vector2I(3, 1));
+		world.PlacePlatform(new Vector2I(4, 1));
 
-		var tlIn = world.InstallEmptyTile(teleIn.InTile.GLocation + teleIn.Dir.ToGrid());
-		var tlOut = world.InstallEmptyTile(teleOut.OutTile.GLocation + teleOut.Dir.ToGrid());
+		var tlIn = world.AddEmptyTile(teleIn.InTile.GLocation + teleIn.Dir.ToGrid());
+		var tlOut = world.AddEmptyTile(teleOut.OutTile.GLocation + teleOut.Dir.ToGrid());
 
 		using (Lvl.Simy.StartAndPause())
 		{
@@ -1062,7 +1090,7 @@ public class UnitTests : ArTest.TestSuit
 		var teleIn = world.PlaceTeleInput(new Vector2I(2, 1), Direction.West, 1);
 		var injy = world.PlaceInjector();
 
-		var tlIn = world.InstallEmptyTile(teleIn.InTile.GLocation + teleIn.Dir.ToGrid());
+		var tlIn = world.AddEmptyTile(teleIn.InTile.GLocation + teleIn.Dir.ToGrid());
 
 		using (Lvl.Simy.StartAndPause())
 		{

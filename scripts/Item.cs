@@ -1,24 +1,26 @@
+using System.Security.Principal;
 using System.Text;
 using Godot;
 
 namespace ArFactory;
 
-public partial class Item : Node2D
+public partial class Item : Node2D, IDestroyable
 {
 	public const int MaxValue = 1000;
 	public const int MinValue = -MaxValue;
 	public const int InvalidValue = MaxValue + 1;
 
 	// Nodes
-	public Sprite2D Sprite => m_Sprite!;
-	public Label CenterLabel => m_CenterLabel!;
+	public Godot.Sprite2D Sprite => m_Sprite!;
+	public Godot.Label CenterLabel => m_CenterLabel!;
 
-	private Sprite2D? m_Sprite;
-	private Label? m_CenterLabel;
+	private Godot.Sprite2D? m_Sprite;
+	private Godot.Label? m_CenterLabel;
 
 
 	// Publics
 	public int Value => m_Value;
+	// Not weak since we will guarantee the tile will outlive its item at all cases.
 	public Tile? ParentTile => m_ParentTile;
 	/// <summary>
 	/// Crashes the program when the tile is floating!
@@ -46,8 +48,8 @@ public partial class Item : Node2D
 
 	public override void _Ready()
 	{
-		m_Sprite = GetNode<Sprite2D>("CenterContainer/Sprite2D");
-		m_CenterLabel = GetNode<Label>("CenterContainer/Sprite2D/CenterContainer/Label");
+		m_Sprite = GetNode<Godot.Sprite2D>("CenterContainer/Sprite2D");
+		m_CenterLabel = GetNode<Godot.Label>("CenterContainer/Sprite2D/CenterContainer/Label");
 	}
 	
 	public void Setup(WorldPanel world, Vector2I gloc, int val)
@@ -83,7 +85,7 @@ public partial class Item : Node2D
 	/// <summary>
 	/// Should not used directly, use <see cref="WorldPanel.TeleportItem"/> and other similar methods instead.
 	/// </summary>
-	public void SetParentTileUnsafe(Tile newParent)
+	public void _SetParentTileUnsafe(Tile newParent)
 	{
 		Debug.AssertEq(GetParent(), null, "Use 'WorldPanel.SpawnItem' or 'WorldPanel.InstallItem'");
 		Debug.AssertRefEq(newParent.Item, this);
@@ -93,13 +95,13 @@ public partial class Item : Node2D
 	/// <summary>
 	/// Use <see cref="Tile.ExtractItem"/> instead.
 	/// </summary>
-	internal void OnExtractItem()
+	internal void _OnExtractItem()
 	{
 		Debug.AssertNotNull(m_ParentTile);
 		Debug.Assert(m_ParentTile!.HasItem());
 		Debug.AssertRefEq(m_ParentTile.Item, this);
-		Debug.Assert(GetParent() is null);
-		Debug.AssertNotNull(m_ParentTile);
+		Debug.AssertNotNull(GetParent());
+		GetParent().RemoveChild(this);
 		m_ParentTile = null;
 	}
 
@@ -147,5 +149,14 @@ public partial class Item : Node2D
 		if (IsMidAnimation()) bui.Append(", anim");
 		if (!IsAllowedToMove()) bui.Append(", stuck");
 		return bui.Append(']').ToString();
-	} 
+	}
+
+	/// <summary>
+	/// May not be called directly, use <see cref="Tile.DestroyItem"/> instead, this doesn't remove the item from the
+	/// world and runs into an undefined state.
+	/// </summary>
+	public void Destroy()
+	{
+		QueueFree();
+	}
 }

@@ -8,7 +8,7 @@ namespace ArFactory;
 /// </summary>
 public partial class UNDemander : Unit
 {
-	public Tile Input => m_In0!;
+	public Tile InTile => m_In0!;
 	public int[] Sequence => m_Sequence!;
 
 	private int[]? m_Sequence;
@@ -41,8 +41,8 @@ public partial class UNDemander : Unit
 		}
 
 		pender.Pend([
-			[ new CmdAwait([Input]) ],
-			[ new CmdDemand(Input, PopNextValue()) ]
+			[ new CmdAwait([InTile]) ],
+			[ new CmdDemand(InTile, PopNextValue()) ]
 		]);
 	}
 

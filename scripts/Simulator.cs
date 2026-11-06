@@ -9,107 +9,8 @@ using System.Threading.Tasks;
 
 namespace ArFactory;
 
-public class Simulator
+public class Simulator : IDestroyable
 {
-	public class PendProxy(CommandRunner runner)
-	{
-		public readonly struct Perm(CommandRunner runner)
-		{
-			private readonly CommandRunner m_Runner = runner;
-			public bool IsFine(PendProxy proxy) => m_Runner == proxy.m_Runner;
-		}
-
-		public Unit? PenderUnit { get; private set; }
-		private readonly CommandRunner m_Runner = runner;
-
-		public void Pend(IEnumerable<IEnumerable<Command>> groups, int startIndex = 0)
-		{
-			m_Runner.PendFullSequence(PenderUnit!, groups.Where(g => g.Any(_ => true)), startIndex);
-		}
-
-		public void _SetPenderUnit(Perm perm, Unit newUnit)
-		{
-			Debug.AssertNotNull(newUnit);
-			Debug.Assert(perm.IsFine(this));
-			PenderUnit = newUnit;
-		}
-	}
-
-	public struct TickExecState()
-	{
-		public enum Kind
-		{
-			NothingSus,
-			IncorrectValue,
-		}
-		
-		public Kind Stat = Kind.NothingSus;
-		public int ExpectedValue = Item.InvalidValue;
-		public int RecievedValue = Item.InvalidValue;
-		public Vector2I GLocation = new(-1, -1);
-	}
-
-	public class OnTickMediator(WorldPanel world, CommandRunner runner)
-	{
-		public CommandRunner.OnTickPender Pender = new(runner);
-		public WorldPanel World = world;
-		private TickExecState m_TickState;
-
-		public TickExecState GetState() => m_TickState;
-
-		public void CrashSimulation(int expected, int found, Vector2I where)
-		{
-			m_TickState = new()
-			{
-				Stat = TickExecState.Kind.IncorrectValue,
-				ExpectedValue = expected,
-				RecievedValue = found,
-				GLocation = where,
-			};
-		}
-	}
-
-	public class PerFrameMediator(WorldPanel world, SimulatorClock clock, double dt)
-	{
-		public WorldPanel World = world;
-		public double FrameDelta = dt;
-		public double TickMillis => m_Clock.GetMilliSecondsPerTick();
-		public double TickElapsedPercent => m_Clock.GetTickElapsedMillis() / TickMillis;
-
-		private readonly SimulatorClock m_Clock = clock;
-	}
-
-	public class OnEdgeMediator(WorldPanel world)
-	{
-		public WorldPanel World = world;
-	}
-
-	public sealed class SimulationAutoEnder(Simulator sim) : IDisposable
-	{
-		private readonly Simulator m_Sim = sim;
-		void IDisposable.Dispose()
-		{
-			if (!m_Sim.IsHalted())
-			{
-				m_Sim.Halt();
-			}
-		}
-	}
-
-	private enum State
-	{
-		Off,
-		Play,
-		Debug,
-	}
-
-	public enum WorldTickResult
-	{
-		NothingSus,
-		RanOutOfItems,
-		SuccessfulRun,
-	}
-
 	public event Action? SimulationStarted;
 	public event Action? SimulationEnded;
 
@@ -140,14 +41,13 @@ public class Simulator
 			tl.GetItemMaybeNull()?.ResetMovementFlag();
 		}
 
-		var allUnits = World.GetUnitsIter();
-		foreach (var u in allUnits)
+		foreach (var u in World.GetUnitsIter())
 		{
 			u.PreprocessTick();
 		}
 
 		var pender = new PendProxy(m_Runner);
-		foreach (var u in allUnits)
+		foreach (var u in World.GetUnitsIter())
 		{
 			pender._SetPenderUnit(new(m_Runner), u);
 			u.HandlePendingNewCommands(pender);
@@ -346,6 +246,15 @@ public class Simulator
 	}
 
 	/// <summary>
+	/// QueueFree's the internal Godot.Timer.
+	/// </summary>
+	public void Destroy()
+	{
+		m_Runner.Destroy();
+		m_Clock.Destroy();
+	}
+
+	/// <summary>
 	/// Adds a slide command blocked by another item in the way only, all other types crash the program in debug.
 	/// </summary>
 	public void QueueBlockedSlideCmdByAnotherItem(CmdSlide cmd)
@@ -376,4 +285,108 @@ public class Simulator
 
 		m_Runner.Reset();
 	}
+
+
+	#region .Inner Classes
+
+	private enum State
+	{
+		Off,
+		Play,
+		Debug,
+	}
+
+	public enum WorldTickResult
+	{
+		NothingSus,
+		RanOutOfItems,
+		SuccessfulRun,
+	}
+
+	public class PendProxy(CommandRunner runner)
+	{
+		public readonly struct Perm(CommandRunner runner)
+		{
+			private readonly CommandRunner m_Runner = runner;
+			public bool IsFine(PendProxy proxy) => m_Runner == proxy.m_Runner;
+		}
+
+		public Unit? PenderUnit { get; private set; }
+		private readonly CommandRunner m_Runner = runner;
+
+		public void Pend(IEnumerable<IEnumerable<Command>> groups, int startIndex = 0)
+		{
+			m_Runner.PendFullSequence(PenderUnit!, groups.Where(g => g.Any(_ => true)), startIndex);
+		}
+
+		public void _SetPenderUnit(Perm perm, Unit newUnit)
+		{
+			Debug.AssertNotNull(newUnit);
+			Debug.Assert(perm.IsFine(this));
+			PenderUnit = newUnit;
+		}
+	}
+
+	public struct TickExecState()
+	{
+		public enum Kind
+		{
+			NothingSus,
+			IncorrectValue,
+		}
+		
+		public Kind Stat = Kind.NothingSus;
+		public int ExpectedValue = Item.InvalidValue;
+		public int RecievedValue = Item.InvalidValue;
+		public Vector2I GLocation = new(-1, -1);
+	}
+
+	public class OnTickMediator(WorldPanel world, CommandRunner runner)
+	{
+		public CommandRunner.OnTickPender Pender = new(runner);
+		public WorldPanel World = world;
+		private TickExecState m_TickState;
+
+		public TickExecState GetState() => m_TickState;
+
+		public void CrashSimulation(int expected, int found, Vector2I where)
+		{
+			m_TickState = new()
+			{
+				Stat = TickExecState.Kind.IncorrectValue,
+				ExpectedValue = expected,
+				RecievedValue = found,
+				GLocation = where,
+			};
+		}
+	}
+
+	public class PerFrameMediator(WorldPanel world, SimulatorClock clock, double dt)
+	{
+		public WorldPanel World = world;
+		public double FrameDelta = dt;
+		public double TickMillis => m_Clock.GetMilliSecondsPerTick();
+		public double TickElapsedPercent => m_Clock.GetTickElapsedMillis() / TickMillis;
+
+		private readonly SimulatorClock m_Clock = clock;
+	}
+
+	public class OnEdgeMediator(WorldPanel world)
+	{
+		public WorldPanel World = world;
+	}
+
+	public sealed class SimulationAutoEnder(Simulator sim) : IDisposable
+	{
+		private readonly Simulator m_Sim = sim;
+		void IDisposable.Dispose()
+		{
+			if (!m_Sim.IsHalted())
+			{
+				m_Sim.Halt();
+			}
+		}
+	}
+
+	#endregion // .Inner Classes
 }
