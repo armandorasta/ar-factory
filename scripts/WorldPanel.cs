@@ -12,20 +12,14 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 	public static readonly Vector2I MinDims = new(3, 3);
 	public static readonly Vector2I MaxDims = new(100, 100);
 
+	// Events
+	public event Action? Redrawing;
+	public event Action? Cleared;
+	public event Action? DimensionsChanged;
+
 
 	// Scenes
 	public static readonly Godot.PackedScene ItemScene = GD.Load<Godot.PackedScene>("res://scenes/Item.tscn");
-	public static readonly Godot.PackedScene UNSupplierScene = GD.Load<Godot.PackedScene>("res://scenes/UNSupplier.tscn");
-	public static readonly Godot.PackedScene UNSliderScene = GD.Load<Godot.PackedScene>("res://scenes/UNSlider.tscn");
-	public static readonly Godot.PackedScene UNUpdaterScene = GD.Load<Godot.PackedScene>("res://scenes/UNUpdater.tscn");
-	public static readonly Godot.PackedScene UNBinScene = GD.Load<Godot.PackedScene>("res://scenes/UNBin.tscn");
-	public static readonly Godot.PackedScene UNDemanderScene = GD.Load<Godot.PackedScene>("res://scenes/UNDemander.tscn");
-	public static readonly Godot.PackedScene UNCombinerScene = GD.Load<Godot.PackedScene>("res://scenes/UNCombiner.tscn");
-	public static readonly Godot.PackedScene UNClonerScene = GD.Load<Godot.PackedScene>("res://scenes/UNCloner.tscn");
-	public static readonly Godot.PackedScene UNBranchScene = GD.Load<Godot.PackedScene>("res://scenes/UNBranch.tscn");
-	public static readonly Godot.PackedScene UNTeleInputScene = GD.Load<Godot.PackedScene>("res://scenes/UNTeleInput.tscn");
-	public static readonly Godot.PackedScene UNTeleOutputScene = GD.Load<Godot.PackedScene>("res://scenes/UNTeleOutput.tscn");
-	public static readonly Godot.PackedScene UNPlatformScene = GD.Load<Godot.PackedScene>("res://scenes/UNPlatform.tscn");
 
 
 	// Nodes
@@ -47,10 +41,11 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 
 	// Privates
 	private Vector2I m_Dims = new(15, 10);
-	private readonly List<Unit> m_Units = [];
+	// This here is a grid, hence the Tile?
 	private List<Tile?> m_Tiles = [];
-	private List<Tile> m_OrphanTiles = [];
-
+	// This here is just a normal list referencing tiles already in m_Tiles.
+	private readonly List<Tile> m_OrphanTiles = [];
+	private readonly List<Godot.Node2D> m_NodeDrawQueue = [];
 
 	#region .Essential Functions
 
@@ -96,6 +91,16 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 	public Vector2I IndexToGrid(int index) => new(index % m_Dims.X, index / m_Dims.X);
 
 	public Vector2I GetMouseGridLocation() => PosToGrid(GetLocalMousePosition());
+
+	public void EnqueueNodeForDrawing<T>(T owner) where T: Node2D, ITileOwner
+	{
+		m_NodeDrawQueue.Add(owner);
+		QueueRedraw();
+	}
+
+
+	#endregion // Essential Functions
+	#region .Tile Methods
 
 	/// <summary>
 	/// Same as <seealso cref="IsWithin"/>, but also checks if a tile is allocated in that spot.
@@ -146,33 +151,7 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 	/// </summary>
 	public bool IsInstalled(Tile tl) => IsWithin(tl.GLocation) && object.ReferenceEquals(tl, GetTile(tl.GLocation));
 
-	/// <summary>
-	/// Returns the whichever unit that <paramref name="gloc"/> lands on.
-	/// </summary>
-	public Unit? GetUnit(Vector2I gloc)
-	{
-		foreach (var u in m_Units)
-		{
-			if (u.IsWithin(gloc))
-			{
-				return u;
-			}
-		}
-		return null;
-	}
-
-	public void DeleteUnit(Unit u)
-	{
-		RemoveChild(u);
-		u.Destroy();
-		m_Units.Remove(u);
-	}
-
 	public IEnumerable<Tile> GetTilesIter() => m_Tiles.Where(tl => tl is not null)!;
-	public IEnumerable<Unit> GetUnitsIter() => m_Units;
-
-
-	#region .Tile Methods
 
 	/// <summary>
 	/// Installs a free tile that allows items in from any direction.
@@ -539,23 +518,16 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 
 
 	#endregion // Item Methods
-	#endregion // Essential Functions
-	#region .Simulation Related
-
-	
-
-	#endregion
 	#region .Godot Overrides
 
 	public override void _Ready()
 	{
 		LoadNodes();
-		Reset();
+		Clear();
 		
 		var dims = m_Dims;
 		m_Dims = Vector2I.Zero;
-		SetDims(dims);
-		// PlaceSomeUnits();
+		SetDimensions(dims);
 	}
 
 	private void LoadNodes()
@@ -564,11 +536,11 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 	}
 
 	/// <summary>
-	/// Just calls <see cref="Reset"/>.
+	/// Just calls <see cref="Clear"/>.
 	/// </summary>
 	public void Destroy()
 	{
-		Reset();
+		Clear();
 	}
 
 	public override void _Draw()
@@ -584,146 +556,35 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 			DrawLine(new(0.0f, i*CellWidth), new(Size.X, i*CellWidth), new(0.0f, 0.18f, 0.0f));
 		}
 #endif
-		
-		// TODO: change this so the units draw the tiles instead.
-		// Probably gonna need to add a empty unit for empty tiles... or just a separate collection for them.
-		foreach (var tl in m_Tiles)
+		if (DebugDrawEnabled)
 		{
-			if (DebugDrawEnabled)
+			foreach (var tl in m_OrphanTiles)
 			{
 				tl?.DebugDraw(this);
 			}
 		}
-		foreach (var u in m_Units)
+
+		foreach (var node in m_NodeDrawQueue)
 		{
-			u.QueueRedraw();
+			var owner = (node as ITileOwner)!;
+			foreach (var tl in owner.GetTilesIter())
+			{
+				tl.DebugDraw(this);
+			}
+			node.QueueRedraw();
 		}
+
+		m_NodeDrawQueue.Clear();
 	}
 
 	#endregion // Godot Overrides
-	#region .Placement Functions
-
-	[Conditional("DEBUG")]
-	private void PlaceSomeUnits()
-	{
-		PlaceSupplier(new Vector2I(1, 7), Direction.East, 3, [1, 2, 3, 4, 5, 6]);
-		PlaceSlider(new Vector2I(2, 7), Direction.East);
-		PlaceSlider(new Vector2I(3, 7), Direction.North);
-		PlaceSlider(new Vector2I(3, 6), Direction.East);
-		PlaceSlider(new Vector2I(4, 6), Direction.East);
-		PlaceSlider(new Vector2I(5, 6), Direction.East);
-		PlaceBranch(new Vector2I(6, 6), Direction.East, 2, CmdIf.CheckType.Greater, 100);
-		PlaceSlider(new Vector2I(7, 6), Direction.East);
-		PlaceBin(new Vector2I(8, 6));
-		PlaceSlider(new Vector2I(7, 7), Direction.South);
-		PlaceSlider(new Vector2I(7, 8), Direction.South);
-		PlaceSlider(new Vector2I(7, 9), Direction.West);
-		PlaceUpdater(new Vector2I(6, 9), Direction.West, 2, UNUpdater.UpdateType.Double);
-		PlaceSlider(new Vector2I(5, 9), Direction.North);
-		PlaceSlider(new Vector2I(5, 8), Direction.North);
-		PlaceSlider(new Vector2I(5, 7), Direction.North);
-	}
-
-	public UNInjector PlaceInjector()
-	{
-		var injy = new UNInjector();
-		AddUnit(injy);
-		injy.Setup(this);
-		return injy;
-	}
-
-	public UNSupplier PlaceSupplier(Vector2I gloc, Direction dir, int rate, IEnumerable<int> seq)
-	{
-		var suppy = UNSupplierScene.Instantiate<UNSupplier>();
-		AddUnit(suppy);
-		suppy.Setup(this, gloc, rate, dir, seq);
-		return suppy;
-	}
-
-	public UNSlider PlaceSlider(Vector2I gloc, Direction dir, int rate = 1)
-	{
-		var slidy = UNSliderScene.Instantiate<UNSlider>();
-		AddUnit(slidy);
-		slidy.Setup(this, gloc, rate, dir);
-		return slidy;
-	}
-
-	public UNUpdater PlaceUpdater(Vector2I gloc, Direction dir, int rate, UNUpdater.UpdateType UpT)
-	{
-		var updater = UNUpdaterScene.Instantiate<UNUpdater>();
-		AddUnit(updater);
-		updater.Setup(this, gloc, rate, dir, UpT);
-		return updater;
-	}
-
-	public UNBin PlaceBin(Vector2I gloc)
-	{
-		var bin = UNBinScene.Instantiate<UNBin>();
-		AddUnit(bin);
-		bin.Setup(this, gloc);
-		return bin;
-	}
-
-	public UNBranch PlaceBranch(Vector2I gloc, Direction dir, int rate, CmdIf.CheckType check, int value)
-	{
-		var bra = UNBranchScene.Instantiate<UNBranch>();
-		AddUnit(bra);
-		bra.Setup(this, gloc, dir, rate, check, value);
-		return bra;
-	}
-
-	public UNDemander PlaceDemander(Vector2I gloc, Direction dir, IEnumerable<int> seq)
-	{
-		var dem = UNDemanderScene.Instantiate<UNDemander>();
-		AddUnit(dem);
-		dem.Setup(this, gloc, dir, seq);
-		return dem;
-	}
-
-	public UNCombiner PlaceCombiner(Vector2I gloc, Direction dir, int rate, BinaryOperation op)
-	{
-		var com = UNCombinerScene.Instantiate<UNCombiner>();
-		AddUnit(com);
-		com.Setup(this, gloc, dir, rate, op);
-		return com;
-	}
-
-	public UNCloner PlaceCloner(Vector2I gloc, Direction dir, int rate)
-	{
-		var cloner = UNClonerScene.Instantiate<UNCloner>();
-		AddUnit(cloner);
-		cloner.Setup(this, gloc, dir, rate);
-		return cloner;
-	}
-
-	public UNTeleInput PlaceTeleInput(Vector2I gloc, Direction dir, int rate)
-	{
-		var teleIn = UNTeleInputScene.Instantiate<UNTeleInput>();
-		AddUnit(teleIn);
-		teleIn.Setup(this, gloc, rate, dir);
-		return teleIn;
-	}
-
-	public UNTeleOutput PlaceTeleOutput(Vector2I gloc, Direction dir, int delay)
-	{
-		var teleIn = UNTeleOutputScene.Instantiate<UNTeleOutput>();
-		AddUnit(teleIn);
-		teleIn.Setup(this, gloc, dir, delay);
-		return teleIn;
-	}
-
-	public UNPlatform PlacePlatform(Vector2I gloc)
-	{
-		var plat = UNPlatformScene.Instantiate<UNPlatform>();
-		AddUnit(plat);
-		plat.Setup(this, gloc);
-		return plat;
-	}
-
-	#endregion // Placement Functions
 	#region .Other Methods
 
-	public void SetDims(Vector2I toWhat)
+	/// <summary>
+	/// This is a very expenesive operation that will shift around all the tiles, and change the dimensions of the 
+	/// godot panel and maybe the sprite in the future.
+	/// </summary>
+	public void SetDimensions(Vector2I toWhat)
 	{
 		var oldDims = m_Dims;
 		var newDims = toWhat.Clamp(MinDims, MaxDims);
@@ -735,21 +596,14 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 		m_Dims = newDims;
 		Size = CellWidth * (Vector2)m_Dims;
 
+		// Let's let the watchers react before we scramble the tiles and stuff.
+		DimensionsChanged?.Invoke();
+
 		var oldTiles = m_Tiles;
 		m_Tiles = [];
 		for (var i = 0; i < newDims.X * newDims.Y; ++i)
 		{
 			m_Tiles.Add(null);
-		}
-
-		// Remove cut-off units
-		for (var i = m_Units.Count - 1; i >= 0; --i)
-		{
-			var u = m_Units[i];
-			if (!Unit.CanFitIn(this, u.GLocation, u.Dimensions, u.Dir))
-			{
-				DeleteUnit(u);
-			}
 		}
 
 		// Copy over the tiles.
@@ -764,21 +618,14 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 		QueueRedraw();
 	}
 
-	public void Reset()
+	public void Clear()
 	{
-		for (var i = m_Units.Count - 1; i >= 0; --i)
-		{
-			DeleteUnit(m_Units[i]);
-		}
-		
+		Cleared?.Invoke();
+
 		for (var i = m_OrphanTiles.Count - 1; i >= 0; --i)
 		{
 			var tl = m_OrphanTiles[i];
 			DeleteTile(tl);
-			// We have to do this check because when AddEmptyTile throws, it sometimes creates
-			// if (tl.IsOwned() && tl.Owner == this)
-			// {
-			// }
 		}
 
 		Debug.Assert(m_Tiles.All(tl => tl is null));
@@ -792,15 +639,6 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 	private void OnTile_NeedsRedraw()
 	{
 		QueueRedraw();
-	}
-
-	/// <summary>
-	/// This adds the unit to the tree, so only call the setup function after this one.
-	/// </summary>
-	private void AddUnit(Unit newUnit)
-	{
-		m_Units.Add(newUnit);
-		AddChild(newUnit);
 	}
 
 	#endregion

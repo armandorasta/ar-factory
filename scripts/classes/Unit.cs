@@ -102,6 +102,11 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	{
 		if (World.DebugDrawEnabled)
 		{
+			if (IsFloating())
+			{
+				return;
+			}
+
 			DrawRect(new(Vector2.Zero, World.CellWidth*(Vector2)Dimensions), Godot.Colors.Black, false, -2.0f);
 			DrawString(WorldPanel.DebugFont, new Vector2(0.0f, 15.0f), GetType().Name,
 				Godot.HorizontalAlignment.Left, World.CellWidth, 16, Godot.Colors.Black);
@@ -110,8 +115,6 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 				DrawString(WorldPanel.DebugFont, 0.5f*World.CellWidth * Vector2.One, "L", HorizontalAlignment.Center,
 					-1, 30, Godot.Colors.Red);
 			}
-			
-			// TODO: Draw the owned tiles here not in world panel!
 		}
 	}
 
@@ -195,19 +198,19 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	{
 		Debug.Assert(m_bCanBeLocked);
 		m_bLocked = true;
-		QueueRedraw();
+		World.EnqueueNodeForDrawing(this);;
 	}
 
 	public void Unlock()
 	{
 		m_bLocked = false;
-		QueueRedraw();
+		World.EnqueueNodeForDrawing(this);;
 	}
 
 	public void ToggleLock()
 	{
 		m_bLocked ^= true;
-		QueueRedraw();
+		World.EnqueueNodeForDrawing(this);;
 	}
 
 	public bool IsFloating() => m_bFloating;
@@ -249,10 +252,9 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 
 		var dir = Dir;
 		m_Dir = Direction.East;
-		SetDir(dir);
-
 		m_bFloating = false;
-		QueueRedraw();
+		SetDirection(dir);
+		World.EnqueueNodeForDrawing(this);;
 	}
 
 	/// <summary>
@@ -274,8 +276,9 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 			}
 		}
 
+		m_TickTiles.Clear();
 		m_bFloating = true;
-		QueueRedraw();
+		World.EnqueueNodeForDrawing(this);;
 	}
 
 	/// <summary>
@@ -300,6 +303,17 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 		return IsWithin(tl.GLocation);
 	}
 	public bool TakeAwayTile(Tile tl) => true; // Called whenever Deconstruct is called.
+	public IEnumerable<Tile> GetTilesIter()
+	{
+		var limVec = Dir is Direction.East or Direction.West ? Dimensions : new Vector2I(Dimensions.Y, Dimensions.X);
+		for (var y = 0; y < limVec.Y; ++y)
+		{
+			for (var x = 0; x < limVec.X; ++x)
+			{
+				yield return GetTileNonNull(new Vector2I(x, y));
+			}
+		}
+	}
 
 	/// <summary>
 	/// Returns true if the machine is expected to operate during this tick, <see cref="m_Rate"/> determines how often
@@ -361,7 +375,7 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	/// TODO: See this `static` business...
 	public virtual bool CanFaceDir(Direction dir) => dir == Direction.East || dir == Direction.West;
 
-	public void SetDir(Direction newDir)
+	public void SetDirection(Direction newDir)
 	{
 		Debug.Assert(Enum.IsDefined(newDir));
 		if (newDir == m_Dir)
@@ -387,6 +401,12 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	public void Rotate180()
 	{
 		Debug.Assert(CanFaceDir(m_Dir.Invert()));
+
+		if (IsFloating())
+		{
+			m_Dir = m_Dir.Invert();
+			return;
+		}
 
 		if (m_Dims == Vector2I.One)
 		{
@@ -418,6 +438,12 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	{
 		Debug.Assert(CanFaceDir(m_Dir.Rotate90()));
 		Debug.Assert(HasSpaceForRotate90());
+
+		if (IsFloating())
+		{
+			m_Dir = m_Dir.Rotate90();
+			return;
+		}
 
 		if (m_Dims == Vector2I.One)
 		{
@@ -459,6 +485,12 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	/// </summary>
 	public void Rotate270()
 	{
+		if (IsFloating())
+		{
+			m_Dir = m_Dir.Rotate270();
+			return;
+		}
+
 		if (m_Dims == Vector2I.One)
 		{
 			Debug.Assert(CanFaceDir(m_Dir.Rotate270()));
@@ -496,7 +528,7 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 		if (bKeepTrack)
 		{
 			// For now dubs are not allowed.
-			Debug.Assert(!m_TickTiles.Contains(tl));
+			Debug.Assert(!m_TickTiles.Any(tl => tl.GLocation == m_GL + gloc));
 			m_TickTiles.Add(tl);
 		}
 		return tl;

@@ -288,6 +288,8 @@ public class Tile : IDestroyable
 
 	public virtual void DebugDraw(WorldPanel world)
 	{
+		Debug.Assert(world.DebugDrawEnabled);
+
 		var myPos = world.GridToPos(GLocation);
 		var col = Godot.Colors.DarkGray;
 

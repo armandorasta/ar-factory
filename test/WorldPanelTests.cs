@@ -4,7 +4,6 @@ using Godot;
 namespace ArFactory.Tests;
 using static ArTest.Asserts;
 
-
 public class WorldPanelTests : ArTest.TestSuit
 {
 	public Editor Lvl => m_Lv!;
@@ -21,7 +20,7 @@ public class WorldPanelTests : ArTest.TestSuit
 	public override void BeforeEach()
 	{
 		Lvl.Simy.Reset();
-		Lvl.World.Reset();
+		Lvl.World.Clear();
 	}
 
 	public override void AfterEach()
@@ -419,7 +418,7 @@ public class WorldPanelTests : ArTest.TestSuit
 		};
 
 		// All tiles fit
-		world.SetDims(new(10, 10));
+		world.SetDimensions(new(10, 10));
 		AssertEq(tls[0].GLocation, new(1, 2));
 		AssertEq(tls[1].GLocation, new(3, 3));
 		AssertEq(tls[2].GLocation, new(0, 7));
@@ -430,7 +429,7 @@ public class WorldPanelTests : ArTest.TestSuit
 		AssertRefEq(tls[3], world[2, 0]);
 
 		// Third tile gets its ass handed over to it
-		world.SetDims(new(5, 5));
+		world.SetDimensions(new(5, 5));
 		AssertEq(tls[0].GLocation, new(1, 2));
 		AssertEq(tls[1].GLocation, new(3, 3));
 		AssertEq(tls[3].GLocation, new(2, 0));

@@ -27,7 +27,7 @@ public class SimulatorTests : ArTest.TestSuit
 	{
 		AssertTrue(Lvl.Simy.IsHalted());
 		Lvl.Simy.Reset();
-		Lvl.World.Reset();
+		Lvl.World.Clear();
 	}
 
 	public override void AfterAll()

@@ -19,7 +19,7 @@ public class TileTests : ArTest.TestSuit
 	public override void BeforeEach()
 	{
 		Lvl.Simy.Reset();
-		Lvl.World.Reset();
+		Lvl.World.Clear();
 	}
 
 	public override void AfterEach()

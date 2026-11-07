@@ -14,7 +14,8 @@ public class Simulator : IDestroyable
 	public event Action? SimulationStarted;
 	public event Action? SimulationEnded;
 
-	public WorldPanel World { get; private set; }
+	public WorldPanel World { get; private init; }
+	public UnitManager UniMan { get; private init; }
 	public SimulatorClock Clock => m_Clock;
 
 	private State m_CurrState = State.Off;
@@ -22,9 +23,10 @@ public class Simulator : IDestroyable
 	private readonly CommandRunner m_Runner = new();
 
 	
-	public Simulator(WorldPanel world)
+	public Simulator(WorldPanel world, UnitManager uniMan)
 	{
 		this.World = world;
+		this.UniMan = uniMan;
 		m_Clock = new SimulatorClock(this);
 		world.AddChild(m_Clock);
 	}
@@ -41,13 +43,13 @@ public class Simulator : IDestroyable
 			tl.GetItemMaybeNull()?.ResetMovementFlag();
 		}
 
-		foreach (var u in World.GetUnitsIter())
+		foreach (var u in UniMan.GetUnitsIter())
 		{
 			u.PreprocessTick();
 		}
 
 		var pender = new PendProxy(m_Runner);
-		foreach (var u in World.GetUnitsIter())
+		foreach (var u in UniMan.GetUnitsIter())
 		{
 			pender._SetPenderUnit(new(m_Runner), u);
 			u.HandlePendingNewCommands(pender);
@@ -94,11 +96,8 @@ public class Simulator : IDestroyable
 
 	public WorldTickResult CheckWorldForErrorsThisTick()
 	{
-		var allUnits = World.GetUnitsIter();
-		var allTiles = World.GetTilesIter();
-
-		var suppliers = allUnits.Where(u => u is UNSupplier).Select(u => (u as UNSupplier)!);
-		var demanders = allUnits.Where(u => u is UNDemander).Select(u => (u as UNDemander)!);
+		var suppliers = UniMan.GetUnitsIter().Where(u => u is UNSupplier).Select(u => (u as UNSupplier)!);
+		var demanders = UniMan.GetUnitsIter().Where(u => u is UNDemander).Select(u => (u as UNDemander)!);
 
 		if (demanders.Any(_ => true) // No success ever if there are no demanders obviously...
 			&& demanders.All(d => d.IsDoneWithOutputSeq() && !d.HasPendingCmds()))
@@ -110,7 +109,7 @@ public class Simulator : IDestroyable
 		// for invalid levels, aka the ones constructed in tests...
 		if (suppliers.Any(_ => true) 
 			&& suppliers.All(s => s.IsDoneWithInputSeq()) 
-			&& allTiles.All(tl => !tl.HasItem()))
+			&& World.GetTilesIter().All(tl => !tl.HasItem()))
 		{
 			return WorldTickResult.RanOutOfItems;
 		}
@@ -273,7 +272,7 @@ public class Simulator : IDestroyable
 
 	private void OnEnd()
 	{
-		foreach (var u in World.GetUnitsIter())
+		foreach (var u in UniMan.GetUnitsIter())
 		{
 			u.Reset();
 		}

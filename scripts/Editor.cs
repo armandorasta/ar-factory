@@ -54,11 +54,13 @@ public partial class Editor : Godot.Node2D
 	// Publics
 	public float DefaultTickMillis = 300.0f;
 	public Simulator Simy => m_Simy!;
+	public UnitManager UniMan => m_UniMan!;
 
 	// Privates
 	private State m_CurrState = State.Off;
 	private float m_TickMillis;
 	private Simulator? m_Simy; // Not actually nullable.
+	private UnitManager? m_UniMan;
 
 	// Editor stuff
 	private record struct UnitPlacement(Godot.ButtonGroup ButtGroup, Godot.Button? Butt, Direction Dir);
@@ -70,7 +72,7 @@ public partial class Editor : Godot.Node2D
 	private readonly Dictionary<string, UnitPickerButtInfo> m_UnitPickerButtInfos = [];
 	private Unit? m_ConnecterUnit;
 	
-	private Godot.ButtonGroup m_ToolboxButtGroup = new() { AllowUnpress = true };
+	// private Godot.ButtonGroup m_ToolboxButtGroup = new() { AllowUnpress = true };
 
 
 	#region .Init
@@ -83,6 +85,7 @@ public partial class Editor : Godot.Node2D
 	public override void _Ready()
 	{
 		GetAllNodes();
+		InitUniMan();
 		InitSimy();
 		InitWorldCam();
 		InitSimButts();
@@ -111,7 +114,8 @@ public partial class Editor : Godot.Node2D
 
 	private void InitSimy()
 	{
-		m_Simy = new(World);
+		Debug.AssertNotNull(m_UniMan is not null);
+		m_Simy = new(World, UniMan);
 		m_Simy.SimulationStarted += OnSimulationStart;
 		m_Simy.SimulationEnded += OnSimulationEnd;
 	}
@@ -121,6 +125,12 @@ public partial class Editor : Godot.Node2D
 		WorldCam.Position = (Vector2)GetWindow().Size * 0.5f;
 		WorldCam.MaxZoom = 1.0f;
 		WorldCam.MinZoom = 0.3f;
+	}
+
+	private void InitUniMan()
+	{
+		Debug.Assert(m_World is not null);
+		m_UniMan = new(World);
 	}
 
 	private void InitSimButts()
@@ -140,18 +150,18 @@ public partial class Editor : Godot.Node2D
 	{
 		m_CurrUnitPlacement.ButtGroup = new() { AllowUnpress = true };
 		m_CurrUnitPlacement.ButtGroup.Pressed += OnUnitPicker_Pressed;
-		AddUnitToPicker("||>", Vector2I.One, true, (l, d) => World.PlaceSupplier(l, d, 1, [1, 2, 3, 4, 5, 6]));
-		AddUnitToPicker(">>>", Vector2I.One, false, (l, d) => World.PlaceSlider(l, d, 1));
-		AddUnitToPicker("xX", Vector2I.One, true, (l, d) => World.PlaceBin(l));
-		AddUnitToPicker("?:", new Vector2I(1, 2), true, (l, d) => World.PlaceBranch(l, d, 2, CmdIf.CheckType.Greater, 0));
-		AddUnitToPicker("1>2", Vector2I.One, true, (l, d) => World.PlaceUpdater(l, d, 2, UNUpdater.UpdateType.Double));
-		AddUnitToPicker(">||", Vector2I.One, true, (l, d) => World.PlaceDemander(l, d, [2, 4, 6, 8, 10, 12]));
-		AddUnitToPicker(">^<", new Vector2I(1, 2), true, (l, d) => World.PlaceCombiner(l, d, 2, BinaryOperation.Add));
-		AddUnitToPicker("1>11", new Vector2I(1, 2), true, (l, d) => World.PlaceCloner(l, d, 2));
+		AddUnitToPicker("||>", Vector2I.One, true, (l, d) => UniMan.PlaceSupplier(l, d, 1, [1, 2, 3, 4, 5, 6]));
+		AddUnitToPicker(">>>", Vector2I.One, false, (l, d) => UniMan.PlaceSlider(l, d, 1));
+		AddUnitToPicker("xX", Vector2I.One, true, (l, d) => UniMan.PlaceBin(l));
+		AddUnitToPicker("?:", new Vector2I(1, 2), true, (l, d) => UniMan.PlaceBranch(l, d, 2, CmdIf.CheckType.Greater, 0));
+		AddUnitToPicker("1>2", Vector2I.One, true, (l, d) => UniMan.PlaceUpdater(l, d, 2, UNUpdater.UpdateType.Double));
+		AddUnitToPicker(">||", Vector2I.One, true, (l, d) => UniMan.PlaceDemander(l, d, [2, 4, 6, 8, 10, 12]));
+		AddUnitToPicker(">^<", new Vector2I(1, 2), true, (l, d) => UniMan.PlaceCombiner(l, d, 2, BinaryOperation.Add));
+		AddUnitToPicker("1>11", new Vector2I(1, 2), true, (l, d) => UniMan.PlaceCloner(l, d, 2));
 		
 		AddUnitToPicker("1>>", Vector2I.One, false, (l, d) =>
 		{
-			m_ConnecterUnit = World.PlaceTeleInput(l, d, 1);
+			m_ConnecterUnit = UniMan.PlaceTeleInput(l, d, 1);
 			CursorLabel.Text = $"Out: {m_CurrUnitPlacement.Dir}";
 			SetState(State.PlacingMatchingTeleOutput);
 			return m_ConnecterUnit;
@@ -192,7 +202,7 @@ public partial class Editor : Godot.Node2D
 			Text = text,
 			CustomMinimumSize = new Vector2I(60, 0),
 			ToggleMode = true,
-			ButtonGroup = m_ToolboxButtGroup,
+			ButtonGroup = m_CurrUnitPlacement.ButtGroup,
 		};
 		ToolsHBox.AddChild(butt);
 		butt.Pressed += () => 
@@ -215,7 +225,7 @@ public partial class Editor : Godot.Node2D
 				if (mev.IsPressed() && mev.ButtonMask == MouseButtonMask.Right && !mev.CtrlPressed && !mev.ShiftPressed)
 				{
 					var mgloc = World.PosToGrid(World.GetLocalMousePosition());
-					switch (World.GetUnit(mgloc)) {
+					switch (UniMan.GetUnit(mgloc)) {
 					case UNUpdater updater:
 						MakePopup(mev, [("2x", 0), ("x+1", 1), ("x-1", 2), ("-x", 3)], id =>
 						{
@@ -295,29 +305,29 @@ public partial class Editor : Godot.Node2D
 			if (Input.GetMouseButtonMask() == MouseButtonMask.Right && Input.IsKeyPressed(Godot.Key.Ctrl))
 			{
 				var mouseGL = World.PosToGrid(GetLocalMousePosition());
-				if (World.GetUnit(mouseGL) is { } u)
+				if (UniMan.GetUnit(mouseGL) is { } u)
 				{
 					switch (u) {
 					case UNTeleInput input:
 					{
 						if (input.GetConnectedOutput() is { } output)
 						{
-							World.DeleteUnit(output);
+							UniMan.DeleteUnit(output);
 						}
-						World.DeleteUnit(u);
+						UniMan.DeleteUnit(u);
 						break;
 					}
 					case UNTeleOutput output:
 					{
 						if (output.GetConnectedInput() is { } input)
 						{
-							World.DeleteUnit(input);
+							UniMan.DeleteUnit(input);
 						}
-						World.DeleteUnit(u);
+						UniMan.DeleteUnit(u);
 						break;
 					}
 					default:
-						World.DeleteUnit(u);
+						UniMan.DeleteUnit(u);
 						break;
 					}
 				}
@@ -381,7 +391,7 @@ public partial class Editor : Godot.Node2D
 			{
 				if (mev.ButtonMask == MouseButtonMask.Left)
 				{
-					if (World.GetUnit(World.GetMouseGridLocation()) is UNSlider tgtSlid)
+					if (UniMan.GetUnit(World.GetMouseGridLocation()) is UNSlider tgtSlid)
 					{
 						if (tgtSlid == m_ConnecterUnit)
 						{
@@ -422,7 +432,7 @@ public partial class Editor : Godot.Node2D
 					if (Unit.CanFitIn(World, mgloc, Vector2I.One, Direction.East))
 					{
 						var teleIn = (m_ConnecterUnit as UNTeleInput)!;
-						var teleOut = World.PlaceTeleOutput(mgloc, m_CurrUnitPlacement.Dir, 1);
+						var teleOut = UniMan.PlaceTeleOutput(mgloc, m_CurrUnitPlacement.Dir, 1);
 						teleIn.AssignOutput(teleOut);
 						m_ConnecterUnit = null;
 						SetState(State.Placement);
@@ -434,7 +444,7 @@ public partial class Editor : Godot.Node2D
 				}
 				else if (mev.ButtonMask == MouseButtonMask.Right)
 				{
-					World.DeleteUnit(m_ConnecterUnit!);
+					UniMan.DeleteUnit(m_ConnecterUnit!);
 					GD.Print("Cancelled");
 					m_ConnecterUnit = null;
 					SetState(State.Placement);
@@ -456,12 +466,13 @@ public partial class Editor : Godot.Node2D
 			{
 				if (mev.ButtonMask == MouseButtonMask.Left)
 				{
-					if (World.GetUnit(World.GetMouseGridLocation()) is { } u)
+					if (UniMan.GetUnit(World.GetMouseGridLocation()) is { } u)
 					{
 						m_ConnecterUnit = u;
 						u.Deconstruct();
 						GD.Print($"Picked up a {u.GetType().Name}");
-						CursorLabel.Text = $"Moving a {u.GetType().Name}";
+						m_CurrUnitPlacement.Dir = u.Dir;
+						CursorLabel.Text = $"Moving a {u.GetType().Name} ({m_CurrUnitPlacement.Dir})";
 						SetState(State.PlacingMovedUnit);
 					}
 				}
@@ -469,7 +480,7 @@ public partial class Editor : Godot.Node2D
 				{
 					GD.Print("Cancelled move tool");
 					SetState(State.Off);
-					m_ToolboxButtGroup.GetPressedButton().ButtonPressed = false;
+					m_CurrUnitPlacement.ButtGroup.GetPressedButton().ButtonPressed = false;
 				}
 			}
 			break;
@@ -500,6 +511,7 @@ public partial class Editor : Godot.Node2D
 							{
 								GD.Print($"Moved a {m_ConnecterUnit!.GetType().Name} from {m_ConnecterUnit.GLocation} to {mgloc}");
 								m_ConnecterUnit!.SetGLocation(mgloc);
+								m_ConnecterUnit.SetDirection(m_CurrUnitPlacement.Dir);
 								m_ConnecterUnit.Construct();
 								CursorLabel.Text = State.MoveTool.ToString();
 								SetState(State.MoveTool);
@@ -510,6 +522,25 @@ public partial class Editor : Godot.Node2D
 							}
 						}
 					}
+				}
+			}
+			else if (ev is InputEventKey kev)
+			{
+				if (kev.Keycode == Godot.Key.R && kev.IsPressed() && !kev.CtrlPressed && !kev.ShiftPressed)
+				{
+					if (m_ConnecterUnit!.CanFaceDir(Direction.North) is false)
+					{
+						m_CurrUnitPlacement.Dir = m_CurrUnitPlacement.Dir switch
+						{
+							Direction.East => Direction.West,
+							Direction.West or _ => Direction.East,
+						};
+					}
+					else
+					{
+						m_CurrUnitPlacement.Dir = m_CurrUnitPlacement.Dir.Rotate90();
+					}
+					CursorLabel.Text = $"Moving a {m_ConnecterUnit!.GetType().Name} ({m_CurrUnitPlacement.Dir})";
 				}
 			}
 			break;
@@ -638,7 +669,7 @@ public partial class Editor : Godot.Node2D
 
 	private void Reset()
 	{
-		World.Reset();
+		World.Clear();
 		Simy.Reset();
 	}
 
