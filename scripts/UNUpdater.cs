@@ -6,14 +6,6 @@ namespace ArFactory;
 
 public partial class UNUpdater : Unit
 {
-	public enum UpdateType
-	{
-		Double,
-		Negate,
-		Increment,
-		Decrement,
-	}
-
 	public static CmdUpdate Apply(UpdateType upT, Tile tl) 
 	{
 		Debug.Assert(Enum.IsDefined(upT));
@@ -27,10 +19,8 @@ public partial class UNUpdater : Unit
 		};
 	}
 
+	public UpdateType UpType { get; private set; }
 
-	public UpdateType UpType;
-
-	public Label UpTypeLabel => m_UpTypeLabel!;
 	private Label? m_UpTypeLabel;
 	
 	public Tile Output => GetTileNonNull(Vector2I.Zero);
@@ -38,7 +28,8 @@ public partial class UNUpdater : Unit
 
 	public override void _Ready()
 	{
-		m_UpTypeLabel = GetNode<Label>("Sprite2D/CenterContainer/HBoxContainer/Label");
+		base._Ready();
+		m_UpTypeLabel = GetNode<Label>("Sprite2D/Label");
 	}
 
 	public void Setup(WorldPanel world, Vector2I gloc, int workRate, Direction dir, UpdateType upT)
@@ -46,15 +37,7 @@ public partial class UNUpdater : Unit
 		Debug.Assert(Enum.IsDefined(upT));
 		BaseInit(world, TickType.OnDemand, workRate, gloc, Vector2I.One, dir);
 
-		UpType = upT;
-		UpTypeLabel.Text = upT switch
-		{
-			UpdateType.Double => "2x",
-			UpdateType.Negate => "-x",
-			UpdateType.Increment => "x+1",
-			UpdateType.Decrement => "x-1",
-			_ => throw new NotImplementedException(),
-		};
+		SetUpdateType(upT);
 	}
 
 	protected override void BuildTilesAsIfFacingEast()
@@ -81,5 +64,27 @@ public partial class UNUpdater : Unit
 	public override string ToString()
 	{
 		return Utilz.AppendToBaseToString(base.ToString(), $"Updater[{UpType}]");
+	}
+
+	public void SetUpdateType(UpdateType newUpT)
+	{
+		Debug.Assert(Enum.IsDefined(newUpT));
+		UpType = newUpT;
+		m_UpTypeLabel!.Text = UpType switch
+		{
+			UpdateType.Double    => "2x",
+			UpdateType.Negate    => "-x",
+			UpdateType.Increment => "x+1",
+			UpdateType.Decrement => "x-1",
+			_ => throw new NotImplementedException(),
+		};
+	}
+
+	public enum UpdateType
+	{
+		Double,
+		Negate,
+		Increment,
+		Decrement,
 	}
 }

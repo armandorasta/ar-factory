@@ -1,6 +1,10 @@
 [gd_scene format=3 uid="uid://clavmrbij5nx3"]
 
 [ext_resource type="Script" uid="uid://cc6wcr2cqbrmb" path="res://scripts/UNBranch.cs" id="1_6s1fh"]
+[ext_resource type="Texture2D" uid="uid://c3msqm21kifbu" path="res://resources/branch.png" id="2_re2yf"]
 
 [node name="Branch" type="Node2D" unique_id=2081016730]
 script = ExtResource("1_6s1fh")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1884638231]
+texture = ExtResource("2_re2yf")

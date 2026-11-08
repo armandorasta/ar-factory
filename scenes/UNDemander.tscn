@@ -1,22 +1,13 @@
 [gd_scene format=3 uid="uid://bphindl43xahl"]
 
 [ext_resource type="Script" uid="uid://c0ibucqoxbqwk" path="res://scripts/UNDemander.cs" id="1_yyc2y"]
-
-[sub_resource type="Gradient" id="Gradient_25bmm"]
-colors = PackedColorArray(0.2221174, 0.36067706, 0.14699468, 1, 0.8766988, 1, 0.49088544, 1)
-
-[sub_resource type="GradientTexture2D" id="GradientTexture2D_25eyo"]
-gradient = SubResource("Gradient_25bmm")
-width = 128
-height = 128
-fill_from = Vector2(0.7777778, 0.23646724)
-fill_to = Vector2(0.78347576, 0.23076923)
+[ext_resource type="Texture2D" uid="uid://cx16bnx8m4co" path="res://resources/demander.png" id="2_kj6yb"]
 
 [node name="Demander" type="Node2D" unique_id=2081016730]
 script = ExtResource("1_yyc2y")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=172897121]
-texture = SubResource("GradientTexture2D_25eyo")
+texture = ExtResource("2_kj6yb")
 
 [node name="Label" type="Label" parent="Sprite2D" unique_id=1799159688]
 anchors_preset = 15

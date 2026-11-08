@@ -229,14 +229,14 @@ public partial class Editor : Godot.Node2D
 					case UNUpdater updater:
 						MakePopup(mev, [("2x", 0), ("x+1", 1), ("x-1", 2), ("-x", 3)], id =>
 						{
-							updater.UpType = id switch
+							updater.SetUpdateType(id switch
 							{
 								0 => UNUpdater.UpdateType.Double,
 								1 => UNUpdater.UpdateType.Increment,
 								2 => UNUpdater.UpdateType.Decrement,
 								3 => UNUpdater.UpdateType.Negate,
 								_ => throw new NotImplementedException(),
-							};
+							});
 						});
 						break;
 					

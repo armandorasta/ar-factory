@@ -1,10 +1,6 @@
 [gd_scene format=3 uid="uid://bqqdrsmg1jayh"]
 
 [ext_resource type="Script" uid="uid://vnyvrq2c0o5e" path="res://scripts/UNPlatform.cs" id="1_bpobu"]
-[ext_resource type="Texture2D" uid="uid://bet3fwwk1rtv0" path="res://resources/bin.png" id="2_kxo53"]
 
 [node name="Bin" type="Node2D" unique_id=2081016730]
 script = ExtResource("1_bpobu")
-
-[node name="Sprite2D" type="Sprite2D" parent="." unique_id=172897121]
-texture = ExtResource("2_kxo53")

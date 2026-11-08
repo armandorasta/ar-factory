@@ -242,27 +242,27 @@ public partial class UNSlider : Unit
 	{
 		Debug.Assert(m_Ext is null);
 		m_Ext = new SliderExtensionConnector(target);
-		QueueRedraw();
+		World.QueueRedraw();
 	}
 
 	public void InstallRuntimeLock()
 	{
 		Debug.Assert(m_Ext is null);
 		m_Ext = new SliderExtensionRuntimeLock();
-		QueueRedraw();
+		World.QueueRedraw();
 	}
 
 	public void InstallDirectionToggle(SliderExtensionDirectionToggle.Kind tt)
 	{
 		Debug.Assert(m_Ext is null);
 		m_Ext = new SliderExtensionDirectionToggle(tt);
-		QueueRedraw();
+		World.QueueRedraw();
 	}
 
 	public void RemoveExtension()
 	{
 		m_Ext?.OnRemoval(this);
 		m_Ext = null;
-		QueueRedraw();
+		World.QueueRedraw();
 	}
 }

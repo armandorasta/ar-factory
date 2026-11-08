@@ -28,7 +28,6 @@ public class UnitManager : IDestroyable
 	public UnitManager(WorldPanel world)
 	{
 		this.World = world;
-		World.Redrawing += DebugDraw;
 		World.Cleared += Clear;
 		World.DimensionsChanged += OnWorldDimensionsChanged;
 	}
@@ -65,14 +64,6 @@ public class UnitManager : IDestroyable
 		World.RemoveChild(u);
 		u.Destroy();
 		m_Units.Remove(u);
-	}
-
-	public void DebugDraw()
-	{
-		foreach (var u in m_Units)
-		{
-			u.QueueRedraw();
-		}
 	}
 
 	public void OnWorldDimensionsChanged()

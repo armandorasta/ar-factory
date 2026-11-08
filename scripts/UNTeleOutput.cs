@@ -87,7 +87,7 @@ public partial class UNTeleOutput : Unit
 	{
 		UnassignInput();
 		m_MatchingIn = new(ass);
-		QueueRedraw();
+		World.QueueRedraw();
 	}
 
 	public void UnassignInput()
@@ -96,7 +96,7 @@ public partial class UNTeleOutput : Unit
 		{
 			m_MatchingIn = null;
 			tgt.UnassignOutput();
-			QueueRedraw();
+			World.QueueRedraw();
 		}
 	}
 }

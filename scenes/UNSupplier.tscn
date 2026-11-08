@@ -1,18 +1,25 @@
 [gd_scene format=3 uid="uid://dmn4mwly6oqh5"]
 
 [ext_resource type="Script" uid="uid://c2vtp8npeco6l" path="res://scripts/UNSupplier.cs" id="1_wl2w4"]
-
-[sub_resource type="Gradient" id="Gradient_hokn4"]
-offsets = PackedFloat32Array(0, 0.65916955, 0.866782, 1)
-colors = PackedColorArray(0.97005206, 0.41555616, 0.41555616, 1, 0.9495534, 0.49149203, 0.40250632, 1, 0.93713504, 0.53749466, 0.3946006, 1, 0, 0, 0, 1)
-
-[sub_resource type="GradientTexture2D" id="GradientTexture2D_jwykw"]
-gradient = SubResource("Gradient_hokn4")
-width = 128
-height = 128
+[ext_resource type="Texture2D" uid="uid://bo8wn87npegaj" path="res://resources/supplier.png" id="2_gjulw"]
 
 [node name="Supplier" type="Node2D" unique_id=2081016730]
 script = ExtResource("1_wl2w4")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=172897121]
-texture = SubResource("GradientTexture2D_jwykw")
+texture = ExtResource("2_gjulw")
+
+[node name="Label" type="Label" parent="Sprite2D" unique_id=585449608]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -64.0
+offset_top = -64.0
+offset_right = -64.0
+offset_bottom = -64.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 32
+text = "0"
+horizontal_alignment = 1
+vertical_alignment = 1

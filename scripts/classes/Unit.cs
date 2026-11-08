@@ -17,7 +17,8 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 
 
 	// Nodes
-	public Sprite2D? Sprite;
+	public Sprite2D Sprite => m_Sprite!;
+	private Sprite2D? m_Sprite;
 
 
 	// Public Interface
@@ -78,15 +79,57 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	}
 
 
+	// This function is called on the `_Ready` function of sub-classes.
+	protected void BaseInit(
+		WorldPanel world, TickType tickType, int workRate, Vector2I gloc, Vector2I dims, Direction dir,
+		bool bLockable = false)
+	{
+		Debug.Assert(Unit.CanFitIn(world, gloc, dims, dir));
+		Debug.Assert(CanFaceDir(dir));
+		Debug.Assert(workRate > 0);
+		Debug.Assert(Enum.IsDefined(tickType));
+
+		this.m_World = world;
+		this.m_Rate = workRate;
+		this.m_GL = gloc;
+		this.m_Dims = dims;
+		this.m_TickType = tickType;
+		this.m_bCanBeLocked = bLockable;
+
+		World.Redrawing += OnWorldRedrawing;
+		Position = world.GridToPos(gloc);
+		InitSprite();
+		m_Dir = dir;
+		Construct();
+	}
+
+	private void InitSprite()
+	{
+		Sprite.ApplyScale(World.CellWidth / 128.0f * Vector2.One);
+		Sprite.Translate(0.5f * World.CellWidth * (Vector2)Dimensions);
+		Sprite.Hide();
+	}
+
+	protected void InjectorBaseInit(WorldPanel world, int workRate)
+	{
+		Debug.Assert(workRate > 0);
+		m_World = world;
+		m_TickType = TickType.Steady;
+		m_Rate = workRate;
+	}
+
+
 	#region .Godot Overrides
 	
 	public override void _Ready()
 	{
-		this.Sprite = GetNodeOrNull<Sprite2D>("Sprite2D");
+		this.m_Sprite = GetNodeOrNull<Sprite2D>("Sprite2D");
 	}
 
 	public virtual void Destroy()
 	{
+		World.Redrawing -= OnWorldRedrawing;
+
 		if (!IsFloating())
 		{
 			CancelPendingCmds();
@@ -118,46 +161,22 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 		}
 	}
 
+	public void OnWorldRedrawing()
+	{
+		if (World.DebugDrawEnabled)
+		{
+			if (!IsFloating())
+			{
+				foreach (var tl in GetTilesIter())
+				{
+					tl.DebugDraw(World);
+				}
+			}
+		}
+		QueueRedraw();
+	}
+
 	#endregion // .Godot Overrides
-
-
-	// This function is called on the `_Ready` function of sub-classes.
-	protected void BaseInit(
-		WorldPanel world, TickType tickType, int workRate, Vector2I gloc, Vector2I dims, Direction dir,
-		bool bLockable = false)
-	{
-		Debug.Assert(Unit.CanFitIn(world, gloc, dims, dir));
-		Debug.Assert(CanFaceDir(dir));
-		Debug.Assert(workRate > 0);
-		Debug.Assert(Enum.IsDefined(tickType));
-
-		this.m_World = world;
-		this.m_Rate = workRate;
-		this.m_GL = gloc;
-		this.m_Dims = dims;
-		this.m_TickType = tickType;
-		this.m_bCanBeLocked = bLockable;
-
-		Position = world.GridToPos(gloc);
-
-		// TODO: Add back sprite code
-
-		Sprite?.Hide();
-		// Sprite.ApplyScale(World.CellWidth/128.0f * (Vector2)Dims);
-		// Sprite.Translate(0.5f*World.CellWidth * Vector2.One);
-
-		m_Dir = dir;
-		Construct();
-	}
-
-	protected void InjectorBaseInit(WorldPanel world, int workRate)
-	{
-		Debug.Assert(workRate > 0);
-		m_World = world;
-		m_TickType = TickType.Steady;
-		m_Rate = workRate;
-	}
-
 	#region Abstract Interface
 
 	/// <summary>
@@ -178,142 +197,6 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 
 	#endregion // Abstract Interface
 	#region Public Interface
-
-	public override string ToString()
-	{
-		var bui = new StringBuilder("Unit[");
-		bui.Append(string.Join(", ", [
-			GLocation,
-			$"{m_Dims.X}x{m_Dims.Y}",
-			m_Dir,
-			$"{m_Rate}s/t",
-		]));
-		return bui.Append(']').ToString();
-	}
-
-	public bool IsLocked() => m_bLocked;
-	public bool CanBeLocked() => m_bCanBeLocked;
-
-	public void Lock()
-	{
-		Debug.Assert(m_bCanBeLocked);
-		m_bLocked = true;
-		World.EnqueueNodeForDrawing(this);;
-	}
-
-	public void Unlock()
-	{
-		m_bLocked = false;
-		World.EnqueueNodeForDrawing(this);;
-	}
-
-	public void ToggleLock()
-	{
-		m_bLocked ^= true;
-		World.EnqueueNodeForDrawing(this);;
-	}
-
-	public bool IsFloating() => m_bFloating;
-
-	/// <summary>
-	/// Only works when floating.
-	/// </summary>
-	public void SetGLocation(Vector2I gloc)
-	{
-		Debug.Assert(IsFloating());
-		if (IsFloating())
-		{
-			m_GL = gloc;
-		}
-	}
-
-	/// <summary>
-	/// Must fit not have any other tiles in the way.
-	/// </summary>
-	public void Construct()
-	{
-		Debug.Assert(Unit.CanFitIn(World, GLocation, Dimensions, Dir));
-
-		for (var y = 0; y < Dimensions.Y; ++y)
-		{
-			for (var x = 0; x < Dimensions.X; ++x)
-			{
-				var mygloc = GLocation + new Vector2I(x, y);
-				var tl = World.AddEmptyTile(mygloc, this);
-				tl.MakeSolid(Direction.North)
-					.MakeSolid(Direction.East)
-					.MakeSolid(Direction.South)
-					.MakeSolid(Direction.West);
-			}
-		}
-
-		BuildTilesAsIfFacingEast();
-		Debug.Assert(m_TickType != TickType.OnDemand || m_TickTiles.Count > 0);
-
-		var dir = Dir;
-		m_Dir = Direction.East;
-		m_bFloating = false;
-		SetDirection(dir);
-		World.EnqueueNodeForDrawing(this);;
-	}
-
-	/// <summary>
-	/// Must not be floating already, has pending commands (just call <see cref="Reset"/>), or have any items within.
-	/// </summary>
-	public void Deconstruct()
-	{
-		Debug.Assert(!IsFloating());
-		Debug.Assert(!HasPendingCmds());
-
-		var limVec = Dir is Direction.East or Direction.West ? Dimensions : new Vector2I(Dimensions.Y, Dimensions.X);
-		for (var y = 0; y < limVec.Y; ++y)
-		{
-			for (var x = 0; x < limVec.X; ++x)
-			{
-				var mygloc = GLocation + new Vector2I(x, y);
-				Debug.Assert(!World.GetTileNonNull(mygloc).IsReserved());
-				World.DeleteTile(mygloc);
-			}
-		}
-
-		m_TickTiles.Clear();
-		m_bFloating = true;
-		World.EnqueueNodeForDrawing(this);;
-	}
-
-	/// <summary>
-	/// Returns enclosing Rect2I in grid-space.
-	/// </summary>
-	public Rect2I GetRect2I() => new(m_GL, m_Dims);
-
-	/// <summary>
-	/// Returns enclosing Rect2 in world-space.
-	/// </summary>
-	public Rect2 GetRect2() => new(World.CellWidth * (Vector2)m_GL, World.CellWidth * (Vector2)m_Dims);
-
-	/// <summary>
-	/// Checks if <paramref name="gloc"/> is within the world in grid-space.
-	/// </summary>
-	public bool IsWithin(Vector2I gloc) => GetRect2I().HasPoint(gloc);
-	
-	public Tile? GetTile(Vector2I gloc) => World.GetTileOrNull(m_GL + gloc);
-	public Tile GetTileNonNull(Vector2I gloc) => World.GetTileNonNull(m_GL + gloc);
-	public bool RecieveTile(Tile tl) // Called whenever Deconstruct is called.
-	{
-		return IsWithin(tl.GLocation);
-	}
-	public bool TakeAwayTile(Tile tl) => true; // Called whenever Deconstruct is called.
-	public IEnumerable<Tile> GetTilesIter()
-	{
-		var limVec = Dir is Direction.East or Direction.West ? Dimensions : new Vector2I(Dimensions.Y, Dimensions.X);
-		for (var y = 0; y < limVec.Y; ++y)
-		{
-			for (var x = 0; x < limVec.X; ++x)
-			{
-				yield return GetTileNonNull(new Vector2I(x, y));
-			}
-		}
-	}
 
 	/// <summary>
 	/// Returns true if the machine is expected to operate during this tick, <see cref="m_Rate"/> determines how often
@@ -341,6 +224,164 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	protected bool AllCmdsAreEndingSlidingCmds()
 		=> m_PendingCmds.All(c => c is CmdSlide sc && sc.CanSlideNextTick(World));
 
+	public override string ToString()
+	{
+		var bui = new StringBuilder("Unit[");
+		bui.Append(string.Join(", ", [
+			GLocation,
+			$"{m_Dims.X}x{m_Dims.Y}",
+			m_Dir,
+			$"{m_Rate}s/t",
+		]));
+		return bui.Append(']').ToString();
+	}
+
+	public bool IsLocked() => m_bLocked;
+	public bool CanBeLocked() => m_bCanBeLocked;
+
+	public void Lock()
+	{
+		Debug.Assert(m_bCanBeLocked);
+		m_bLocked = true;
+		World.QueueRedraw();
+	}
+
+	public void Unlock()
+	{
+		m_bLocked = false;
+		World.QueueRedraw();
+	}
+
+	public void ToggleLock()
+	{
+		m_bLocked ^= true;
+		World.QueueRedraw();
+	}
+
+	public bool IsFloating() => m_bFloating;
+
+	/// <summary>
+	/// Only works when floating.
+	/// </summary>
+	public void SetGLocation(Vector2I gloc, bool bNoSync = false)
+	{
+		Debug.Assert(IsFloating());
+		m_GL = gloc;
+		if (!bNoSync)
+		{
+			SyncPosWithGrid();
+		}
+	}
+
+	/// <summary>
+	/// Only works when floating.
+	/// </summary>
+	public void SyncPosWithGrid()
+	{
+		Debug.Assert(IsFloating());
+		Position = World.GridToPos(GLocation);
+	}
+
+	/// <summary>
+	/// Must fit not have any other tiles in the way.
+	/// </summary>
+	public void Construct()
+	{
+		Debug.Assert(Unit.CanFitIn(World, GLocation, Dimensions, Dir));
+		Debug.Assert(!Sprite.Visible);
+
+		Sprite.Show();
+		Sprite.Rotation = 0f;
+
+		for (var y = 0; y < Dimensions.Y; ++y)
+		{
+			for (var x = 0; x < Dimensions.X; ++x)
+			{
+				var mygloc = GLocation + new Vector2I(x, y);
+				Debug.Assert(World.HasTileOn(mygloc) is false);
+				var tl = World.AddEmptyTile(mygloc, this);
+				tl.MakeSolid(Direction.North)
+					.MakeSolid(Direction.East)
+					.MakeSolid(Direction.South)
+					.MakeSolid(Direction.West);
+			}
+		}
+
+		BuildTilesAsIfFacingEast();
+		Debug.Assert(m_TickType != TickType.OnDemand || m_TickTiles.Count > 0);
+
+		var dir = Dir;
+		m_Dir = Direction.East;
+		m_bFloating = false;
+		SetDirection(dir);
+		World.QueueRedraw();
+	}
+
+	/// <summary>
+	/// Must not be floating already, has pending commands (just call <see cref="Reset"/>), or have any items within.
+	/// </summary>
+	public void Deconstruct()
+	{
+		Debug.Assert(!IsFloating());
+		Debug.Assert(!HasPendingCmds());
+		Debug.Assert(Sprite.Visible);
+
+		Sprite.Hide();
+
+		var limVec = Dir is Direction.East or Direction.West ? Dimensions : new Vector2I(Dimensions.Y, Dimensions.X);
+		for (var y = 0; y < limVec.Y; ++y)
+		{
+			for (var x = 0; x < limVec.X; ++x)
+			{
+				var mygloc = GLocation + new Vector2I(x, y);
+				Debug.Assert(!World.GetTileNonNull(mygloc).IsReserved());
+				World.DeleteTile(mygloc);
+			}
+		}
+
+		m_TickTiles.Clear();
+		m_bFloating = true;
+		World.QueueRedraw();
+	}
+
+	/// <summary>
+	/// Returns enclosing Rect2I in grid-space.
+	/// </summary>
+	public Rect2I GetRect2I() => new(m_GL, m_Dims);
+
+	/// <summary>
+	/// Returns enclosing Rect2 in world-space.
+	/// </summary>
+	public Rect2 GetRect2() => new(World.CellWidth * (Vector2)m_GL, World.CellWidth * (Vector2)m_Dims);
+
+	/// <summary>
+	/// Checks if <paramref name="gloc"/> is within the world in grid-space.
+	/// </summary>
+	public bool IsWithin(Vector2I gloc) => GetRect2I().HasPoint(gloc);
+	
+
+	#region .ITileOwner Stuff
+
+	public Tile? GetTile(Vector2I gloc) => World.GetTileOrNull(m_GL + gloc);
+	public Tile GetTileNonNull(Vector2I gloc) => World.GetTileNonNull(m_GL + gloc);
+	public bool RecieveTile(Tile tl) // Called whenever Deconstruct is called.
+	{
+		return IsWithin(tl.GLocation);
+	}
+	public bool TakeAwayTile(Tile tl) => true; // Called whenever Deconstruct is called.
+	public IEnumerable<Tile> GetTilesIter()
+	{
+		var limVec = Dir is Direction.East or Direction.West ? Dimensions : new Vector2I(Dimensions.Y, Dimensions.X);
+		for (var y = 0; y < limVec.Y; ++y)
+		{
+			for (var x = 0; x < limVec.X; ++x)
+			{
+				yield return GetTileNonNull(new Vector2I(x, y));
+			}
+		}
+	}
+
+	#endregion // .ITileOwner Stuff
 	#region Direction Related Methods
 
 	/// <summary>
@@ -372,7 +413,6 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	/// Returns true if the unit can face that direction, by default units can only face east and west, but this
 	/// behaviour can be changed by overriding this function.
 	/// </summary>
-	/// TODO: See this `static` business...
 	public virtual bool CanFaceDir(Direction dir) => dir == Direction.East || dir == Direction.West;
 
 	public void SetDirection(Direction newDir)
@@ -398,6 +438,34 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 		}
 	}
 
+	private void SyncSpriteRotation()
+	{
+		switch (m_Dir) {
+		case Direction.North: 
+			Sprite.FlipH = false; 
+			Sprite.Rotation = -0.5f * Mathf.Pi; 
+			break;
+		
+		case Direction.East : 
+			Sprite.FlipH = false; 
+			Sprite.Rotation = 0f; 
+			break;
+		
+		case Direction.South: 
+			Sprite.FlipH = false; 
+			Sprite.Rotation = +0.5f * Mathf.Pi; 
+			break;
+		
+		case Direction.West: // special 
+			Sprite.FlipH = true; 
+			Sprite.Rotation = 0f;
+			break;
+		
+		default:
+			throw new NotImplementedException();
+		}
+	}
+
 	public void Rotate180()
 	{
 		Debug.Assert(CanFaceDir(m_Dir.Invert()));
@@ -405,6 +473,7 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 		if (IsFloating())
 		{
 			m_Dir = m_Dir.Invert();
+			SyncSpriteRotation();
 			return;
 		}
 
@@ -412,6 +481,7 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 		{
 			GetTileNonNull(Vector2I.Zero).Rotate180();
 			m_Dir = m_Dir.Invert();
+			SyncSpriteRotation();
 			return;
 		}
 
@@ -427,7 +497,9 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 				World.SwapTiles(m_GL + vec, m_GL + (maxGL - vec));
 			}
 		}
+
 		m_Dir = m_Dir.Invert();
+		SyncSpriteRotation();
 	}
 
 	/// <summary>
@@ -439,9 +511,12 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 		Debug.Assert(CanFaceDir(m_Dir.Rotate90()));
 		Debug.Assert(HasSpaceForRotate90());
 
+		Sprite.Rotate(0.5f * Mathf.Pi);
+
 		if (IsFloating())
 		{
 			m_Dir = m_Dir.Rotate90();
+			SyncSpriteRotation();
 			return;
 		}
 
@@ -449,9 +524,9 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 		{
 			GetTileNonNull(Vector2I.Zero).Rotate90();
 			m_Dir = m_Dir.Rotate90();
+			SyncSpriteRotation();
 			return;
 		}
-
 
 		// Collect all the tiles and remove them from the world.
 		var floatyTiles = new Tile[m_Dims.X * m_Dims.Y];
@@ -477,6 +552,7 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 
 		m_Dims = new(m_Dims.Y, m_Dims.X);
 		m_Dir = m_Dir.Rotate90();
+		SyncSpriteRotation();
 	}
 
 	/// <summary>
@@ -485,20 +561,6 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	/// </summary>
 	public void Rotate270()
 	{
-		if (IsFloating())
-		{
-			m_Dir = m_Dir.Rotate270();
-			return;
-		}
-
-		if (m_Dims == Vector2I.One)
-		{
-			Debug.Assert(CanFaceDir(m_Dir.Rotate270()));
-			GetTileNonNull(Vector2I.Zero).Rotate270();
-			m_Dir = m_Dir.Rotate270();
-			return;
-		}
-
 		Rotate180();
 		Rotate90();
 	}

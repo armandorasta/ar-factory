@@ -36,7 +36,7 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 	public Vector2I Dimensions => m_Dims;
 	public readonly float CellWidth = 100.0f;
 	public Tile? this[int x, int y] => GetTileOrNull(new(x, y));
-	public bool DebugDrawEnabled { get; set; } = true;
+	public bool DebugDrawEnabled { get; set; } = false;
 
 
 	// Privates
@@ -45,7 +45,6 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 	private List<Tile?> m_Tiles = [];
 	// This here is just a normal list referencing tiles already in m_Tiles.
 	private readonly List<Tile> m_OrphanTiles = [];
-	private readonly List<Godot.Node2D> m_NodeDrawQueue = [];
 
 	#region .Essential Functions
 
@@ -91,12 +90,6 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 	public Vector2I IndexToGrid(int index) => new(index % m_Dims.X, index / m_Dims.X);
 
 	public Vector2I GetMouseGridLocation() => PosToGrid(GetLocalMousePosition());
-
-	public void EnqueueNodeForDrawing<T>(T owner) where T: Node2D, ITileOwner
-	{
-		m_NodeDrawQueue.Add(owner);
-		QueueRedraw();
-	}
 
 
 	#endregion // Essential Functions
@@ -564,17 +557,7 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 			}
 		}
 
-		foreach (var node in m_NodeDrawQueue)
-		{
-			var owner = (node as ITileOwner)!;
-			foreach (var tl in owner.GetTilesIter())
-			{
-				tl.DebugDraw(this);
-			}
-			node.QueueRedraw();
-		}
-
-		m_NodeDrawQueue.Clear();
+		Redrawing?.Invoke();
 	}
 
 	#endregion // Godot Overrides
@@ -632,14 +615,5 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 		Debug.Assert(m_OrphanTiles.All(tl => tl is null));
 	}
 
-	/// <summary>
-	/// Silly little function... Needed because disconnection requires a reference to the callable, 
-	/// otherwise I would have to disconnect everything, which I feel might bite me in the butt later.
-	/// </summary>
-	private void OnTile_NeedsRedraw()
-	{
-		QueueRedraw();
-	}
-
-	#endregion
+	#endregion // .Other Methods
 }
