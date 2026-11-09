@@ -12,7 +12,7 @@ public partial class Editor : Godot.Node2D
 	{
 		Off,
 		Placement,
-		ConnectingSliders,
+		ConnectingUEConnector,
 		PlacingMatchingTeleOutput,
 		
 		MoveTool,
@@ -150,16 +150,34 @@ public partial class Editor : Godot.Node2D
 	{
 		m_CurrUnitPlacement.ButtGroup = new() { AllowUnpress = true };
 		m_CurrUnitPlacement.ButtGroup.Pressed += OnUnitPicker_Pressed;
-		AddUnitToPicker("||>", Vector2I.One, true, (l, d) => UniMan.PlaceSupplier(l, d, 1, [1, 2, 3, 4, 5, 6]));
-		AddUnitToPicker(">>>", Vector2I.One, false, (l, d) => UniMan.PlaceSlider(l, d, 1));
-		AddUnitToPicker("xX", Vector2I.One, true, (l, d) => UniMan.PlaceBin(l));
-		AddUnitToPicker("?:", new Vector2I(1, 2), true, (l, d) => UniMan.PlaceBranch(l, d, 2, CmdIf.CheckType.Greater, 0));
-		AddUnitToPicker("1>2", Vector2I.One, true, (l, d) => UniMan.PlaceUpdater(l, d, 2, UNUpdater.UpdateType.Double));
-		AddUnitToPicker(">||", Vector2I.One, true, (l, d) => UniMan.PlaceDemander(l, d, [2, 4, 6, 8, 10, 12]));
-		AddUnitToPicker(">^<", new Vector2I(1, 2), true, (l, d) => UniMan.PlaceCombiner(l, d, 2, BinaryOperation.Add));
-		AddUnitToPicker("1>11", new Vector2I(1, 2), true, (l, d) => UniMan.PlaceCloner(l, d, 2));
+		AddUnitToPicker("Supplier", Vector2I.One, true, 
+			"res://resources/supplier.png", 
+			(l, d) => UniMan.PlaceSupplier(l, d, 1, [1, 2, 3, 4, 5, 6]));
+		AddUnitToPicker("Slider", Vector2I.One, false, 
+			"res://resources/belt.png", 
+			(l, d) => UniMan.PlaceSlider(l, d, 1));
+		AddUnitToPicker("Bin", Vector2I.One, true, 
+			"res://resources/bin.png", 
+			(l, d) => UniMan.PlaceBin(l));
+		AddUnitToPicker("Branch", new Vector2I(1, 2), true, 
+			"res://resources/branch.png", 
+			(l, d) => UniMan.PlaceBranch(l, d, 2, CmdIf.CheckType.Greater, 0));
+		AddUnitToPicker("Updater", Vector2I.One, true, 
+			"res://resources/updater.png", 
+			(l, d) => UniMan.PlaceUpdater(l, d, 2, UNUpdater.UpdateType.Double));
+		AddUnitToPicker("Demander", Vector2I.One, true, 
+			"res://resources/demander.png", 
+			(l, d) => UniMan.PlaceDemander(l, d, [2, 4, 6, 8, 10, 12]));
+		AddUnitToPicker("Combiner", new Vector2I(1, 2), true, 
+			"res://resources/combiner.png", 
+			(l, d) => UniMan.PlaceCombiner(l, d, 2, BinaryOperation.Add));
+		AddUnitToPicker("Cloner", new Vector2I(1, 2), true, 
+			"res://resources/cloner.png", 
+			(l, d) => UniMan.PlaceCloner(l, d, 2));
 		
-		AddUnitToPicker("1>>", Vector2I.One, false, (l, d) =>
+		AddUnitToPicker("Teleporter", Vector2I.One, false, 
+			"res://resources/belt.png", 
+			(l, d) =>
 		{
 			m_ConnecterUnit = UniMan.PlaceTeleInput(l, d, 1);
 			CursorLabel.Text = $"Out: {m_CurrUnitPlacement.Dir}";
@@ -169,17 +187,21 @@ public partial class Editor : Godot.Node2D
 	}
 
 	private void AddUnitToPicker(
-		string text, Vector2I dims, bool bEastWest, Func<Vector2I, Direction, Unit> placementFunc)
+		string text, Vector2I dims, bool bEastWest, string iconPath, Func<Vector2I, Direction, Unit> placementFunc)
 	{
 		var butt = new Godot.Button
 		{
-
 			Text = text,
 			CustomMinimumSize = new Vector2I(0, 90),
 			ButtonGroup = m_CurrUnitPlacement.ButtGroup,
 			ToggleMode = true,
 			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+			Icon = GD.Load<Texture2D>(iconPath),
+			IconAlignment = HorizontalAlignment.Center,
+			VerticalIconAlignment = VerticalAlignment.Top,
+			ExpandIcon = true,
 		};
+		butt.AddThemeFontSizeOverride("font_size", 10);
 		UnitPlacerGCon.AddChild(butt);
 		m_UnitPickerButtInfos.Add(butt.Name, new(dims, bEastWest, placementFunc));
 	}
@@ -255,10 +277,10 @@ public partial class Editor : Godot.Node2D
 					case UNSlider slid:
 						MakePopup(mev, [
 							(slid.IsLocked() ? "Unlock" : "Lock", 0), 
-							("Connect", 1),
-							(!slid.IsToggle() ? "Make toggle" : null, 2),
-							(!slid.IsLock() ? "Make lock" : null, 3),
-							(!slid.IsNormal() ? slid.IsKey() ? "Disconnect" : "Make normal" : null, 4),
+							(UniMan.GetExtension(slid) is not UnitManager.UEConnector ? "Connect" : null, 1),
+							(UniMan.GetExtension(slid) is not UnitManager.UEDirectionToggle ? "Make toggle" : null, 2),
+							(UniMan.GetExtension(slid) is not UnitManager.UERuntimeLock ? "Make lock" : null, 3),
+							(UniMan.HasExtension(slid) ? "Detach Extension" : null, 4)
 						], id =>
 						{
 							switch (id) {
@@ -273,25 +295,26 @@ public partial class Editor : Godot.Node2D
 								}
 								break;
 							
-							case 1: // Connect to lock
+							case 1: // Connector
 								GD.Print("Connecting...");
 								m_ConnecterUnit = slid;
 								CursorLabel.Text = "Connecting...";
-								SetState(State.ConnectingSliders);
+								SetState(State.ConnectingUEConnector);
 								break;
 							
 							case 2: // Toggle
-								slid.RemoveExtension();
-								slid.InstallDirectionToggle(UNSlider.SliderExtensionDirectionToggle.Kind._90);
+								UniMan.DetachExtensionFrom(slid);
+								UniMan.AttachExtension(
+									new UnitManager.UEDirectionToggle(slid, UnitManager.UEDirectionToggle.Kind._270));
 								break;
 							
-							case 3: // Lock
-								slid.RemoveExtension();
-								slid.InstallRuntimeLock();
+							case 3: // RuntimeLock
+								UniMan.DetachExtensionFrom(slid);
+								UniMan.AttachExtension(new UnitManager.UERuntimeLock(slid));
 								break;
 
-							case 4: // Normal
-								slid.RemoveExtension();
+							case 4: // Detaching
+								UniMan.DetachExtensionFrom(slid);
 								break;
 							
 							default:
@@ -385,7 +408,7 @@ public partial class Editor : Godot.Node2D
 			}
 			break;
 		}
-		case State.ConnectingSliders:
+		case State.ConnectingUEConnector:
 		{
 			if (ev is InputEventMouse mev && mev.IsPressed() && !mev.CtrlPressed && !mev.ShiftPressed)
 			{
@@ -400,8 +423,8 @@ public partial class Editor : Godot.Node2D
 						else
 						{
 							var connSlid = (m_ConnecterUnit as UNSlider)!;
-							connSlid.RemoveExtension();
-							connSlid.MakeKey(tgtSlid);
+							UniMan.DetachExtensionFrom(connSlid);
+							UniMan.AttachExtension(new UnitManager.UEConnector(connSlid, tgtSlid));
 							GD.Print($"Connected slider on {connSlid!.GLocation} to the one on {tgtSlid.GLocation}");
 							SetState(State.Off);
 							m_ConnecterUnit = null;
@@ -577,7 +600,7 @@ public partial class Editor : Godot.Node2D
 			break;
 
 		case State.Placement:
-		case State.ConnectingSliders:
+		case State.ConnectingUEConnector:
 		case State.PlacingMatchingTeleOutput:
 		case State.MoveTool:
 		case State.PlacingMovedUnit:
@@ -695,7 +718,7 @@ public partial class Editor : Godot.Node2D
 			break;
 
 		case State.Placement:
-		case State.ConnectingSliders:
+		case State.ConnectingUEConnector:
 		case State.PlacingMatchingTeleOutput:
 		case State.MoveTool:
 		case State.PlacingMovedUnit:

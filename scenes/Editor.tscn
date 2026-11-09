@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://b32qsjvwapht7" path="res://scripts/WorldPanel.cs" id="2_kl8ac"]
 [ext_resource type="Script" uid="uid://dli18m8xc1m77" path="res://scripts/Cam.cs" id="3_qifjx"]
 [ext_resource type="Texture2D" uid="uid://cnh1gw0ji7fow" path="res://resources/15x10_checkboard_100px_per_sq.png" id="4_wmxca"]
+[ext_resource type="Texture2D" uid="uid://cx16bnx8m4co" path="res://resources/demander.png" id="5_j6dse"]
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_wmxca"]
 
@@ -215,3 +216,7 @@ custom_minimum_size = Vector2(0, 90)
 layout_mode = 2
 size_flags_horizontal = 3
 text = ">>>"
+icon = ExtResource("5_j6dse")
+icon_alignment = 1
+vertical_icon_alignment = 0
+expand_icon = true

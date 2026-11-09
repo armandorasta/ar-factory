@@ -20,6 +20,33 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	public Sprite2D Sprite => m_Sprite!;
 	private Sprite2D? m_Sprite;
 
+	
+	// Events
+	/// <summary>
+	/// Here you can use the world's draw functions. This is called after the world is done first.
+	/// </summary>
+	public event Action? RedrawingSelf;
+	
+	/// <summary>
+	/// When <see cref="Destory"/> is called, before <see cref="QueueFree"/>.
+	/// </summary>
+	public event Action? Destoryed;
+	
+	/// <summary>
+	/// When a signal is recieved from a connector (hopefully).
+	/// </summary>
+	public event Action? RecievedSignal; // TODO: Handle this!
+	
+	/// <summary>
+	/// When <see cref="Reset"/> is called. Called after it's done resetting, in the base class at least.
+	/// </summary>
+	public event Action? DidAReset;
+
+	/// <summary>
+	/// Varries per unit, some units never call this.
+	/// </summary>
+	public event Action? TriggerHappened;
+
 
 	// Public Interface
 	public Vector2I GLocation => m_GL;
@@ -54,13 +81,12 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 
 	public static bool CanFitIn(WorldPanel world, Vector2I gloc, Vector2I dims, Direction dir)
 	{
-		var bLeftRight = dir is Direction.East or Direction.West;
-		var adjustedDims = bLeftRight ? dims : new(dims.Y, dims.X);
-		if (!world.GetGridRect().Encloses(new(gloc, adjustedDims)))
+		var adjustedDims = GetDirAdjustedDims(dims, dir);
+		if (!world.GetGridRect().Encloses(new Rect2I(gloc, adjustedDims)))
 		{
 			return false;
 		}
-		for (int y = 0; y < adjustedDims.Y; ++y)
+		else for (int y = 0; y < adjustedDims.Y; ++y)
 		{
 			for (int x = 0; x < adjustedDims.X; ++x)
 			{
@@ -78,6 +104,10 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 		return CanFitIn(world, gloc, u.Dimensions, u.Dir);
 	}
 
+	public static Vector2I GetDirAdjustedDims(Vector2I dims, Direction dir)
+	{
+		return dir is Direction.East or Direction.West ? dims : new(dims.Y, dims.X);
+	}
 
 	// This function is called on the `_Ready` function of sub-classes.
 	protected void BaseInit(
@@ -123,7 +153,7 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	
 	public override void _Ready()
 	{
-		this.m_Sprite = GetNodeOrNull<Sprite2D>("Sprite2D");
+		this.m_Sprite = GetNodeOrNull<Godot.Sprite2D>("Sprite2D");
 	}
 
 	public virtual void Destroy()
@@ -135,6 +165,7 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 			CancelPendingCmds();
 			Deconstruct();
 		}
+		Destoryed?.Invoke();
 		QueueFree();
 	}
 
@@ -159,6 +190,8 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 					-1, 30, Godot.Colors.Red);
 			}
 		}
+
+		RedrawingSelf?.Invoke();
 	}
 
 	public void OnWorldRedrawing()
@@ -193,6 +226,11 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	/// are used quite often here.
 	/// </summary>
 	public abstract void PendNewCommands(Simulator.PendProxy pender);
+
+	public virtual void HandleSignal()
+	{
+		RecievedSignal?.Invoke();
+	}
 
 
 	#endregion // Abstract Interface
@@ -243,19 +281,27 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	{
 		Debug.Assert(m_bCanBeLocked);
 		m_bLocked = true;
+		Sprite.Modulate = Godot.Colors.Red;
 		World.QueueRedraw();
 	}
 
 	public void Unlock()
 	{
 		m_bLocked = false;
+		Sprite.Modulate = Godot.Colors.White;
 		World.QueueRedraw();
 	}
 
 	public void ToggleLock()
 	{
-		m_bLocked ^= true;
-		World.QueueRedraw();
+		if (IsLocked())
+		{
+			Unlock();
+		}
+		else
+		{
+			Lock();
+		}
 	}
 
 	public bool IsFloating() => m_bFloating;
@@ -328,7 +374,7 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 
 		Sprite.Hide();
 
-		var limVec = Dir is Direction.East or Direction.West ? Dimensions : new Vector2I(Dimensions.Y, Dimensions.X);
+		var limVec = Unit.GetDirAdjustedDims(Dimensions, Dir);
 		for (var y = 0; y < limVec.Y; ++y)
 		{
 			for (var x = 0; x < limVec.X; ++x)
@@ -371,7 +417,7 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	public bool TakeAwayTile(Tile tl) => true; // Called whenever Deconstruct is called.
 	public IEnumerable<Tile> GetTilesIter()
 	{
-		var limVec = Dir is Direction.East or Direction.West ? Dimensions : new Vector2I(Dimensions.Y, Dimensions.X);
+		var limVec = GetDirAdjustedDims(Dimensions, Dir);
 		for (var y = 0; y < limVec.Y; ++y)
 		{
 			for (var x = 0; x < limVec.X; ++x)
@@ -711,8 +757,10 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	{
 		m_Count = 1;
 		CancelPendingCmds();
+		DidAReset?.Invoke();
 	}
 
+	protected void InvokeEventTriggerHappened() => TriggerHappened?.Invoke();
 
 	#endregion // Simulation
 	#endregion // Public Interface
