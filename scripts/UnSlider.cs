@@ -1,12 +1,11 @@
 using System;
 using Godot;
+using ArFactory.Serialization;
 
 namespace ArFactory;
 
 public partial class UNSlider : Unit
 {
-	// public event Action? ItemArrived;
-
 	public Tile OnlyTile => GetTileNonNull(Vector2I.Zero);
 
 	public void Setup(WorldPanel world, Vector2I gloc, int workRate, Direction dir)

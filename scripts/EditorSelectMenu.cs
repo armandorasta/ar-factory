@@ -29,6 +29,6 @@ public partial class EditorSelectMenu : Godot.Control
 
 	private void OnAddButt_Pressed()
 	{
-		SceneManager.MoveToLevel(GetTree());
+		SceneManager.MoveToEditor(GetTree());
 	}
 }

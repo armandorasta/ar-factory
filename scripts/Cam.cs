@@ -35,7 +35,7 @@ public partial class Cam : Camera2D
 
 	public override void _Input(InputEvent @event)
 	{
-		if (@event is InputEventMouseButton mev && mev.ButtonIndex == DragButt)
+		if (@event is InputEventMouseButton mev && mev.ButtonIndex == DragButt && !mev.CtrlPressed && !mev.ShiftPressed)
 		{
 			if (mev.IsPressed())
 			{
@@ -51,7 +51,7 @@ public partial class Cam : Camera2D
 
 	public override void _UnhandledInput(InputEvent @event)
 	{
-		if (@event is InputEventMouseButton mev && mev.IsPressed())
+		if (@event is InputEventMouseButton mev && mev.IsPressed() && !mev.CtrlPressed && !mev.ShiftPressed)
 		{
 			Vector2 newZoom = Zoom;
 			if (mev.ButtonIndex == MouseButton.WheelDown)

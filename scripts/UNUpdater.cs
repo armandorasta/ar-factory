@@ -1,5 +1,8 @@
 using System;
 using System.Diagnostics;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using ArFactory.Serialization;
 using Godot;
 
 namespace ArFactory;
@@ -79,6 +82,7 @@ public partial class UNUpdater : Unit
 			_ => throw new NotImplementedException(),
 		};
 	}
+	
 
 	public enum UpdateType
 	{

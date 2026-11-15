@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using ArFactory.Serialization;
 using Godot;
 
 namespace ArFactory;
@@ -43,7 +46,7 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	public event Action? DidAReset;
 
 	/// <summary>
-	/// Varries per unit, some units never call this.
+	/// Varies per unit, some units never call this.
 	/// </summary>
 	public event Action? TriggerHappened;
 
@@ -232,7 +235,6 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 		RecievedSignal?.Invoke();
 	}
 
-
 	#endregion // Abstract Interface
 	#region Public Interface
 
@@ -404,8 +406,30 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	/// Checks if <paramref name="gloc"/> is within the world in grid-space.
 	/// </summary>
 	public bool IsWithin(Vector2I gloc) => GetRect2I().HasPoint(gloc);
-	
 
+
+	#region .Serialization
+
+	// public abstract JsonElement Serialize();
+	// public abstract void Restore(JsonElement elem);
+	public virtual JsonElement Serialize() => Serializer.SerializeToElement(GetBaseSerializationData());
+	public virtual void Restore(UnitSerializationData data)
+	{
+		if (data.IsLocked)
+		{
+			Lock();
+		}
+	}
+		
+	protected UnitSerializationData GetBaseSerializationData() => new()
+	{
+		GL = GLocation,
+		Dir = Dir,
+		Rate = m_Rate,
+		IsLocked = IsLocked(),
+	};
+
+	#endregion // .Serialization
 	#region .ITileOwner Stuff
 
 	public Tile? GetTile(Vector2I gloc) => World.GetTileOrNull(m_GL + gloc);
@@ -764,10 +788,13 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 
 	#endregion // Simulation
 	#endregion // Public Interface
+	#region .Inner Classes
 
 	protected enum TickType
 	{
 		Steady,   // Always counts ticks, even when no item is fed, like sliders.
 		OnDemand, // Counts ticks only when all item slots are filled, like updaters.
 	}
+
+	#endregion // .Inner Classes
 }

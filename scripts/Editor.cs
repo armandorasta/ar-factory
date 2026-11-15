@@ -28,6 +28,8 @@ public partial class Editor : Godot.Node2D
 	public Godot.Button PlayButt => m_PlayButt!;
 	public Godot.Button HaltButt => m_HaltButt!;
 	public Godot.Button DebugButt => m_DebugButt!;
+	public Godot.Button SaveButt => m_SaveButt!;
+	public Godot.Button LoadButt => m_LoadButt!;
 	public Godot.HBoxContainer ToolsHBox => m_ToolsHBox!;
 	public Godot.HBoxContainer PlayHBox => m_PlayHBox!;
 	public Godot.Label TicksLabel => m_TicksLabel!;
@@ -42,6 +44,8 @@ public partial class Editor : Godot.Node2D
 	private Godot.Button? m_PlayButt;
 	private Godot.Button? m_HaltButt;
 	private Godot.Button? m_DebugButt;
+	private Godot.Button? m_SaveButt;
+	private Godot.Button? m_LoadButt;
 	private Godot.HBoxContainer? m_ToolsHBox;
 	private Godot.HBoxContainer? m_PlayHBox;
 	private Godot.Label? m_TicksLabel;
@@ -103,6 +107,8 @@ public partial class Editor : Godot.Node2D
 		m_PlayButt = GetNode<Godot.Button>("HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PlayButt");
 		m_HaltButt = GetNode<Godot.Button>("HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/PauseButt");
 		m_DebugButt = GetNode<Godot.Button>("HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/DebugButt");
+		m_SaveButt = GetNode<Godot.Button>("HUDLayer/TopPanel/MarCon/HBox/SaveButt");
+		m_LoadButt = GetNode<Godot.Button>("HUDLayer/TopPanel/MarCon/HBox/LoadButt");
 		m_ToolsHBox = GetNode<Godot.HBoxContainer>("HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/ToolsHBox");
 		m_PlayHBox = GetNode<Godot.HBoxContainer>("HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox");
 		m_TicksLabel = GetNode<Godot.Label>("HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TicksLabel");
@@ -138,6 +144,8 @@ public partial class Editor : Godot.Node2D
 		PlayButt.Pressed += OnPlayButt_Pressed;
 		DebugButt.Pressed += OnDebugButt_Pressed;
 		HaltButt.Pressed += OnHaltButt_Pressed;
+		SaveButt.Pressed += OnSaveButt_Pressed;
+		LoadButt.Pressed += OnLoadButt_Pressed;
 	}
 
 	private void InitSimSpeedSlider()
@@ -176,14 +184,13 @@ public partial class Editor : Godot.Node2D
 			(l, d) => UniMan.PlaceCloner(l, d, 2));
 		
 		AddUnitToPicker("Teleporter", Vector2I.One, false, 
-			"res://resources/belt.png", 
-			(l, d) =>
-		{
-			m_ConnecterUnit = UniMan.PlaceTeleInput(l, d, 1);
-			CursorLabel.Text = $"Out: {m_CurrUnitPlacement.Dir}";
-			SetState(State.PlacingMatchingTeleOutput);
-			return m_ConnecterUnit;
-		});
+			"res://resources/belt.png", (l, d) =>
+			{
+				m_ConnecterUnit = UniMan.PlaceTeleInput(l, d, 1);
+				CursorLabel.Text = $"Out: {m_CurrUnitPlacement.Dir}";
+				SetState(State.PlacingMatchingTeleOutput);
+				return m_ConnecterUnit;
+			});
 	}
 
 	private void AddUnitToPicker(
@@ -235,7 +242,24 @@ public partial class Editor : Godot.Node2D
 	}
 
 	#endregion // Init
+	#region .Public Interface
+		
+	public void Deserialize()
+	{
+		World.Clear();
+		GD.Print("Cleared the world");
+		if (UniMan.Deserialize())
+		{
+			GD.Print("Loaded");
+		}
+		else
+		{
+			GD.Print("No file to load");
+		}
+	}
 
+	#endregion // .Public Interface
+	#region .Godot Overrides
 
 	public override void _UnhandledInput(InputEvent ev)
 	{
@@ -305,7 +329,7 @@ public partial class Editor : Godot.Node2D
 							case 2: // Toggle
 								UniMan.DetachExtensionFrom(slid);
 								UniMan.AttachExtension(
-									new UnitManager.UEDirectionToggle(slid, UnitManager.UEDirectionToggle.Kind._270));
+									new UnitManager.UEDirectionToggle(slid, UnitManager.UEDirectionToggle.Kind._90));
 								break;
 							
 							case 3: // RuntimeLock
@@ -614,7 +638,19 @@ public partial class Editor : Godot.Node2D
 		}
 	}
 
+	#endregion // .Godot Overrides
 	#region .Signal Handlers
+
+	private void OnSaveButt_Pressed()
+	{
+		UniMan.Serialize();
+		GD.Print("Saved");
+	}
+
+	private void OnLoadButt_Pressed()
+	{
+		Deserialize();
+	}
 
 	private void OnPlayButt_Pressed()
 	{

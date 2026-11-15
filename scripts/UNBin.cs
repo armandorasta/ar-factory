@@ -1,4 +1,7 @@
+using System;
+using System.Text.Json;
 using Godot;
+using ArFactory.Serialization;
 
 namespace ArFactory;
 
@@ -19,7 +22,7 @@ public partial class UNBin : Unit
 			return;
 		}
 
-		Tile tl = GetTile(Vector2I.Zero);
+		Tile tl = OnlyTile;
 		pender.Pend([
 			[ new CmdAwait([tl]) ], 
 			[ new CmdKill(tl) ],

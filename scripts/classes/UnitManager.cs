@@ -1,6 +1,12 @@
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
+using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using ArFactory.Serialization;
 using Godot;
 
 namespace ArFactory;
@@ -133,8 +139,8 @@ public class UnitManager : IDestroyable
 
 	public void OnExtensionParent_Destoryed(UnitExtension ext)
 	{
-		Debug.Assert(m_Extensions.ContainsKey(ext.Parent));
-		Debug.AssertRefEq(m_Extensions[ext.Parent], ext);
+		// Debug.Assert(m_Extensions.ContainsKey(ext.Parent));
+		// Debug.AssertRefEq(m_Extensions[ext.Parent], ext);
 		m_Extensions.Remove(ext.Parent);
 	}
 
@@ -259,6 +265,57 @@ public class UnitManager : IDestroyable
 	}
 
 	#endregion // Placement Functions
+	#region .Serialization
+
+	private struct UnitManagerSerializationInfo(int count)
+	{
+		[JsonInclude] public List<UnitInfo> Units = new(count);
+	}
+
+	private struct UnitInfo
+	{
+		[JsonInclude] public string TypeName;
+		[JsonInclude] public JsonElement Elem;
+	}
+	
+	public void Serialize()
+	{
+		var info = new UnitManagerSerializationInfo(m_Units.Count);
+		foreach (var u in m_Units)
+		{
+			info.Units.Add(new UnitInfo
+			{
+				TypeName = u.GetType().Name,
+				Elem = u.Serialize(),
+			});
+		}
+
+		var file = Godot.FileAccess.Open("res://resources/saves/Level.json", FileAccess.ModeFlags.Write);
+		Debug.AssertNotNull(file);
+		file.StoreString(Serializer.Serialize(info));
+		file.Close();
+	}
+
+	public bool Deserialize()
+	{
+		if (!Godot.FileAccess.FileExists("res://resources/saves/Level.json"))
+		{
+			return false;
+		}
+
+		var fileContents = Godot.FileAccess.GetFileAsString("res://resources/saves/Level.json");
+		Debug.AssertNotNull(fileContents);
+		var uniManInfo = Serializer.Deserialize<UnitManagerSerializationInfo>(fileContents);
+		Debug.AssertNotNull(uniManInfo);
+		foreach (var su in uniManInfo.Units!)
+		{
+			Serializer.DeserializeUnit(su.TypeName, su.Elem, this);
+		}
+
+		return true;
+	}
+
+	#endregion //  .Serialization
 	#region .Inner Classes
 
 	public abstract class UnitExtension
@@ -311,7 +368,7 @@ public class UnitManager : IDestroyable
 			{
 				m_InitState = Parent.IsLocked() ? 1 : 0;
 			}
-			Parent.Unlock();
+			Parent.ToggleLock();
 		}
 
 		public override void OnReset()
