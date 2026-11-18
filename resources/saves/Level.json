@@ -1,1 +1,145 @@
-{"Units":[{"TypeName":"UNBin","Elem":{"GL":{"X":8,"Y":4},"Dir":1,"Rate":1,"IsLocked":false}},{"TypeName":"UNSlider","Elem":{"GL":{"X":5,"Y":3},"Dir":1,"Rate":1,"IsLocked":false}},{"TypeName":"UNSlider","Elem":{"GL":{"X":6,"Y":3},"Dir":1,"Rate":1,"IsLocked":false}},{"TypeName":"UNSlider","Elem":{"GL":{"X":7,"Y":3},"Dir":1,"Rate":1,"IsLocked":false}},{"TypeName":"UNSlider","Elem":{"GL":{"X":9,"Y":5},"Dir":1,"Rate":1,"IsLocked":false}},{"TypeName":"UNSlider","Elem":{"GL":{"X":10,"Y":5},"Dir":1,"Rate":1,"IsLocked":false}},{"TypeName":"UNSlider","Elem":{"GL":{"X":11,"Y":5},"Dir":1,"Rate":1,"IsLocked":false}},{"TypeName":"UNCloner","Elem":{"GL":{"X":5,"Y":7},"Dir":1,"Rate":2,"IsLocked":false}},{"TypeName":"UNCloner","Elem":{"GL":{"X":10,"Y":2},"Dir":1,"Rate":2,"IsLocked":false}}]}
+{
+  "Units": [
+    {
+      "TypeName": "UNSupplier",
+      "Elem": {
+        "Sequence": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "GL": {
+          "X": 4,
+          "Y": 4
+        },
+        "Dir": 1,
+        "Rate": 1,
+        "IsLocked": false
+      }
+    },
+    {
+      "TypeName": "UNSlider",
+      "Elem": {
+        "GL": {
+          "X": 5,
+          "Y": 4
+        },
+        "Dir": 1,
+        "Rate": 1,
+        "IsLocked": false
+      }
+    },
+    {
+      "TypeName": "UNSlider",
+      "Elem": {
+        "GL": {
+          "X": 6,
+          "Y": 4
+        },
+        "Dir": 1,
+        "Rate": 1,
+        "IsLocked": false
+      }
+    },
+    {
+      "TypeName": "UNBin",
+      "Elem": {
+        "GL": {
+          "X": 8,
+          "Y": 4
+        },
+        "Dir": 1,
+        "Rate": 1,
+        "IsLocked": false
+      }
+    },
+    {
+      "TypeName": "UNSlider",
+      "Elem": {
+        "GL": {
+          "X": 7,
+          "Y": 4
+        },
+        "Dir": 1,
+        "Rate": 1,
+        "IsLocked": false
+      }
+    },
+    {
+      "TypeName": "UNSlider",
+      "Elem": {
+        "GL": {
+          "X": 6,
+          "Y": 1
+        },
+        "Dir": 1,
+        "Rate": 1,
+        "IsLocked": false
+      }
+    },
+    {
+      "TypeName": "UNBranch",
+      "Elem": {
+        "Check": 8,
+        "CmpValue": 0,
+        "GL": {
+          "X": 10,
+          "Y": 2
+        },
+        "Dir": 1,
+        "Rate": 2,
+        "IsLocked": false
+      }
+    }
+  ],
+  "Extensions": [
+    {
+      "TypeName": "UERuntimeLock",
+      "Elem": {
+        "ParentGL": {
+          "X": 5,
+          "Y": 4
+        }
+      }
+    },
+    {
+      "TypeName": "UEConnector",
+      "Elem": {
+        "PartnerGL": {
+          "X": 5,
+          "Y": 4
+        },
+        "ParentGL": {
+          "X": 6,
+          "Y": 4
+        }
+      }
+    },
+    {
+      "TypeName": "UEDirectionToggle",
+      "Elem": {
+        "Kind": 1,
+        "ParentGL": {
+          "X": 6,
+          "Y": 1
+        }
+      }
+    },
+    {
+      "TypeName": "UEConnector",
+      "Elem": {
+        "PartnerGL": {
+          "X": 6,
+          "Y": 1
+        },
+        "ParentGL": {
+          "X": 7,
+          "Y": 4
+        }
+      }
+    }
+  ]
+}

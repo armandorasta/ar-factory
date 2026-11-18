@@ -16,6 +16,7 @@ public class Serializer
         var options = new JsonSerializerOptions
 		{
 			IncludeFields = true,
+			WriteIndented = true,
 		};
 
         foreach (var tp in Assembly.GetExecutingAssembly().GetTypes())
@@ -44,7 +45,7 @@ public class Serializer
 	public static T? Deserialize<T>(JsonElement elem)
 		=> JsonSerializer.Deserialize<T>(elem, sc_Options);
 	
-
+	public static JsonElement SerializeUnitToElement(Unit u) => u.SerializeToElement();
 	public static void DeserializeUnit(string typeName, JsonElement elem, UnitManager uniMan)
 	{
 		switch (typeName) {
@@ -52,60 +53,113 @@ public class Serializer
 		{
 			var data = Deserialize<UNBinSerializationData>(elem);
 			Debug.AssertNotNull(data);
-			var bin = uniMan.PlaceBin(data!.GL);
-			bin.Restore(data);
+			var u = uniMan.PlaceBin(data!.GL);
+			u.RestoreAfterInit(data);
 			break;
 		}
 		case nameof(UNCloner):
 		{
 			var data = Deserialize<UNClonerSerializationData>(elem);
 			Debug.AssertNotNull(data);
-			var clo = uniMan.PlaceCloner(data!.GL, data.Dir, data.Rate);
-			clo.Restore(data);
+			var u = uniMan.PlaceCloner(data!.GL, data.Dir, data.Rate);
+			u.RestoreAfterInit(data);
 			break;
 		}
 		case nameof(UNSlider):
 		{
 			var data = Deserialize<UNSliderSerializationData>(elem);
 			Debug.AssertNotNull(data);
-			var slid = uniMan.PlaceSlider(data!.GL, data.Dir, data.Rate);
-			slid.Restore(data);
+			var u = uniMan.PlaceSlider(data!.GL, data.Dir, data.Rate);
+			u.RestoreAfterInit(data);
 			break;
 		}
-		// case nameof(UNUpdater):
-		// {
-		// 	var info = UNUpdater.Deserialize(su["Info"]);
-		// 	var upd = PlaceUpdater(info.BaseInfo.GL, info.BaseInfo.Dir, info.BaseInfo.Rate, info.UpType);
-		// 	DeserializeBaseInfo(ref info.BaseInfo, upd);
-		// 	break;
-		// }
-		// case nameof(UNSupplier):
-		// {
-		// 	var info = UNSupplier.Deserialize(su["Info"]);
-		// 	var supp = PlaceSupplier(info.BaseInfo.GL, info.BaseInfo.Dir, info.BaseInfo.Rate, info.Sequence);
-		// 	DeserializeBaseInfo(ref info.BaseInfo, supp);
-		// 	break;
-		// }
-		// case nameof(UNDemander):
-		// {
-		// 	var info = UNDemander.Deserialize(su["Info"]);
-		// 	var dem = PlaceDemander(info.BaseInfo.GL, info.BaseInfo.Dir, info.Sequence);
-		// 	DeserializeBaseInfo(ref info.BaseInfo, dem);
-		// 	break;
-		// }
+		case nameof(UNUpdater):
+		{
+			var data = Deserialize<UNUpdaterSerializationData>(elem);
+			Debug.AssertNotNull(data);
+			var u = uniMan.PlaceUpdater(data!.GL, data.Dir, data.Rate, data.UpType);
+			u.RestoreAfterInit(data);
+			break;
+		}
+		case nameof(UNSupplier):
+		{
+			var data = Deserialize<UNSupplierSerializationData>(elem);
+			Debug.AssertNotNull(data);
+			var u = uniMan.PlaceSupplier(data!.GL, data.Dir, data.Rate, data.Sequence!);
+			u.RestoreAfterInit(data);
+			break;
+		}
+		case nameof(UNDemander):
+		{
+			var data = Deserialize<UNDemanderSerializationData>(elem);
+			Debug.AssertNotNull(data);
+			var u = uniMan.PlaceDemander(data!.GL, data.Dir, data.Sequence!);
+			u.RestoreAfterInit(data);
+			break;
+		}
+		case nameof(UNBranch):
+		{
+			var data = Deserialize<UNBranchSerializationData>(elem);
+			Debug.AssertNotNull(data);
+			var u = uniMan.PlaceBranch(data!.GL, data.Dir, data.Rate, data.Check, data.CmpValue);
+			u.RestoreAfterInit(data);
+			break;
+		}
+		case nameof(UNCombiner):
+		{
+			var data = Deserialize<UNCombinerSerializationData>(elem);
+			Debug.AssertNotNull(data);
+			var u = uniMan.PlaceCombiner(data!.GL, data.Dir, data.Rate, data.Operation);
+			u.RestoreAfterInit(data);
+			break;
+		}
 		default:
 			throw new NotImplementedException($"Forgot to add deserialization code for {typeName}");
 		}
 	}
 
-	private static void DeserializeUnitBaseInfo(UnitSerializationData baseData, Unit tgtUnit)
+	public static JsonElement SerializeUnitExtensionToElement(UnitManager.UnitExtension ue) => ue.SerializeToElement();
+	public static void DeserializeUnitExtension(string typeName, JsonElement elem, UnitManager uniMan)
 	{
-		if (baseData.IsLocked)
+		switch (typeName) {
+		case nameof(UnitManager.UERuntimeLock):
 		{
-			tgtUnit.Lock();
+			var (data, parent) = DeserializeUnitExtensionBase<UERuntimeLockSerializationData>(elem, uniMan);
+			uniMan.AttachExtension(new UnitManager.UERuntimeLock(parent!));
+			break;
+		}
+		case nameof(UnitManager.UEDirectionToggle):
+		{
+			var (data, parent) = DeserializeUnitExtensionBase<UEDirectionToggleSerializationData>(elem, uniMan);
+			uniMan.AttachExtension(new UnitManager.UEDirectionToggle(parent, data.Kind));
+			break;
+		}
+		case nameof(UnitManager.UEConnector):
+		{
+			var (data, parent) = DeserializeUnitExtensionBase<UEConnectorSerializationData>(elem, uniMan);
+			var partnerUnit = uniMan.GetUnit(data!.PartnerGL);
+			Debug.AssertNotNull(parent);
+			uniMan.AttachExtension(new UnitManager.UEConnector(parent!, partnerUnit!));
+			break;
+		}
+		default:
+			throw new NotImplementedException($"Forgot to add deserialization code for {typeName}");
 		}
 	}
+
+	private static (TData, Unit) DeserializeUnitExtensionBase<TData>(JsonElement elem, UnitManager uniMan)
+		where TData : UnitExtensionSerializationData
+	{
+		var data = Deserialize<TData>(elem);
+		Debug.AssertNotNull(data);
+		var parent = uniMan.GetUnit(data!.ParentGL);
+		Debug.AssertNotNull(parent);
+		return (data!, parent!);
+	}
+
 }
+
+#region .Unit
 
 public record UnitSerializationData
 {
@@ -121,15 +175,46 @@ public record UNClonerSerializationData : UnitSerializationData { }
 
 public record UNUpdaterSerializationData : UnitSerializationData
 {
-	[JsonInclude] public required UNUpdater.UpdateType UpType;
+	[JsonInclude] public UNUpdater.UpdateType UpType;
 }
 
 public record UNSupplierSerializationData : UnitSerializationData
 {
-	[JsonInclude] public required int[] Sequence;
+	[JsonInclude] public int[]? Sequence;
 }
 
 public record UNDemanderSerializationData : UnitSerializationData
 {
-	[JsonInclude] public required int[] Sequence;
+	[JsonInclude] public int[]? Sequence;
 }
+
+public record UNBranchSerializationData : UnitSerializationData
+{
+	[JsonInclude] public CmdIf.CheckType Check;
+	[JsonInclude] public int CmpValue;
+}
+
+public record UNCombinerSerializationData : UnitSerializationData
+{
+	[JsonInclude] public BinaryOperation Operation;
+}
+
+#endregion // .Unit
+#region .UnitExtension
+
+public record UnitExtensionSerializationData
+{
+	[JsonInclude] public Vector2I ParentGL;
+}
+
+public record UERuntimeLockSerializationData : UnitExtensionSerializationData { }
+public record UEDirectionToggleSerializationData : UnitExtensionSerializationData
+{
+	[JsonInclude] public UnitManager.UEDirectionToggle.Kind Kind;
+}
+public record UEConnectorSerializationData : UnitExtensionSerializationData
+{
+	[JsonInclude] public Vector2I PartnerGL;
+}
+
+#endregion // .UnitExtension

@@ -115,7 +115,7 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	// This function is called on the `_Ready` function of sub-classes.
 	protected void BaseInit(
 		WorldPanel world, TickType tickType, int workRate, Vector2I gloc, Vector2I dims, Direction dir,
-		bool bLockable = false)
+		bool bCanBeLocked = false)
 	{
 		Debug.Assert(Unit.CanFitIn(world, gloc, dims, dir));
 		Debug.Assert(CanFaceDir(dir));
@@ -127,7 +127,7 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 		this.m_GL = gloc;
 		this.m_Dims = dims;
 		this.m_TickType = tickType;
-		this.m_bCanBeLocked = bLockable;
+		this.m_bCanBeLocked = bCanBeLocked;
 
 		World.Redrawing += OnWorldRedrawing;
 		Position = world.GridToPos(gloc);
@@ -412,25 +412,32 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 
 	// public abstract JsonElement Serialize();
 	// public abstract void Restore(JsonElement elem);
-	public virtual JsonElement Serialize() => Serializer.SerializeToElement(GetBaseSerializationData());
-	public virtual void Restore(UnitSerializationData data)
+	public virtual JsonElement SerializeToElement() 
+		=> Serializer.SerializeToElement(SerializeBase<UnitSerializationData>());
+
+	public virtual void RestoreAfterInit(UnitSerializationData data)
 	{
 		if (data.IsLocked)
 		{
 			Lock();
 		}
 	}
-		
-	protected UnitSerializationData GetBaseSerializationData() => new()
+
+	protected TData SerializeBase<TData>() where TData : UnitSerializationData, new()
 	{
-		GL = GLocation,
-		Dir = Dir,
-		Rate = m_Rate,
-		IsLocked = IsLocked(),
-	};
+		return new()
+		{
+			GL = GLocation,
+			Dir = Dir,
+			Rate = m_Rate,
+			IsLocked = IsLocked(),
+		};
+	}
+
 
 	#endregion // .Serialization
 	#region .ITileOwner Stuff
+
 
 	public Tile? GetTile(Vector2I gloc) => World.GetTileOrNull(m_GL + gloc);
 	public Tile GetTileNonNull(Vector2I gloc) => World.GetTileNonNull(m_GL + gloc);

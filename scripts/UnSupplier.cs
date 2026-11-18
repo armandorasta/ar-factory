@@ -88,4 +88,11 @@ public partial class UNSupplier : Unit
 	{
 		m_Label!.Text = IsDoneWithInputSeq() ? "DONE" : $"{PeekNextValue()}";
 	}
+
+	public override JsonElement SerializeToElement() 
+	{
+		var data = SerializeBase<UNSupplierSerializationData>();
+		data.Sequence = Sequence;
+		return Serializer.SerializeToElement(data);
+	}
 }

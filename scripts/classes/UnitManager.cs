@@ -267,12 +267,13 @@ public class UnitManager : IDestroyable
 	#endregion // Placement Functions
 	#region .Serialization
 
-	private struct UnitManagerSerializationInfo(int count)
+	private struct UnitManagerSerializationInfo(int unitCount, int extCount)
 	{
-		[JsonInclude] public List<UnitInfo> Units = new(count);
+		[JsonInclude] public List<TypeAndElem> Units = new(unitCount);
+		[JsonInclude] public List<TypeAndElem> Extensions = new(extCount);
 	}
 
-	private struct UnitInfo
+	private struct TypeAndElem
 	{
 		[JsonInclude] public string TypeName;
 		[JsonInclude] public JsonElement Elem;
@@ -280,13 +281,21 @@ public class UnitManager : IDestroyable
 	
 	public void Serialize()
 	{
-		var info = new UnitManagerSerializationInfo(m_Units.Count);
+		var info = new UnitManagerSerializationInfo(m_Units.Count, m_Extensions.Count);
 		foreach (var u in m_Units)
 		{
-			info.Units.Add(new UnitInfo
+			info.Units.Add(new TypeAndElem
 			{
 				TypeName = u.GetType().Name,
-				Elem = u.Serialize(),
+				Elem = Serializer.SerializeUnitToElement(u),
+			});
+		}
+		foreach (var ext in m_Extensions.Values)
+		{
+			info.Extensions.Add(new TypeAndElem
+			{
+				TypeName = ext.GetType().Name,
+				Elem = Serializer.SerializeUnitExtensionToElement(ext),
 			});
 		}
 
@@ -310,6 +319,10 @@ public class UnitManager : IDestroyable
 		foreach (var su in uniManInfo.Units!)
 		{
 			Serializer.DeserializeUnit(su.TypeName, su.Elem, this);
+		}
+		foreach (var sext in uniManInfo.Extensions!)
+		{
+			Serializer.DeserializeUnitExtension(sext.TypeName, sext.Elem, this);
 		}
 
 		return true;
@@ -341,6 +354,12 @@ public class UnitManager : IDestroyable
 
 		public virtual void OnTrigger() { }
 		public virtual void OnReset() { }
+
+		public abstract JsonElement SerializeToElement();
+		protected virtual T SerializeBaseInto<T>() where T : UnitExtensionSerializationData, new()
+		{
+			return new() { ParentGL = Parent.GLocation };
+		}
 	}
 
 	public class UERuntimeLock(Unit parentUnit) : UnitExtension(parentUnit)
@@ -383,15 +402,18 @@ public class UnitManager : IDestroyable
 			}
 			m_InitState = -1;
 		}
+
+		public override JsonElement SerializeToElement()
+			=> Serializer.SerializeToElement(SerializeBaseInto<UERuntimeLockSerializationData>());
 	}
 
 	public class UEDirectionToggle(Unit parentUnit, UEDirectionToggle.Kind tt) : UnitExtension(parentUnit)
 	{
 		public enum Kind
 		{
-			_90,
-			_270,
-			_180,
+			Clockwise,
+			CounterClockwise,
+			Flipper,
 		}
 
 		private readonly Kind m_TT = tt;
@@ -403,9 +425,9 @@ public class UnitManager : IDestroyable
 			var cellSize = Parent.World.GetCellSize();
 			var dirVec = m_TT switch
 			{
-				Kind._90 => m_bIsToggled ? Parent.Dir.Rotate90().ToGrid() : Parent.Dir.Rotate270().ToGrid(),
-				Kind._270 => m_bIsToggled ? Parent.Dir.Rotate270().ToGrid() : Parent.Dir.Rotate90().ToGrid(),
-				Kind._180 => Parent.Dir.Invert().ToGrid(),
+				Kind.CounterClockwise => m_bIsToggled ? Parent.Dir.Rotate90().ToGrid() : Parent.Dir.Rotate270().ToGrid(),
+				Kind.Clockwise => m_bIsToggled ? Parent.Dir.Rotate270().ToGrid() : Parent.Dir.Rotate90().ToGrid(),
+				Kind.Flipper => Parent.Dir.Invert().ToGrid(),
 				_ => throw new NotImplementedException(),
 			};
 			Parent.DrawLine(0.5f*cellSize, 0.5f*cellSize + 0.4f*Parent.World.CellWidth*(Vector2)dirVec,
@@ -423,7 +445,7 @@ public class UnitManager : IDestroyable
 		private void ToggleParentDir()
 		{
 			switch (m_TT) {
-			case Kind._90:
+			case Kind.CounterClockwise:
 				if (m_bIsToggled)
 				{
 					Parent.Rotate90();
@@ -434,7 +456,7 @@ public class UnitManager : IDestroyable
 				}
 				break;
 			
-			case Kind._270:
+			case Kind.Clockwise:
 				if (m_bIsToggled)
 				{
 					Parent.Rotate270();
@@ -445,7 +467,7 @@ public class UnitManager : IDestroyable
 				}
 				break;
 			
-			case Kind._180:
+			case Kind.Flipper:
 				Parent.Rotate180();
 				break;
 
@@ -461,6 +483,14 @@ public class UnitManager : IDestroyable
 			ToggleParentDir();
 			Parent.CancelPendingCmds();
 		}
+
+		public override JsonElement SerializeToElement()
+		{
+			var data = SerializeBaseInto<UEDirectionToggleSerializationData>();
+			data.Kind = m_TT;
+			return Serializer.SerializeToElement(data);
+		}
+
 	}
 
 	public class UEConnector(Unit parentUnit, Unit other) : UnitExtension(parentUnit)
@@ -487,6 +517,19 @@ public class UnitManager : IDestroyable
 
 		public override void OnSignal()
 		{
+		}
+
+		// We are gonna assume this is a valid link always...		
+		public override JsonElement SerializeToElement()
+		{
+			Debug.AssertNotNull(m_Partner);
+			var res = m_Partner.TryGetTarget(out var ptner);
+			Debug.Assert(res);
+			Debug.Assert(GodotObject.IsInstanceValid(ptner));
+
+			var data = SerializeBaseInto<UEConnectorSerializationData>();
+			data.PartnerGL = ptner.GLocation;
+			return Serializer.SerializeToElement(data);
 		}
 	}
 

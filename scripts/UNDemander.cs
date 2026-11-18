@@ -87,4 +87,11 @@ public partial class UNDemander : Unit
 	{
 		m_Label!.Text = IsDoneWithOutputSeq() ? "DONE" : $"{PeekNextValue()}";
 	}
+
+	public override JsonElement SerializeToElement() 
+	{
+		var data = SerializeBase<UNDemanderSerializationData>();
+		data.Sequence = Sequence;
+		return Serializer.SerializeToElement(data);
+	}
 }

@@ -83,6 +83,12 @@ public partial class UNUpdater : Unit
 		};
 	}
 	
+	public override JsonElement SerializeToElement() 
+	{
+		var data = SerializeBase<UNUpdaterSerializationData>();
+		data.UpType = UpType;
+		return Serializer.SerializeToElement(data);
+	}
 
 	public enum UpdateType
 	{

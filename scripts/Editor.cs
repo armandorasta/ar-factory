@@ -287,15 +287,19 @@ public partial class Editor : Godot.Node2D
 						break;
 					
 					case UNCombiner combi:
-						MakePopup(mev, [("x + x + ...", 0), ("x * x * x...", 1)], id =>
-						{
-							combi.Operation = id switch
+						MakePopup(mev, [
+							(combi.Operation is BinaryOperation.Add ? null : "x + x + ...", 0), 
+							(combi.Operation is BinaryOperation.Mul ? null : "x * x * x...", 1)], 
+							id =>
 							{
-								0 => BinaryOperation.Add,
-								1 => BinaryOperation.Mul,
-								_ => throw new NotImplementedException(),
-							};
-						});
+								combi.SetOperation(id switch
+								{
+									0 => BinaryOperation.Add,
+									1 => BinaryOperation.Mul,
+									_ => throw new NotImplementedException(),
+								});
+							}
+						);
 						break;
 					
 					case UNSlider slid:
@@ -304,47 +308,71 @@ public partial class Editor : Godot.Node2D
 							(UniMan.GetExtension(slid) is not UnitManager.UEConnector ? "Connect" : null, 1),
 							(UniMan.GetExtension(slid) is not UnitManager.UEDirectionToggle ? "Make toggle" : null, 2),
 							(UniMan.GetExtension(slid) is not UnitManager.UERuntimeLock ? "Make lock" : null, 3),
-							(UniMan.HasExtension(slid) ? "Detach Extension" : null, 4)
-						], id =>
-						{
-							switch (id) {
-							case 0: // Lock
-								if (slid.IsLocked())
-								{
-									slid.Unlock();
-								}
-								else
-								{
-									slid.Lock();
-								}
-								break;
-							
-							case 1: // Connector
-								GD.Print("Connecting...");
-								m_ConnecterUnit = slid;
-								CursorLabel.Text = "Connecting...";
-								SetState(State.ConnectingUEConnector);
-								break;
-							
-							case 2: // Toggle
-								UniMan.DetachExtensionFrom(slid);
-								UniMan.AttachExtension(
-									new UnitManager.UEDirectionToggle(slid, UnitManager.UEDirectionToggle.Kind._90));
-								break;
-							
-							case 3: // RuntimeLock
-								UniMan.DetachExtensionFrom(slid);
-								UniMan.AttachExtension(new UnitManager.UERuntimeLock(slid));
-								break;
+							(UniMan.HasExtension(slid) ? "Detach Extension" : null, 4),
+							], 
+							id =>
+							{
+								switch (id) {
+								case 0: // Lock
+									if (slid.IsLocked())
+									{
+										slid.Unlock();
+									}
+									else
+									{
+										slid.Lock();
+									}
+									break;
+								
+								case 1: // Connector
+									GD.Print("Connecting...");
+									m_ConnecterUnit = slid;
+									CursorLabel.Text = "Connecting...";
+									SetState(State.ConnectingUEConnector);
+									break;
+								
+								case 2: // Toggle
+									UniMan.DetachExtensionFrom(slid);
+									UniMan.AttachExtension(
+										new UnitManager.UEDirectionToggle(slid, UnitManager.UEDirectionToggle.Kind.CounterClockwise));
+									break;
+								
+								case 3: // RuntimeLock
+									UniMan.DetachExtensionFrom(slid);
+									UniMan.AttachExtension(new UnitManager.UERuntimeLock(slid));
+									break;
 
-							case 4: // Detaching
-								UniMan.DetachExtensionFrom(slid);
-								break;
-							
-							default:
-								throw new NotImplementedException();
+								case 4: // Detaching
+									UniMan.DetachExtensionFrom(slid);
+									break;
+								
+								default:
+									throw new NotImplementedException();
+								}
 							}
-						});
+						);
+						break;
+
+					case UNBranch branch:
+						MakePopup(mev, [
+							(branch.Check is CmdIf.CheckType.Equal   ? null : "==", 0),
+							(branch.Check is CmdIf.CheckType.Greater ? null :  ">", 1),
+							(branch.Check is CmdIf.CheckType.Less    ? null :  "<", 2),
+							],
+							id =>
+							{
+								branch.SetCheck(id switch
+								{
+									0 => CmdIf.CheckType.Equal,
+									1 => CmdIf.CheckType.Greater,
+									2 => CmdIf.CheckType.Less,
+									_ => throw new NotImplementedException(),
+								});
+							}
+						);
+						break;
+					
+					default:
 						break;
 					}
 				}

@@ -1,10 +1,12 @@
+using System.Text.Json;
+using ArFactory.Serialization;
 using Godot;
 
 namespace ArFactory;
 
 public partial class UNBranch : Unit
 {
-	public CmdIf.CheckType Check;
+	public CmdIf.CheckType Check { get; private set; }
 	public int CmpValue;
 
 	public Tile InTile => m_tlInput!;
@@ -18,7 +20,7 @@ public partial class UNBranch : Unit
 	public void Setup(WorldPanel world, Vector2I gloc, Direction dir, int workRate, CmdIf.CheckType check, int value)
 	{
 		BaseInit(world, TickType.OnDemand, workRate, gloc, new Vector2I(1, 2), dir);
-		Check = check;
+		SetCheck(check);
 		CmpValue = value;
 	}
 
@@ -53,5 +55,24 @@ public partial class UNBranch : Unit
 				[ new CmdSlide(OutFalseTile, Dir) ],
 			]);
 		}
+	}
+
+	public void SetCheck(CmdIf.CheckType newCheck)
+	{
+		Check = newCheck;
+		Modulate = Check switch 
+		{
+			CmdIf.CheckType.Greater => new(0xAAFFAAFF),
+			CmdIf.CheckType.Less => new(0xFFAAAAFF),
+			CmdIf.CheckType.Equal or _ => Godot.Colors.White,
+		};
+	}
+
+	public override JsonElement SerializeToElement() 
+	{
+		var data = SerializeBase<UNBranchSerializationData>();
+		data.Check = Check;
+		data.CmpValue = CmpValue;
+		return Serializer.SerializeToElement(data);
 	}
 }

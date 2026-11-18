@@ -1,10 +1,12 @@
+using System.Text.Json;
+using ArFactory.Serialization;
 using Godot;
 
 namespace ArFactory;
 
 public partial class UNCombiner : Unit
 {
-	public BinaryOperation Operation;
+	public BinaryOperation Operation { get; private set; }
 
 	public Tile OutTile => m_tlOutput!;
 	public Tile InLeftTile => m_tlLhs!;
@@ -40,5 +42,17 @@ public partial class UNCombiner : Unit
 			[ new CmdCombine(InLeftTile, InRightTile, OutTile, Operation) ],
 			[ new CmdSlide(OutTile, Dir) ],
 		]);
+	}
+
+	public void SetOperation(BinaryOperation newOp)
+	{
+		Operation = newOp;
+	}
+
+	public override JsonElement SerializeToElement() 
+	{
+		var data = SerializeBase<UNCombinerSerializationData>();
+		data.Operation = Operation;
+		return Serializer.SerializeToElement(data);
 	}
 }
