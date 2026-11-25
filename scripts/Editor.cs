@@ -1,26 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using ArFactory.Serialization;
 using Godot;
 
 namespace ArFactory;
 
 public partial class Editor : Godot.Node2D
 {
-	private enum State
-	{
-		Off,
-		Placement,
-		ConnectingUEConnector,
-		PlacingMatchingTeleOutput,
-		
-		MoveTool,
-		PlacingMovedUnit,
-
-		Play,
-		Debug,
-	}
+	// Constants
+	public const string AutoSaveFilePath = "res://resources/saves/Level.json";
 
 	// Nodes
 	public Cam WorldCam => m_Cam!;
@@ -30,13 +21,16 @@ public partial class Editor : Godot.Node2D
 	public Godot.Button DebugButt => m_DebugButt!;
 	public Godot.Button SaveButt => m_SaveButt!;
 	public Godot.Button LoadButt => m_LoadButt!;
+	public Godot.Button DimButt => m_DimButt!;
 	public Godot.HBoxContainer ToolsHBox => m_ToolsHBox!;
 	public Godot.HBoxContainer PlayHBox => m_PlayHBox!;
 	public Godot.Label TicksLabel => m_TicksLabel!;
 	public Godot.HSlider SpeedSlider => m_SpeedSlider!;
 	public Godot.Label TickSpeedLabel => m_TickSpeedLabel!;
-	private Godot.MarginContainer UnitPlacerMarCon => m_UnitPlacerMarCon!;
-	private Godot.GridContainer UnitPlacerGCon => m_UnitPlacerGCon!;
+	public Godot.MarginContainer UnitPlacerMarCon => m_UnitPlacerMarCon!;
+	public Godot.GridContainer UnitPlacerGCon => m_UnitPlacerGCon!;
+	public Godot.LineEdit XLiEd => m_XLiEd!;
+	public Godot.LineEdit YLiEd => m_YLiEd!;
 
 	#region Actual Nodes
 	private Cam? m_Cam;
@@ -46,6 +40,7 @@ public partial class Editor : Godot.Node2D
 	private Godot.Button? m_DebugButt;
 	private Godot.Button? m_SaveButt;
 	private Godot.Button? m_LoadButt;
+	private Godot.Button? m_DimButt;
 	private Godot.HBoxContainer? m_ToolsHBox;
 	private Godot.HBoxContainer? m_PlayHBox;
 	private Godot.Label? m_TicksLabel;
@@ -53,6 +48,8 @@ public partial class Editor : Godot.Node2D
 	private Godot.Label? m_TickSpeedLabel;
 	private Godot.MarginContainer? m_UnitPlacerMarCon;
 	private Godot.GridContainer? m_UnitPlacerGCon;
+	private Godot.LineEdit? m_XLiEd;
+	private Godot.LineEdit? m_YLiEd;
 	#endregion
 
 	// Publics
@@ -61,8 +58,7 @@ public partial class Editor : Godot.Node2D
 	public UnitManager UniMan => m_UniMan!;
 
 	// Privates
-	private State m_CurrState = State.Off;
-	private float m_TickMillis;
+	private EditorState m_CurrState;
 	private Simulator? m_Simy; // Not actually nullable.
 	private UnitManager? m_UniMan;
 
@@ -79,7 +75,13 @@ public partial class Editor : Godot.Node2D
 	// private Godot.ButtonGroup m_ToolboxButtGroup = new() { AllowUnpress = true };
 
 
+
 	#region .Init
+
+	public Editor()
+	{
+		m_CurrState = new EditorStateIdle(this);
+	}
 
 	public override void _EnterTree()
 	{
@@ -93,11 +95,11 @@ public partial class Editor : Godot.Node2D
 		InitSimy();
 		InitWorldCam();
 		InitSimButts();
+		InitDimButts();
 		InitSimSpeedSlider();
 		InitUnitPicker();
 		InitToolbox();
 		InitDirPlacementLabel();
-		SetState(State.Off, true);
 	}
 
 	private void GetAllNodes()
@@ -109,6 +111,7 @@ public partial class Editor : Godot.Node2D
 		m_DebugButt = GetNode<Godot.Button>("HUDLayer/MarginContainer/HBoxContainer/ButtPanel/MarginContainer/ButtsHBox/DebugButt");
 		m_SaveButt = GetNode<Godot.Button>("HUDLayer/TopPanel/MarCon/HBox/SaveButt");
 		m_LoadButt = GetNode<Godot.Button>("HUDLayer/TopPanel/MarCon/HBox/LoadButt");
+		m_DimButt = GetNode<Godot.Button>("HUDLayer/TopPanel/MarCon/HBox/DimButt");
 		m_ToolsHBox = GetNode<Godot.HBoxContainer>("HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/ToolsHBox");
 		m_PlayHBox = GetNode<Godot.HBoxContainer>("HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox");
 		m_TicksLabel = GetNode<Godot.Label>("HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TicksLabel");
@@ -116,6 +119,8 @@ public partial class Editor : Godot.Node2D
 		m_TickSpeedLabel = GetNode<Godot.Label>("HUDLayer/MarginContainer/HBoxContainer/FactoryPan/MarginContainer/PlayHBox/TickSpeedLabel");
 		m_UnitPlacerMarCon = GetNode<Godot.MarginContainer>("HUDLayer/UnitPlacerMarCon");
 		m_UnitPlacerGCon = GetNode<Godot.GridContainer>("HUDLayer/UnitPlacerMarCon/Pan/MarginContainer/GCon");
+		m_XLiEd = GetNode<Godot.LineEdit>("HUDLayer/TopPanel/MarCon/HBox/XLiEd");
+		m_YLiEd = GetNode<Godot.LineEdit>("HUDLayer/TopPanel/MarCon/HBox/YLiEd");
 	}
 
 	private void InitSimy()
@@ -146,6 +151,13 @@ public partial class Editor : Godot.Node2D
 		HaltButt.Pressed += OnHaltButt_Pressed;
 		SaveButt.Pressed += OnSaveButt_Pressed;
 		LoadButt.Pressed += OnLoadButt_Pressed;
+	}
+
+	private void InitDimButts()
+	{
+		DimButt.Pressed += OnDimButt_Pressed;
+		World.DimensionsChanged += OnWorld_DimensionsChanged;
+		UpdateDimInterface(World.Dimensions);
 	}
 
 	private void InitSimSpeedSlider()
@@ -188,7 +200,7 @@ public partial class Editor : Godot.Node2D
 			{
 				m_ConnecterUnit = UniMan.PlaceTeleInput(l, d, 1);
 				CursorLabel.Text = $"Out: {m_CurrUnitPlacement.Dir}";
-				SetState(State.PlacingMatchingTeleOutput);
+				SetState(new EditorStatePlacingMatchingTeleOutput(this));
 				return m_ConnecterUnit;
 			});
 	}
@@ -221,10 +233,11 @@ public partial class Editor : Godot.Node2D
 
 	private void InitToolbox()
 	{
-		AddToolToToolbox("MOVE", State.MoveTool);
+		AddToolToToolbox("MOVE", () => new EditorStateMoveTool(this));
+		AddToolToToolbox("ROTATE", () => new EditorStateRotationTool(this));
 	}
 
-	private void AddToolToToolbox(string text, State onClickState)
+	private void AddToolToToolbox(string text, Func<EditorState> onClickFunc)
 	{
 		var butt = new Godot.Button
 		{
@@ -234,436 +247,76 @@ public partial class Editor : Godot.Node2D
 			ButtonGroup = m_CurrUnitPlacement.ButtGroup,
 		};
 		ToolsHBox.AddChild(butt);
-		butt.Pressed += () => 
+		butt.Pressed += () =>
 		{
-			CursorLabel.Text = onClickState.ToString();
-			SetState(onClickState);
+			var newState = onClickFunc.Invoke();
+			CursorLabel.Text = newState.GetType().Name;
+			SetState(newState);
 		};
 	}
 
 	#endregion // Init
-	#region .Public Interface
+	#region .Serialization
+
+	private struct EditorSerializationData
+	{
+		[JsonInclude] public JsonElement WorldElem;
+		[JsonInclude] public JsonElement UniManElem;
+	}
+
+	public bool Serialize(string filePath)
+	{
+		var data = new EditorSerializationData
+		{
+			WorldElem = Serializer.SerializeWorldPanel(World),
+			UniManElem = Serializer.SerializeUnitManager(UniMan),
+		};
+
+		using var file = Godot.FileAccess.Open(filePath, FileAccess.ModeFlags.Write);
+		if (file is null)
+		{
+			return false;
+		}
+
+		file.StoreString(Serializer.Serialize(data));
+		return true;
+	}
 		
-	public void Deserialize()
+	public bool Deserialize(string filePath)
 	{
 		World.Clear();
 		GD.Print("Cleared the world");
-		if (UniMan.Deserialize())
+
+		if (!Godot.FileAccess.FileExists(filePath))
 		{
-			GD.Print("Loaded");
+			GD.Print($"Couldn't find save file: {filePath}");
+			return false;
 		}
-		else
+
+		var fileContents = Godot.FileAccess.GetFileAsString(filePath);
+		if (string.IsNullOrEmpty(fileContents))
 		{
-			GD.Print("No file to load");
+			GD.Print($"Something happaned while loading file: {filePath}");
 		}
+
+		var data = Serializer.Deserialize<EditorSerializationData>(fileContents);
+		Debug.AssertNotNull(data);
+		Serializer.DeserializeWorldPanel(data.WorldElem, World);
+		Serializer.DeserializeUnitManager(data.UniManElem, UniMan);
+		return true;
 	}
 
-	#endregion // .Public Interface
+	#endregion // .Serialization
 	#region .Godot Overrides
 
 	public override void _UnhandledInput(InputEvent ev)
 	{
-		switch (m_CurrState) {
-		case State.Off:
-		{
-			if (ev is InputEventMouseButton mev)
-			{
-				if (mev.IsPressed() && mev.ButtonMask == MouseButtonMask.Right && !mev.CtrlPressed && !mev.ShiftPressed)
-				{
-					var mgloc = World.PosToGrid(World.GetLocalMousePosition());
-					switch (UniMan.GetUnit(mgloc)) {
-					case UNUpdater updater:
-						MakePopup(mev, [("2x", 0), ("x+1", 1), ("x-1", 2), ("-x", 3)], id =>
-						{
-							updater.SetUpdateType(id switch
-							{
-								0 => UNUpdater.UpdateType.Double,
-								1 => UNUpdater.UpdateType.Increment,
-								2 => UNUpdater.UpdateType.Decrement,
-								3 => UNUpdater.UpdateType.Negate,
-								_ => throw new NotImplementedException(),
-							});
-						});
-						break;
-					
-					case UNCombiner combi:
-						MakePopup(mev, [
-							(combi.Operation is BinaryOperation.Add ? null : "x + x + ...", 0), 
-							(combi.Operation is BinaryOperation.Mul ? null : "x * x * x...", 1)], 
-							id =>
-							{
-								combi.SetOperation(id switch
-								{
-									0 => BinaryOperation.Add,
-									1 => BinaryOperation.Mul,
-									_ => throw new NotImplementedException(),
-								});
-							}
-						);
-						break;
-					
-					case UNSlider slid:
-						MakePopup(mev, [
-							(slid.IsLocked() ? "Unlock" : "Lock", 0), 
-							(UniMan.GetExtension(slid) is not UnitManager.UEConnector ? "Connect" : null, 1),
-							(UniMan.GetExtension(slid) is not UnitManager.UEDirectionToggle ? "Make toggle" : null, 2),
-							(UniMan.GetExtension(slid) is not UnitManager.UERuntimeLock ? "Make lock" : null, 3),
-							(UniMan.HasExtension(slid) ? "Detach Extension" : null, 4),
-							], 
-							id =>
-							{
-								switch (id) {
-								case 0: // Lock
-									if (slid.IsLocked())
-									{
-										slid.Unlock();
-									}
-									else
-									{
-										slid.Lock();
-									}
-									break;
-								
-								case 1: // Connector
-									GD.Print("Connecting...");
-									m_ConnecterUnit = slid;
-									CursorLabel.Text = "Connecting...";
-									SetState(State.ConnectingUEConnector);
-									break;
-								
-								case 2: // Toggle
-									UniMan.DetachExtensionFrom(slid);
-									UniMan.AttachExtension(
-										new UnitManager.UEDirectionToggle(slid, UnitManager.UEDirectionToggle.Kind.CounterClockwise));
-									break;
-								
-								case 3: // RuntimeLock
-									UniMan.DetachExtensionFrom(slid);
-									UniMan.AttachExtension(new UnitManager.UERuntimeLock(slid));
-									break;
-
-								case 4: // Detaching
-									UniMan.DetachExtensionFrom(slid);
-									break;
-								
-								default:
-									throw new NotImplementedException();
-								}
-							}
-						);
-						break;
-
-					case UNBranch branch:
-						MakePopup(mev, [
-							(branch.Check is CmdIf.CheckType.Equal   ? null : "==", 0),
-							(branch.Check is CmdIf.CheckType.Greater ? null :  ">", 1),
-							(branch.Check is CmdIf.CheckType.Less    ? null :  "<", 2),
-							],
-							id =>
-							{
-								branch.SetCheck(id switch
-								{
-									0 => CmdIf.CheckType.Equal,
-									1 => CmdIf.CheckType.Greater,
-									2 => CmdIf.CheckType.Less,
-									_ => throw new NotImplementedException(),
-								});
-							}
-						);
-						break;
-					
-					default:
-						break;
-					}
-				}
-			}
-			if (Input.GetMouseButtonMask() == MouseButtonMask.Right && Input.IsKeyPressed(Godot.Key.Ctrl))
-			{
-				var mouseGL = World.PosToGrid(GetLocalMousePosition());
-				if (UniMan.GetUnit(mouseGL) is { } u)
-				{
-					switch (u) {
-					case UNTeleInput input:
-					{
-						if (input.GetConnectedOutput() is { } output)
-						{
-							UniMan.DeleteUnit(output);
-						}
-						UniMan.DeleteUnit(u);
-						break;
-					}
-					case UNTeleOutput output:
-					{
-						if (output.GetConnectedInput() is { } input)
-						{
-							UniMan.DeleteUnit(input);
-						}
-						UniMan.DeleteUnit(u);
-						break;
-					}
-					default:
-						UniMan.DeleteUnit(u);
-						break;
-					}
-				}
-			}
-			break;
-		}
-		case State.Placement:
-		{
-			if (ev is InputEventMouseButton mev)
-			{
-				if (mev.ButtonIndex == MouseButton.Right)
-				{
-					if (mev.IsPressed())
-					{
-						SetState(State.Off);
-						m_CurrUnitPlacement.Butt!.ButtonPressed = false;
-					}
-				}
-				else if (mev.ButtonIndex == MouseButton.Left)
-				{
-					if (mev.IsPressed() && !mev.CtrlPressed && !mev.ShiftPressed)
-					{
-						var mousePos = GetLocalMousePosition();
-						if (World.GetWorldRect().HasPoint(mousePos))
-						{
-							var info = m_UnitPickerButtInfos[m_CurrUnitPlacement.Butt!.Name];
-							Vector2I mgloc = World.GetMouseGridLocation();
-							if (Unit.CanFitIn(World, mgloc, info.Dims, m_CurrUnitPlacement.Dir))
-							{
-								info.PlacementFunc.Invoke(mgloc, m_CurrUnitPlacement.Dir);
-							}
-						}
-					}
-				}
-			}
-			else if (ev is InputEventKey kev)
-			{
-				if (kev.Keycode == Godot.Key.R && kev.IsPressed() && !kev.CtrlPressed && !kev.ShiftPressed)
-				{
-					var info = m_UnitPickerButtInfos[m_CurrUnitPlacement.Butt!.Name];
-					if (info.bEastWest)
-					{
-						m_CurrUnitPlacement.Dir = m_CurrUnitPlacement.Dir switch
-						{
-							Direction.East => Direction.West,
-							Direction.West or _ => Direction.East,
-						};
-					}
-					else
-					{
-						m_CurrUnitPlacement.Dir = m_CurrUnitPlacement.Dir.Rotate90();
-					}
-					CursorLabel.Text = m_CurrUnitPlacement.Dir.ToString();
-				}
-			}
-			break;
-		}
-		case State.ConnectingUEConnector:
-		{
-			if (ev is InputEventMouse mev && mev.IsPressed() && !mev.CtrlPressed && !mev.ShiftPressed)
-			{
-				if (mev.ButtonMask == MouseButtonMask.Left)
-				{
-					if (UniMan.GetUnit(World.GetMouseGridLocation()) is UNSlider tgtSlid)
-					{
-						if (tgtSlid == m_ConnecterUnit)
-						{
-							GD.Print("Hit the connecting slider bruh...");
-						}
-						else
-						{
-							var connSlid = (m_ConnecterUnit as UNSlider)!;
-							UniMan.DetachExtensionFrom(connSlid);
-							UniMan.AttachExtension(new UnitManager.UEConnector(connSlid, tgtSlid));
-							GD.Print($"Connected slider on {connSlid!.GLocation} to the one on {tgtSlid.GLocation}");
-							SetState(State.Off);
-							m_ConnecterUnit = null;
-						}
-					}
-					else
-					{
-						GD.Print("Hit nothing and cancelled anyway");
-						SetState(State.Off);
-					}
-				}
-				else if (mev.ButtonMask == MouseButtonMask.Right)
-				{
-					GD.Print("Lock cancelled");
-					SetState(State.Off);
-					m_ConnecterUnit = null;
-				}
-			}
-			break;
-		}
-		case State.PlacingMatchingTeleOutput:
-		{
-			if (ev is InputEventMouse mev && mev.IsPressed() && !mev.CtrlPressed && !mev.ShiftPressed)
-			{
-				if (mev.ButtonMask == MouseButtonMask.Left)
-				{
-					var mgloc = World.GetMouseGridLocation();
-					if (Unit.CanFitIn(World, mgloc, Vector2I.One, Direction.East))
-					{
-						var teleIn = (m_ConnecterUnit as UNTeleInput)!;
-						var teleOut = UniMan.PlaceTeleOutput(mgloc, m_CurrUnitPlacement.Dir, 1);
-						teleIn.AssignOutput(teleOut);
-						m_ConnecterUnit = null;
-						SetState(State.Placement);
-					}
-					else
-					{
-						GD.Print("Nope, doesn't fit");
-					}
-				}
-				else if (mev.ButtonMask == MouseButtonMask.Right)
-				{
-					UniMan.DeleteUnit(m_ConnecterUnit!);
-					GD.Print("Cancelled");
-					m_ConnecterUnit = null;
-					SetState(State.Placement);
-				}
-			}
-			else if (ev is InputEventKey kev)
-			{
-				if (kev.Keycode == Godot.Key.R && kev.IsPressed() && !kev.CtrlPressed && !kev.ShiftPressed)
-				{
-					m_CurrUnitPlacement.Dir = m_CurrUnitPlacement.Dir.Rotate90();
-					CursorLabel.Text = $"Out: {m_CurrUnitPlacement.Dir}";
-				}
-			}
-			break;
-		}
-		case State.MoveTool:
-		{
-			if (ev is InputEventMouse mev && mev.IsPressed() && !mev.CtrlPressed && !mev.ShiftPressed)
-			{
-				if (mev.ButtonMask == MouseButtonMask.Left)
-				{
-					if (UniMan.GetUnit(World.GetMouseGridLocation()) is { } u)
-					{
-						m_ConnecterUnit = u;
-						u.Deconstruct();
-						GD.Print($"Picked up a {u.GetType().Name}");
-						m_CurrUnitPlacement.Dir = u.Dir;
-						CursorLabel.Text = $"Moving a {u.GetType().Name} ({m_CurrUnitPlacement.Dir})";
-						SetState(State.PlacingMovedUnit);
-					}
-				}
-				else if (mev.ButtonMask == MouseButtonMask.Right)
-				{
-					GD.Print("Cancelled move tool");
-					SetState(State.Off);
-					m_CurrUnitPlacement.ButtGroup.GetPressedButton().ButtonPressed = false;
-				}
-			}
-			break;
-		}
-		case State.PlacingMovedUnit:
-		{
-			if (ev is InputEventMouseButton mev)
-			{
-				if (mev.ButtonIndex == MouseButton.Right)
-				{
-					if (mev.IsPressed())
-					{
-						GD.Print("Cancelled moving.");
-						m_ConnecterUnit!.Construct(); // Where it originally was.
-						CursorLabel.Text = State.MoveTool.ToString();
-						SetState(State.MoveTool);
-					}
-				}
-				else if (mev.ButtonIndex == MouseButton.Left)
-				{
-					if (mev.IsPressed() && !mev.CtrlPressed && !mev.ShiftPressed)
-					{
-						var mousePos = GetLocalMousePosition();
-						if (World.GetWorldRect().HasPoint(mousePos))
-						{
-							Vector2I mgloc = World.GetMouseGridLocation();
-							if (Unit.CanFitIn(World, mgloc, m_ConnecterUnit!))
-							{
-								GD.Print($"Moved a {m_ConnecterUnit!.GetType().Name} from {m_ConnecterUnit.GLocation} to {mgloc}");
-								m_ConnecterUnit!.SetGLocation(mgloc);
-								m_ConnecterUnit.SetDirection(m_CurrUnitPlacement.Dir);
-								m_ConnecterUnit.Construct();
-								CursorLabel.Text = State.MoveTool.ToString();
-								SetState(State.MoveTool);
-							}
-							else
-							{
-								GD.Print("Nope, doesn't fit.");
-							}
-						}
-					}
-				}
-			}
-			else if (ev is InputEventKey kev)
-			{
-				if (kev.Keycode == Godot.Key.R && kev.IsPressed() && !kev.CtrlPressed && !kev.ShiftPressed)
-				{
-					if (m_ConnecterUnit!.CanFaceDir(Direction.North) is false)
-					{
-						m_CurrUnitPlacement.Dir = m_CurrUnitPlacement.Dir switch
-						{
-							Direction.East => Direction.West,
-							Direction.West or _ => Direction.East,
-						};
-					}
-					else
-					{
-						m_CurrUnitPlacement.Dir = m_CurrUnitPlacement.Dir.Rotate90();
-					}
-					CursorLabel.Text = $"Moving a {m_ConnecterUnit!.GetType().Name} ({m_CurrUnitPlacement.Dir})";
-				}
-			}
-			break;
-		}
-		case State.Play:
-		case State.Debug:
-		default:
-			break;
-		}
-	}
-
-	private void MakePopup(Godot.InputEventMouse mev, IEnumerable<(string? Name, int id)> items, Action<int> pressFunc)
-	{
-		var men = new Godot.PopupMenu();
-		foreach (var (name, id) in items.Where(it => !string.IsNullOrEmpty(it.Name)))
-		{
-			men.AddItem(name, id);
-		}
-		men.IdPressed += id => pressFunc.Invoke((int)id);
-		men.PopupHide += () =>
-		{
-			RemoveChild(men);
-			men.QueueFree();
-		};
-		AddChild(men);
-		men.Position = (Vector2I)mev.GlobalPosition;
-		men.Popup();
+		m_CurrState.OnUnhandledInput(ev);
 	}
 
 	public override void _Process(double dt)
 	{
-		switch (m_CurrState) {
-		case State.Off:
-			break;
-
-		case State.Placement:
-		case State.ConnectingUEConnector:
-		case State.PlacingMatchingTeleOutput:
-		case State.MoveTool:
-		case State.PlacingMovedUnit:
-			CursorLabel.Position = GetLocalMousePosition() + Vector2.One * 50;
-			break;
-
-		case State.Debug:
-		case State.Play:
-			Simy.DoPerFrame(dt);
-			break;
-		}
+		m_CurrState.OnProcess(dt);
 	}
 
 	#endregion // .Godot Overrides
@@ -671,67 +324,52 @@ public partial class Editor : Godot.Node2D
 
 	private void OnSaveButt_Pressed()
 	{
-		UniMan.Serialize();
-		GD.Print("Saved");
+		if (Serialize(AutoSaveFilePath))
+		{
+			GD.Print("Saved");
+		}
+		else
+		{
+			GD.Print($"Save failed: couldn't open save file {AutoSaveFilePath} for reading.");
+		}
 	}
 
 	private void OnLoadButt_Pressed()
 	{
-		Deserialize();
+		if (Deserialize(AutoSaveFilePath))
+		{
+			GD.Print("Loaded from disk");
+		}
+	}
+
+	private void OnDimButt_Pressed()
+	{
+		if (int.TryParse(XLiEd.Text, out var w) && 
+			int.TryParse(YLiEd.Text, out var h))
+		{
+			World.SetDimensions(new Vector2I(w, h));
+		}
 	}
 
 	private void OnPlayButt_Pressed()
 	{
-		Debug.Assert(m_CurrState is State.Off or State.Debug);
-		switch (m_CurrState) {
-		case State.Off:
-			Simy.Start();
-			SetState(State.Play);
-			break;
-
-
-		case State.Debug:
-			Simy.Resume();
-			SetState(State.Play);
-			break;
-
-		case State.Play:
-		default:
-			throw new InvalidProgramException("Somehow pressed the play button in PlayMode.Play");
-		}
+		Debug.Assert(m_CurrState is ISimulationState);
+		var simState = (m_CurrState as ISimulationState)!;
+		simState.OnPlayButtPressed();
 	}
 
 	private void OnHaltButt_Pressed()
 	{
-		Simy.Halt();
-		SetState(State.Off);
+		Debug.Assert(m_CurrState is ISimulationState);
+		var simState = (m_CurrState as ISimulationState)!;
+		simState.OnHaltButtPressed();
 	}
 
 	private void OnDebugButt_Pressed()
 	{
-		switch (m_CurrState) {
-		case State.Off:
-			Simy.StartAndPause();
-			SetState(State.Debug);
-			break;
-
-		case State.Play:
-			Simy.Start();
-			SetState(State.Debug);
-			break;
-
-		case State.Debug:
-			if (!Simy.IsPaused()) // Spamming the debug key while the tick is in progress.
-			{
-				return;
-			}
-
-			Simy.TickOnce();
-			break;
-
-		default:
-			throw new NotImplementedException("New PlayMode?");
-		}
+		Debug.Assert(m_CurrState is ISimulationState);
+		var simState = (m_CurrState as ISimulationState)!;
+		simState.OnDebugButtPressed();
 	}
 
 	private void OnSpeedSlider_ValueChanged(double newVal)
@@ -744,11 +382,17 @@ public partial class Editor : Godot.Node2D
 	{
 		Debug.AssertIs(baseButt, typeof(Godot.Button));
 		var butt = (baseButt as Godot.Button)!;
-		SetState(State.Placement);
+		// SetStateOld(State.Placement);
+		SetState(new EditorStateUnitPlacement(this));		
 		m_CurrUnitPlacement.Butt = butt;
 		m_CurrUnitPlacement.Dir = Direction.East;
 
 		CursorLabel.Text = m_CurrUnitPlacement.Dir.ToString();
+	}
+
+	private void OnWorld_DimensionsChanged(Vector2I newDims)
+	{
+		UpdateDimInterface(newDims);
 	}
 
 	#endregion .Signal Handlers
@@ -762,79 +406,630 @@ public partial class Editor : Godot.Node2D
 
 	private void SyncButtStates()
 	{
-		// Hide everything first.
-		// I could the extra marshalling by using in-between booleans but who cares bruh, this only happens once in 
-		// a while.
-		PlayButt.Disabled = true;
-		HaltButt.Disabled = true;
-		DebugButt.Disabled = true;
-		PlayHBox.Hide();
-		ToolsHBox.Hide();
-		CursorLabel.Hide();
-		UnitPlacerMarCon.Hide();
-
-		switch (m_CurrState) {
-		case State.Off:
-			PlayButt.Disabled = false;
-			DebugButt.Disabled = false;
-			ToolsHBox.Show();
-			UnitPlacerMarCon.Show();
-			break;
-
-		case State.Placement:
-		case State.ConnectingUEConnector:
-		case State.PlacingMatchingTeleOutput:
-		case State.MoveTool:
-		case State.PlacingMovedUnit:
-			ToolsHBox.Show();
-			UnitPlacerMarCon.Show();
-			CursorLabel.Show();
-			break;
-
-		case State.Play:
-			HaltButt.Disabled = false;
-			DebugButt.Disabled = false;
-			PlayHBox.Show();
-			break;
-
-		case State.Debug:
-			PlayButt.Disabled = false;
-			HaltButt.Disabled = false;
-			DebugButt.Disabled = false;
-			PlayHBox.Show();
-			break;
-
-		default:
-			throw new NotImplementedException("New PlayMode?");
-		}
+		m_CurrState.SyncButtStates();
 	}
 
 	private void OnSimulationStart()
 	{
-		Debug.Assert(m_CurrState is State.Off);
-		SetState(Simy.IsDebugging() ? State.Debug : State.Play);
+		Debug.Assert(m_CurrState is EditorStateIdle);
+		SetState(Simy.IsDebugging() ? new EditorStateDebug(this) : new EditorStatePlay(this));
 		UpdateTickCountLabel();
 	}
 
 	private void OnSimulationEnd()
 	{
-		Debug.Assert(m_CurrState is State.Play or State.Debug);
-		SetState(State.Off);
+		Debug.Assert(m_CurrState is ISimulationState);
+		SetState(new EditorStateIdle(this));
 	}
 
-	private void SetState(State newPlayMode, bool bForce = false)
+	private void SetState(EditorState newState, bool bForce = false)
 	{
-		if (!bForce && newPlayMode == m_CurrState) // Avoid unecessary marshaling
+		if (!bForce && newState.GetType() == m_CurrState.GetType())
 		{
 			return;
 		}
 
-		m_CurrState = newPlayMode;
-		SyncButtStates();
+		m_CurrState = newState;
+		m_CurrState.SyncButtStates();
 	}
 
 	private void UpdateTickCountLabel()
 	{
 		TicksLabel.Text = $"tick: {Simy.Clock.GetTicksSinceStart()}";
 	}
+
+	private void UpdateDimInterface(Vector2I newDims)
+	{
+		XLiEd.Text = newDims.X.ToString();
+		YLiEd.Text = newDims.Y.ToString();
+	}
+
+	#region .Inner Classes
+
+	private abstract class EditorState(Editor parent)
+	{
+		protected Editor m_Parent = parent;
+
+		public abstract void SyncButtStates();
+		public abstract void OnUnhandledInput(InputEvent ev);
+		
+		public virtual void OnProcess(double dt) { }
+
+		protected void ResetEverythingForButtSync()
+		{
+			// Hide everything first.
+			// I could the extra marshalling by using in-between booleans but who cares bruh, this only happens once in 
+			// a while.
+			m_Parent.PlayButt.Disabled = true;
+			m_Parent.HaltButt.Disabled = true;
+			m_Parent.DebugButt.Disabled = true;
+			m_Parent.PlayHBox.Hide();
+			m_Parent.ToolsHBox.Hide();
+			m_Parent.CursorLabel.Hide();
+			m_Parent.UnitPlacerMarCon.Hide();
+		}
+	}
+
+	/// <summary>
+	/// For states valid during simulation.
+	/// </summary>
+	private interface ISimulationState
+	{
+		void OnPlayButtPressed();
+		void OnDebugButtPressed();
+		void OnHaltButtPressed();
+	}
+
+	private class EditorStateIdle(Editor parent) : EditorState(parent), ISimulationState
+	{
+		public override void OnUnhandledInput(InputEvent ev)
+		{
+			if (Input.IsActionJustPressed(InputManager.Names.RightClick, true))
+			{
+				var mev = (ev as InputEventMouse)!;
+				var mgloc = m_Parent.World.PosToGrid(m_Parent.World.GetLocalMousePosition());
+				switch (m_Parent.UniMan.GetUnit(mgloc)) {
+				case UNUpdater updater:
+					MakePopup(mev, [("2x", 0), ("x+1", 1), ("x-1", 2), ("-x", 3)], id =>
+					{
+						updater.SetUpdateType(id switch
+						{
+							0 => UNUpdater.UpdateType.Double,
+							1 => UNUpdater.UpdateType.Increment,
+							2 => UNUpdater.UpdateType.Decrement,
+							3 => UNUpdater.UpdateType.Negate,
+							_ => throw new NotImplementedException(),
+						});
+					});
+					break;
+
+				case UNCombiner combi:
+					MakePopup(mev, [
+						(combi.Operation is BinaryOperation.Add ? null : "x + x + ...", 0),
+						(combi.Operation is BinaryOperation.Mul ? null : "x * x * x...", 1)],
+						id =>
+						{
+							combi.SetOperation(id switch
+							{
+								0 => BinaryOperation.Add,
+								1 => BinaryOperation.Mul,
+								_ => throw new NotImplementedException(),
+							});
+						}
+					);
+					break;
+
+				case UNSlider slid:
+					MakePopup(mev, [
+						(slid.IsLocked() ? "Unlock" : "Lock", 0),
+						(m_Parent.UniMan.GetExtension(slid) is not UnitManager.UEConnector ? "Connect" : null, 1),
+						(m_Parent.UniMan.GetExtension(slid) is not UnitManager.UEDirectionToggle ? "Make toggle" : null, 2),
+						(m_Parent.UniMan.GetExtension(slid) is not UnitManager.UERuntimeLock ? "Make lock" : null, 3),
+						(m_Parent.UniMan.HasExtension(slid) ? "Detach Extension" : null, 4),
+						],
+						id =>
+						{
+							switch (id)
+							{
+								case 0: // Lock
+									if (slid.IsLocked())
+									{
+										slid.Unlock();
+									}
+									else
+									{
+										slid.Lock();
+									}
+									break;
+
+								case 1: // Connector
+									GD.Print("Connecting...");
+									m_Parent.m_ConnecterUnit = slid;
+									m_Parent.CursorLabel.Text = "Connecting...";
+									m_Parent.SetState(new EditorStatePlacingUEConnector(m_Parent));
+									break;
+
+								case 2: // Toggle
+									m_Parent.UniMan.DetachExtensionFrom(slid);
+									m_Parent.UniMan.AttachExtension(
+										new UnitManager.UEDirectionToggle(slid, UnitManager.UEDirectionToggle.Kind.CounterClockwise));
+									break;
+
+								case 3: // RuntimeLock
+									m_Parent.UniMan.DetachExtensionFrom(slid);
+									m_Parent.UniMan.AttachExtension(new UnitManager.UERuntimeLock(slid));
+									break;
+
+								case 4: // Detaching
+									m_Parent.UniMan.DetachExtensionFrom(slid);
+									break;
+
+								default:
+									throw new NotImplementedException();
+							}
+						}
+					);
+					break;
+
+				case UNBranch branch:
+					MakePopup(mev, [
+						(branch.Check is CmdIf.CheckType.Equal   ? null : "==", 0),
+						(branch.Check is CmdIf.CheckType.Greater ? null :  ">", 1),
+						(branch.Check is CmdIf.CheckType.Less    ? null :  "<", 2),
+						],
+						id =>
+						{
+							branch.SetCheck(id switch
+							{
+								0 => CmdIf.CheckType.Equal,
+								1 => CmdIf.CheckType.Greater,
+								2 => CmdIf.CheckType.Less,
+								_ => throw new NotImplementedException(),
+							});
+						}
+					);
+					break;
+
+				default:
+					break;
+				}
+			}
+		}
+
+		public override void SyncButtStates()
+		{
+			ResetEverythingForButtSync();
+			m_Parent.PlayButt.Disabled = false;
+			m_Parent.DebugButt.Disabled = false;
+			m_Parent.ToolsHBox.Show();
+			m_Parent.UnitPlacerMarCon.Show();
+		}
+
+		public void OnDebugButtPressed()
+		{
+			m_Parent.Simy.StartAndPause();
+			m_Parent.SetState(new EditorStateDebug(m_Parent));
+		}
+
+		public void OnHaltButtPressed()
+		{
+			throw new InvalidProgramException();
+		}
+
+		public void OnPlayButtPressed()
+		{
+			m_Parent.Simy.Start();
+			m_Parent.SetState(new EditorStatePlay(m_Parent));
+		}
+
+		private void MakePopup(Godot.InputEventMouse mev, IEnumerable<(string? Name, int id)> items, Action<int> pressFunc)
+		{ // TODO: Reuse the same instance!
+			var men = new Godot.PopupMenu();
+			foreach (var (name, id) in items.Where(it => !string.IsNullOrEmpty(it.Name)))
+			{
+				men.AddItem(name, id);
+			}
+			men.IdPressed += id => pressFunc.Invoke((int)id);
+			men.PopupHide += () =>
+			{
+				m_Parent.RemoveChild(men);
+				men.QueueFree();
+			};
+			m_Parent.AddChild(men);
+			men.Position = (Vector2I)mev.GlobalPosition;
+			men.Popup();
+		}
+	}
+
+	private class EditorStateUnitPlacement(Editor parent) : EditorState(parent)
+	{
+		public override void OnUnhandledInput(InputEvent ev)
+		{
+			if (Input.IsActionJustPressed(InputManager.Names.RightClick, true))
+			{
+				m_Parent.SetState(new EditorStateIdle(m_Parent));
+				m_Parent.m_CurrUnitPlacement.Butt!.ButtonPressed = false;
+			}
+			else if (Input.IsActionJustPressed(InputManager.Names.LeftClick, true))
+			{
+				var mousePos = m_Parent.GetLocalMousePosition();
+				if (m_Parent.World.GetWorldRect().HasPoint(mousePos))
+				{
+					var info = m_Parent.m_UnitPickerButtInfos[m_Parent.m_CurrUnitPlacement.Butt!.Name];
+					Vector2I mgloc = m_Parent.World.GetMouseGridLocation();
+					if (Unit.CanFitIn(m_Parent.World, mgloc, info.Dims, m_Parent.m_CurrUnitPlacement.Dir))
+					{
+						info.PlacementFunc.Invoke(mgloc, m_Parent.m_CurrUnitPlacement.Dir);
+					}
+				}
+			}
+			else if (Input.IsActionJustPressed(InputManager.Names.EdRotate, true))
+			{
+				var info = m_Parent.m_UnitPickerButtInfos[m_Parent.m_CurrUnitPlacement.Butt!.Name];
+				if (info.bEastWest)
+				{
+					m_Parent.m_CurrUnitPlacement.Dir = m_Parent.m_CurrUnitPlacement.Dir switch
+					{
+						Direction.East => Direction.West,
+						Direction.West or _ => Direction.East,
+					};
+				}
+				else
+				{
+					m_Parent.m_CurrUnitPlacement.Dir = m_Parent.m_CurrUnitPlacement.Dir.Rotate90();
+				}
+				m_Parent.CursorLabel.Text = m_Parent.m_CurrUnitPlacement.Dir.ToString();
+			}
+		}
+
+		public override void SyncButtStates()
+		{
+			ResetEverythingForButtSync();
+			m_Parent.ToolsHBox.Show();
+			m_Parent.UnitPlacerMarCon.Show();
+			m_Parent.CursorLabel.Show();
+		}
+
+		public override void OnProcess(double dt)
+		{
+			m_Parent.CursorLabel.Position = m_Parent.GetLocalMousePosition() + Vector2.One * 50;
+		}
+	}
+
+	private class EditorStatePlacingUEConnector(Editor parent) : EditorState(parent)
+	{
+		public override void OnUnhandledInput(InputEvent ev)
+		{
+			if (Input.IsActionJustPressed(InputManager.Names.LeftClick, true))
+			{
+				if (m_Parent.UniMan.GetUnit(m_Parent.World.GetMouseGridLocation()) is UNSlider tgtSlid)
+				{
+					if (tgtSlid == m_Parent.m_ConnecterUnit)
+					{
+						GD.Print("Hit the connecting slider bruh...");
+					}
+					else
+					{
+						var connSlid = (m_Parent.m_ConnecterUnit as UNSlider)!;
+						m_Parent.UniMan.DetachExtensionFrom(connSlid);
+						m_Parent.UniMan.AttachExtension(new UnitManager.UEConnector(connSlid, tgtSlid));
+						GD.Print($"Connected slider on {connSlid!.GLocation} to the one on {tgtSlid.GLocation}");
+						m_Parent.SetState(new EditorStateIdle(m_Parent));
+						m_Parent.m_ConnecterUnit = null;
+					}
+				}
+				else
+				{
+					GD.Print("Hit nothing and cancelled anyway");
+					m_Parent.SetState(new EditorStateIdle(m_Parent));
+				}
+			}
+			else if (Input.IsActionJustPressed(InputManager.Names.RightClick, true))
+			{
+				GD.Print("Lock cancelled");
+				m_Parent.SetState(new EditorStateIdle(m_Parent));
+				m_Parent.m_ConnecterUnit = null;
+			}
+		}
+
+		public override void SyncButtStates()
+		{
+			ResetEverythingForButtSync();
+			m_Parent.ToolsHBox.Show();
+			m_Parent.UnitPlacerMarCon.Show();
+			m_Parent.CursorLabel.Show();
+		}
+
+		public override void OnProcess(double dt)
+		{
+			m_Parent.CursorLabel.Position = m_Parent.GetLocalMousePosition() + Vector2.One * 50;
+		}
+	}
+
+	private class EditorStatePlacingMatchingTeleOutput(Editor parent) : EditorState(parent)
+	{
+		public override void OnUnhandledInput(InputEvent ev)
+		{
+			if (Input.IsActionJustPressed(InputManager.Names.LeftClick, true))
+			{
+				var mgloc = m_Parent.World.GetMouseGridLocation();
+				if (Unit.CanFitIn(m_Parent.World, mgloc, Vector2I.One, Direction.East))
+				{
+					var teleIn = (m_Parent.m_ConnecterUnit as UNTeleInput)!;
+					var teleOut = m_Parent.UniMan.PlaceTeleOutput(mgloc, m_Parent.m_CurrUnitPlacement.Dir, 1);
+					teleIn.AssignOutput(teleOut);
+					m_Parent.m_ConnecterUnit = null;
+					m_Parent.SetState(new EditorStateUnitPlacement(m_Parent));
+				}
+				else
+				{
+					GD.Print("Nope, doesn't fit");
+				}
+			}
+			else if (Input.IsActionJustPressed(InputManager.Names.RightClick, true))
+			{
+				m_Parent.UniMan.DeleteUnit(m_Parent.m_ConnecterUnit!);
+				GD.Print("Cancelled");
+				m_Parent.m_ConnecterUnit = null;
+				m_Parent.SetState(new EditorStateUnitPlacement(m_Parent));
+			}
+			if (Input.IsActionJustPressed(InputManager.Names.EdRotate, true))
+			{
+				m_Parent.m_CurrUnitPlacement.Dir = m_Parent.m_CurrUnitPlacement.Dir.Rotate90();
+				m_Parent.CursorLabel.Text = $"Out: {m_Parent.m_CurrUnitPlacement.Dir}";
+			}
+		}
+
+		public override void SyncButtStates()
+		{
+			ResetEverythingForButtSync();
+			m_Parent.ToolsHBox.Show();
+			m_Parent.UnitPlacerMarCon.Show();
+			m_Parent.CursorLabel.Show();
+		}
+
+		public override void OnProcess(double dt)
+		{
+			m_Parent.CursorLabel.Position = m_Parent.GetLocalMousePosition() + Vector2.One * 50;
+		}
+	}
+
+	private class EditorStateMoveTool(Editor parent) : EditorState(parent)
+	{
+		public override void OnProcess(double dt)
+		{
+			m_Parent.CursorLabel.Position = m_Parent.GetLocalMousePosition() + Vector2.One * 50;
+		}
+
+		public override void OnUnhandledInput(InputEvent ev)
+		{
+			if (Input.IsActionJustPressed(InputManager.Names.LeftClick, true))
+			{
+				if (m_Parent.UniMan.GetUnit(m_Parent.World.GetMouseGridLocation()) is { } u)
+				{
+					m_Parent.m_ConnecterUnit = u;
+					u.Deconstruct();
+					GD.Print($"Picked up a {u.GetType().Name}");
+					m_Parent.m_CurrUnitPlacement.Dir = u.Dir;
+					m_Parent.CursorLabel.Text = $"Moving a {u.GetType().Name} ({m_Parent.m_CurrUnitPlacement.Dir})";
+					m_Parent.SetState(new EditorStatePlacingMovedUnit(m_Parent));
+				}
+			}
+			else if (Input.IsActionJustPressed(InputManager.Names.RightClick, true))
+			{
+				GD.Print("Cancelled move tool");
+				m_Parent.SetState(new EditorStateIdle(m_Parent));
+				m_Parent.m_CurrUnitPlacement.ButtGroup.GetPressedButton().ButtonPressed = false;
+			}
+		}
+
+		public override void SyncButtStates()
+		{
+			ResetEverythingForButtSync();
+			m_Parent.ToolsHBox.Show();
+			m_Parent.UnitPlacerMarCon.Show();
+			m_Parent.CursorLabel.Show();
+		}
+	}
+
+	private class EditorStatePlacingMovedUnit(Editor parent) : EditorState(parent)
+	{
+		public override void OnProcess(double dt)
+		{
+			m_Parent.CursorLabel.Position = m_Parent.GetLocalMousePosition() + Vector2.One * 50;
+		}
+
+		public override void OnUnhandledInput(InputEvent ev)
+		{
+			if (Input.IsActionJustPressed(InputManager.Names.RightClick, true))
+			{
+				GD.Print("Cancelled moving.");
+				m_Parent.m_ConnecterUnit!.Construct(); // Where it originally was.
+				m_Parent.CursorLabel.Text = nameof(EditorStateMoveTool);
+				m_Parent.SetState(new EditorStateMoveTool(m_Parent));
+			}
+			else if (Input.IsActionJustPressed(InputManager.Names.LeftClick, true))
+			{
+				var mousePos = m_Parent.GetLocalMousePosition();
+				if (m_Parent.World.GetWorldRect().HasPoint(mousePos))
+				{
+					var mgloc = m_Parent.World.GetMouseGridLocation();
+					if (Unit.CanFitIn(m_Parent.World, mgloc, m_Parent.m_ConnecterUnit!))
+					{
+						GD.Print($"Moved a {m_Parent.m_ConnecterUnit!.GetType().Name} from {m_Parent.m_ConnecterUnit.GLocation} to {mgloc}");
+						m_Parent.m_ConnecterUnit!.SetGLocation(mgloc);
+						m_Parent.m_ConnecterUnit.SetDirection(m_Parent.m_CurrUnitPlacement.Dir);
+						m_Parent.m_ConnecterUnit.Construct();
+						m_Parent.CursorLabel.Text = nameof(EditorStateMoveTool);
+						m_Parent.SetState(new EditorStateMoveTool(m_Parent));
+					}
+					else
+					{
+						GD.Print("Nope, doesn't fit.");
+					}
+				}
+			}
+			else if (Input.IsActionJustPressed(InputManager.Names.EdRotate, true))
+			{
+				if (m_Parent.m_ConnecterUnit!.CanFaceDir(Direction.North) is false)
+				{
+					m_Parent.m_CurrUnitPlacement.Dir = m_Parent.m_CurrUnitPlacement.Dir switch
+					{
+						Direction.East => Direction.West,
+						Direction.West or _ => Direction.East,
+					};
+				}
+				else
+				{
+					m_Parent.m_CurrUnitPlacement.Dir = m_Parent.m_CurrUnitPlacement.Dir.Rotate90();
+				}
+				m_Parent.CursorLabel.Text = $"Moving a {m_Parent.m_ConnecterUnit!.GetType().Name} ({m_Parent.m_CurrUnitPlacement.Dir})";
+			}
+		}
+
+		public override void SyncButtStates()
+		{
+			ResetEverythingForButtSync();
+			m_Parent.ToolsHBox.Show();
+			m_Parent.UnitPlacerMarCon.Show();
+			m_Parent.CursorLabel.Show();
+		}
+	}
+
+	private class EditorStateRotationTool(Editor parent) : EditorState(parent)
+	{
+		public override void OnUnhandledInput(InputEvent ev)
+		{
+			if (Input.IsActionJustPressed(InputManager.Names.EdRotationToolNorm, true))
+			{
+				if (m_Parent.UniMan.GetUnit(m_Parent.World.GetMouseGridLocation()) is { } u)
+				{
+					if (u.CanFaceDir(Direction.North) is false)
+					{
+						GD.Print($"Flipped a {u.GetType().Name}");
+						u.Rotate180();
+					}
+					else
+					{
+						GD.Print($"Rotated a {u.GetType().Name} by 90 degrees");
+						u.Rotate90();
+					}
+
+				}
+			}
+			else if (Input.IsActionJustPressed(InputManager.Names.EdRotationToolAlt, true))
+			{
+				if (m_Parent.UniMan.GetUnit(m_Parent.World.GetMouseGridLocation()) is { } u)
+				{
+					if (u.CanFaceDir(Direction.North) is false)
+					{
+						GD.Print($"Flipped a {u.GetType().Name}");
+						u.Rotate180();
+					}
+					else
+					{
+						GD.Print($"Rotated a {u.GetType().Name} by -90 degrees");
+						u.Rotate270();
+					}
+				}
+			}
+			else if (Input.IsActionJustPressed(InputManager.Names.RightClick))
+			{
+				GD.Print("Cancelled rotation tool");
+				m_Parent.SetState(new EditorStateIdle(m_Parent));
+				m_Parent.m_CurrUnitPlacement.ButtGroup.GetPressedButton().ButtonPressed = false;
+			}
+		}
+
+		public override void SyncButtStates()
+		{
+			ResetEverythingForButtSync();
+			m_Parent.ToolsHBox.Show();
+			m_Parent.UnitPlacerMarCon.Show();
+		}
+	}
+
+	private class EditorStatePlay(Editor parent) : EditorState(parent), ISimulationState
+	{
+		public override void OnUnhandledInput(InputEvent ev) { }
+		public override void OnProcess(double dt)
+		{
+			m_Parent.Simy.DoPerFrame(dt);
+		}
+
+		public override void SyncButtStates()
+		{
+			ResetEverythingForButtSync();
+			m_Parent.HaltButt.Disabled = false;
+			m_Parent.DebugButt.Disabled = false;
+			m_Parent.PlayHBox.Show();
+		}
+
+		public void OnDebugButtPressed()
+		{
+			m_Parent.Simy.Pause();
+			m_Parent.SetState(new EditorStateDebug(m_Parent));
+		}
+
+		public void OnHaltButtPressed()
+		{
+			m_Parent.Simy.Halt();
+			m_Parent.SetState(new EditorStateIdle(m_Parent));
+		}
+
+		public void OnPlayButtPressed()
+		{
+			throw new NotImplementedException();
+		}
+	}
+
+	private class EditorStateDebug(Editor parent) : EditorState(parent), ISimulationState
+	{
+		public override void OnUnhandledInput(InputEvent ev) { }
+		public override void OnProcess(double dt)
+		{
+			m_Parent.Simy.DoPerFrame(dt);
+		}
+
+		public override void SyncButtStates()
+		{
+			ResetEverythingForButtSync();
+			m_Parent.PlayButt.Disabled = false;
+			m_Parent.HaltButt.Disabled = false;
+			m_Parent.DebugButt.Disabled = false;
+			m_Parent.PlayHBox.Show();
+		}
+
+		public void OnDebugButtPressed()
+		{
+			if (!m_Parent.Simy.IsPaused()) // Spamming the debug key while the tick is in progress.
+			{
+				return;
+			}
+
+			m_Parent.Simy.TickOnce();
+		}
+
+		public void OnHaltButtPressed()
+		{
+			m_Parent.Simy.Halt();
+			m_Parent.SetState(new EditorStateIdle(m_Parent));
+		}
+
+		public void OnPlayButtPressed()
+		{
+			m_Parent.Simy.Resume();
+			m_Parent.SetState(new EditorStatePlay(m_Parent));
+		}
+	}
+
+
+
+
+
+
+
+
+
+	#endregion // .Inner Classes
 }

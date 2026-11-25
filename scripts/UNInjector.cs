@@ -46,4 +46,7 @@ public partial class UNInjector : Unit
 
 	public override string ToString() 
 		=> Utilz.ReplaceBaseNameInToString(base.ToString(), "Injector");
+
+	public override void Construct() { }
+	public override void Deconstruct() { }
 }

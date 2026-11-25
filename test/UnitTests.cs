@@ -25,6 +25,7 @@ public class UnitTests : ArTest.TestSuit
 	{
 		Lvl.Simy.Reset();
 		Lvl.World.Clear();
+		Lvl.World.SetDimensions(new(6, 6));
 	}
 
 	public override void AfterEach()

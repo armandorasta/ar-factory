@@ -47,10 +47,11 @@ keycode = 4194341
 [sub_resource type="Shortcut" id="Shortcut_u716c"]
 events = [SubResource("InputEventKey_ppgk2")]
 
-[node name="Level" type="Node2D" unique_id=1731236255]
+[node name="Editor" type="Node2D" unique_id=1731236255]
 script = ExtResource("1_6vs76")
 
 [node name="WorldPanel" type="Panel" parent="." unique_id=1258821105]
+clip_contents = true
 offset_right = 1200.0
 offset_bottom = 720.0
 mouse_filter = 1
@@ -250,3 +251,39 @@ text = "SAVE"
 [node name="LoadButt" type="Button" parent="HUDLayer/TopPanel/MarCon/HBox" unique_id=302341303]
 layout_mode = 2
 text = "LOAD"
+
+[node name="HSep1" type="HSeparator" parent="HUDLayer/TopPanel/MarCon/HBox" unique_id=557593637]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="XLiEd" type="LineEdit" parent="HUDLayer/TopPanel/MarCon/HBox" unique_id=18850777]
+custom_maximum_size = Vector2(40, -1)
+layout_mode = 2
+placeholder_text = "W"
+alignment = 1
+max_length = 2
+context_menu_enabled = false
+emoji_menu_enabled = false
+selecting_enabled = false
+
+[node name="Label" type="Label" parent="HUDLayer/TopPanel/MarCon/HBox" unique_id=123842513]
+layout_mode = 2
+text = "X"
+
+[node name="YLiEd" type="LineEdit" parent="HUDLayer/TopPanel/MarCon/HBox" unique_id=1429659312]
+custom_maximum_size = Vector2(40, -1)
+layout_mode = 2
+placeholder_text = "H"
+alignment = 1
+max_length = 2
+context_menu_enabled = false
+emoji_menu_enabled = false
+selecting_enabled = false
+
+[node name="DimButt" type="Button" parent="HUDLayer/TopPanel/MarCon/HBox" unique_id=2094266116]
+layout_mode = 2
+text = "SET"
+
+[node name="HSep2" type="HSeparator" parent="HUDLayer/TopPanel/MarCon/HBox" unique_id=1144519615]
+layout_mode = 2
+size_flags_horizontal = 3

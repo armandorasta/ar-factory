@@ -1,145 +1,246 @@
 {
-  "Units": [
-    {
-      "TypeName": "UNSupplier",
-      "Elem": {
-        "Sequence": [
-          1,
-          2,
-          3,
-          4,
-          5,
-          6
-        ],
-        "GL": {
-          "X": 4,
-          "Y": 4
-        },
-        "Dir": 1,
-        "Rate": 1,
-        "IsLocked": false
-      }
-    },
-    {
-      "TypeName": "UNSlider",
-      "Elem": {
-        "GL": {
-          "X": 5,
-          "Y": 4
-        },
-        "Dir": 1,
-        "Rate": 1,
-        "IsLocked": false
-      }
-    },
-    {
-      "TypeName": "UNSlider",
-      "Elem": {
-        "GL": {
-          "X": 6,
-          "Y": 4
-        },
-        "Dir": 1,
-        "Rate": 1,
-        "IsLocked": false
-      }
-    },
-    {
-      "TypeName": "UNBin",
-      "Elem": {
-        "GL": {
-          "X": 8,
-          "Y": 4
-        },
-        "Dir": 1,
-        "Rate": 1,
-        "IsLocked": false
-      }
-    },
-    {
-      "TypeName": "UNSlider",
-      "Elem": {
-        "GL": {
-          "X": 7,
-          "Y": 4
-        },
-        "Dir": 1,
-        "Rate": 1,
-        "IsLocked": false
-      }
-    },
-    {
-      "TypeName": "UNSlider",
-      "Elem": {
-        "GL": {
-          "X": 6,
-          "Y": 1
-        },
-        "Dir": 1,
-        "Rate": 1,
-        "IsLocked": false
-      }
-    },
-    {
-      "TypeName": "UNBranch",
-      "Elem": {
-        "Check": 8,
-        "CmpValue": 0,
-        "GL": {
-          "X": 10,
-          "Y": 2
-        },
-        "Dir": 1,
-        "Rate": 2,
-        "IsLocked": false
-      }
+  "WorldElem": {
+    "Dimensions": {
+      "X": 10,
+      "Y": 9
     }
-  ],
-  "Extensions": [
-    {
-      "TypeName": "UERuntimeLock",
-      "Elem": {
-        "ParentGL": {
-          "X": 5,
-          "Y": 4
+  },
+  "UniManElem": {
+    "Units": [
+      {
+        "TypeName": "UNSupplier",
+        "Elem": {
+          "Sequence": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "GL": {
+            "X": 3,
+            "Y": 5
+          },
+          "Dir": 1,
+          "Rate": 1,
+          "IsLocked": false
+        }
+      },
+      {
+        "TypeName": "UNCloner",
+        "Elem": {
+          "GL": {
+            "X": 4,
+            "Y": 5
+          },
+          "Dir": 1,
+          "Rate": 2,
+          "IsLocked": false
+        }
+      },
+      {
+        "TypeName": "UNCombiner",
+        "Elem": {
+          "Operation": 0,
+          "GL": {
+            "X": 6,
+            "Y": 3
+          },
+          "Dir": 3,
+          "Rate": 2,
+          "IsLocked": false
+        }
+      },
+      {
+        "TypeName": "UNSlider",
+        "Elem": {
+          "GL": {
+            "X": 5,
+            "Y": 5
+          },
+          "Dir": 1,
+          "Rate": 1,
+          "IsLocked": false
+        }
+      },
+      {
+        "TypeName": "UNSlider",
+        "Elem": {
+          "GL": {
+            "X": 5,
+            "Y": 6
+          },
+          "Dir": 1,
+          "Rate": 1,
+          "IsLocked": false
+        }
+      },
+      {
+        "TypeName": "UNSlider",
+        "Elem": {
+          "GL": {
+            "X": 6,
+            "Y": 5
+          },
+          "Dir": 1,
+          "Rate": 1,
+          "IsLocked": false
+        }
+      },
+      {
+        "TypeName": "UNSlider",
+        "Elem": {
+          "GL": {
+            "X": 6,
+            "Y": 6
+          },
+          "Dir": 1,
+          "Rate": 1,
+          "IsLocked": false
+        }
+      },
+      {
+        "TypeName": "UNSlider",
+        "Elem": {
+          "GL": {
+            "X": 7,
+            "Y": 6
+          },
+          "Dir": 1,
+          "Rate": 1,
+          "IsLocked": false
+        }
+      },
+      {
+        "TypeName": "UNSlider",
+        "Elem": {
+          "GL": {
+            "X": 7,
+            "Y": 4
+          },
+          "Dir": 3,
+          "Rate": 1,
+          "IsLocked": false
+        }
+      },
+      {
+        "TypeName": "UNSlider",
+        "Elem": {
+          "GL": {
+            "X": 7,
+            "Y": 3
+          },
+          "Dir": 3,
+          "Rate": 1,
+          "IsLocked": false
+        }
+      },
+      {
+        "TypeName": "UNSlider",
+        "Elem": {
+          "GL": {
+            "X": 8,
+            "Y": 3
+          },
+          "Dir": 3,
+          "Rate": 1,
+          "IsLocked": false
+        }
+      },
+      {
+        "TypeName": "UNSlider",
+        "Elem": {
+          "GL": {
+            "X": 8,
+            "Y": 4
+          },
+          "Dir": 0,
+          "Rate": 1,
+          "IsLocked": false
+        }
+      },
+      {
+        "TypeName": "UNSlider",
+        "Elem": {
+          "GL": {
+            "X": 8,
+            "Y": 5
+          },
+          "Dir": 0,
+          "Rate": 1,
+          "IsLocked": false
+        }
+      },
+      {
+        "TypeName": "UNSlider",
+        "Elem": {
+          "GL": {
+            "X": 8,
+            "Y": 6
+          },
+          "Dir": 0,
+          "Rate": 1,
+          "IsLocked": false
+        }
+      },
+      {
+        "TypeName": "UNSlider",
+        "Elem": {
+          "GL": {
+            "X": 7,
+            "Y": 5
+          },
+          "Dir": 0,
+          "Rate": 1,
+          "IsLocked": false
+        }
+      },
+      {
+        "TypeName": "UNDemander",
+        "Elem": {
+          "Sequence": [
+            2,
+            4,
+            6,
+            8,
+            10,
+            12
+          ],
+          "GL": {
+            "X": 3,
+            "Y": 4
+          },
+          "Dir": 1,
+          "Rate": 1,
+          "IsLocked": false
+        }
+      },
+      {
+        "TypeName": "UNSlider",
+        "Elem": {
+          "GL": {
+            "X": 5,
+            "Y": 4
+          },
+          "Dir": 3,
+          "Rate": 1,
+          "IsLocked": false
+        }
+      },
+      {
+        "TypeName": "UNSlider",
+        "Elem": {
+          "GL": {
+            "X": 4,
+            "Y": 4
+          },
+          "Dir": 3,
+          "Rate": 1,
+          "IsLocked": false
         }
       }
-    },
-    {
-      "TypeName": "UEConnector",
-      "Elem": {
-        "PartnerGL": {
-          "X": 5,
-          "Y": 4
-        },
-        "ParentGL": {
-          "X": 6,
-          "Y": 4
-        }
-      }
-    },
-    {
-      "TypeName": "UEDirectionToggle",
-      "Elem": {
-        "Kind": 1,
-        "ParentGL": {
-          "X": 6,
-          "Y": 1
-        }
-      }
-    },
-    {
-      "TypeName": "UEConnector",
-      "Elem": {
-        "PartnerGL": {
-          "X": 6,
-          "Y": 1
-        },
-        "ParentGL": {
-          "X": 7,
-          "Y": 4
-        }
-      }
-    }
-  ]
+    ],
+    "Extensions": []
+  }
 }

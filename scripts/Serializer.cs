@@ -54,7 +54,7 @@ public class Serializer
 			var data = Deserialize<UNBinSerializationData>(elem);
 			Debug.AssertNotNull(data);
 			var u = uniMan.PlaceBin(data!.GL);
-			u.RestoreAfterInit(data);
+			u.DeserializeAfterReady(data);
 			break;
 		}
 		case nameof(UNCloner):
@@ -62,7 +62,7 @@ public class Serializer
 			var data = Deserialize<UNClonerSerializationData>(elem);
 			Debug.AssertNotNull(data);
 			var u = uniMan.PlaceCloner(data!.GL, data.Dir, data.Rate);
-			u.RestoreAfterInit(data);
+			u.DeserializeAfterReady(data);
 			break;
 		}
 		case nameof(UNSlider):
@@ -70,7 +70,7 @@ public class Serializer
 			var data = Deserialize<UNSliderSerializationData>(elem);
 			Debug.AssertNotNull(data);
 			var u = uniMan.PlaceSlider(data!.GL, data.Dir, data.Rate);
-			u.RestoreAfterInit(data);
+			u.DeserializeAfterReady(data);
 			break;
 		}
 		case nameof(UNUpdater):
@@ -78,7 +78,7 @@ public class Serializer
 			var data = Deserialize<UNUpdaterSerializationData>(elem);
 			Debug.AssertNotNull(data);
 			var u = uniMan.PlaceUpdater(data!.GL, data.Dir, data.Rate, data.UpType);
-			u.RestoreAfterInit(data);
+			u.DeserializeAfterReady(data);
 			break;
 		}
 		case nameof(UNSupplier):
@@ -86,7 +86,7 @@ public class Serializer
 			var data = Deserialize<UNSupplierSerializationData>(elem);
 			Debug.AssertNotNull(data);
 			var u = uniMan.PlaceSupplier(data!.GL, data.Dir, data.Rate, data.Sequence!);
-			u.RestoreAfterInit(data);
+			u.DeserializeAfterReady(data);
 			break;
 		}
 		case nameof(UNDemander):
@@ -94,7 +94,7 @@ public class Serializer
 			var data = Deserialize<UNDemanderSerializationData>(elem);
 			Debug.AssertNotNull(data);
 			var u = uniMan.PlaceDemander(data!.GL, data.Dir, data.Sequence!);
-			u.RestoreAfterInit(data);
+			u.DeserializeAfterReady(data);
 			break;
 		}
 		case nameof(UNBranch):
@@ -102,7 +102,7 @@ public class Serializer
 			var data = Deserialize<UNBranchSerializationData>(elem);
 			Debug.AssertNotNull(data);
 			var u = uniMan.PlaceBranch(data!.GL, data.Dir, data.Rate, data.Check, data.CmpValue);
-			u.RestoreAfterInit(data);
+			u.DeserializeAfterReady(data);
 			break;
 		}
 		case nameof(UNCombiner):
@@ -110,7 +110,7 @@ public class Serializer
 			var data = Deserialize<UNCombinerSerializationData>(elem);
 			Debug.AssertNotNull(data);
 			var u = uniMan.PlaceCombiner(data!.GL, data.Dir, data.Rate, data.Operation);
-			u.RestoreAfterInit(data);
+			u.DeserializeAfterReady(data);
 			break;
 		}
 		default:
@@ -157,6 +157,11 @@ public class Serializer
 		return (data!, parent!);
 	}
 
+	public static JsonElement SerializeWorldPanel(WorldPanel world) => world.SerializeToElement();
+	public static void DeserializeWorldPanel(JsonElement elem, WorldPanel world) => world.DeserializeAfterReady(elem);
+
+	public static JsonElement SerializeUnitManager(UnitManager uniMan) => uniMan.SerializeToElement();
+	public static void DeserializeUnitManager(JsonElement elem, UnitManager uniMan) => uniMan.Deserialize(elem);
 }
 
 #region .Unit
@@ -218,3 +223,7 @@ public record UEConnectorSerializationData : UnitExtensionSerializationData
 }
 
 #endregion // .UnitExtension
+#region .Other
+
+
+#endregion

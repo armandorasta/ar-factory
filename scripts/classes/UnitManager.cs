@@ -36,7 +36,7 @@ public class UnitManager : IDestroyable
 	public UnitManager(WorldPanel world)
 	{
 		this.World = world;
-		World.Cleared += Clear;
+		World.Clearing += Clear;
 		World.DimensionsChanged += OnWorld_DimensionsChanged;
 	}
 
@@ -125,12 +125,13 @@ public class UnitManager : IDestroyable
 	#endregion // .Extension Interface
 	#region .Event Handlers
 
-	public void OnWorld_DimensionsChanged()
+	public void OnWorld_DimensionsChanged(Vector2I newDims)
 	{
+		var worldFutureRect = new Rect2I(Vector2I.Zero, newDims);
 		for (var i = m_Units.Count - 1; i >= 0; --i)
 		{
 			var u = m_Units[i];
-			if (!Unit.CanFitIn(World, u.GLocation, u.Dimensions, u.Dir))
+			if (!worldFutureRect.Encloses(u.GetGridRect()))
 			{
 				DeleteUnit(u);
 			}
@@ -267,7 +268,7 @@ public class UnitManager : IDestroyable
 	#endregion // Placement Functions
 	#region .Serialization
 
-	private struct UnitManagerSerializationInfo(int unitCount, int extCount)
+	private struct UnitManagerSerializationData(int unitCount, int extCount)
 	{
 		[JsonInclude] public List<TypeAndElem> Units = new(unitCount);
 		[JsonInclude] public List<TypeAndElem> Extensions = new(extCount);
@@ -278,13 +279,13 @@ public class UnitManager : IDestroyable
 		[JsonInclude] public string TypeName;
 		[JsonInclude] public JsonElement Elem;
 	}
-	
-	public void Serialize()
+
+	public JsonElement SerializeToElement()
 	{
-		var info = new UnitManagerSerializationInfo(m_Units.Count, m_Extensions.Count);
+		var data = new UnitManagerSerializationData(m_Units.Count, m_Extensions.Count);
 		foreach (var u in m_Units)
 		{
-			info.Units.Add(new TypeAndElem
+			data.Units.Add(new TypeAndElem
 			{
 				TypeName = u.GetType().Name,
 				Elem = Serializer.SerializeUnitToElement(u),
@@ -292,40 +293,28 @@ public class UnitManager : IDestroyable
 		}
 		foreach (var ext in m_Extensions.Values)
 		{
-			info.Extensions.Add(new TypeAndElem
+			data.Extensions.Add(new TypeAndElem
 			{
 				TypeName = ext.GetType().Name,
 				Elem = Serializer.SerializeUnitExtensionToElement(ext),
 			});
 		}
 
-		var file = Godot.FileAccess.Open("res://resources/saves/Level.json", FileAccess.ModeFlags.Write);
-		Debug.AssertNotNull(file);
-		file.StoreString(Serializer.Serialize(info));
-		file.Close();
+		return Serializer.SerializeToElement(data);
 	}
 
-	public bool Deserialize()
+	public void Deserialize(JsonElement elem)
 	{
-		if (!Godot.FileAccess.FileExists("res://resources/saves/Level.json"))
-		{
-			return false;
-		}
-
-		var fileContents = Godot.FileAccess.GetFileAsString("res://resources/saves/Level.json");
-		Debug.AssertNotNull(fileContents);
-		var uniManInfo = Serializer.Deserialize<UnitManagerSerializationInfo>(fileContents);
-		Debug.AssertNotNull(uniManInfo);
-		foreach (var su in uniManInfo.Units!)
+		var data = Serializer.Deserialize<UnitManagerSerializationData>(elem);
+		Debug.AssertNotNull(data);
+		foreach (var su in data!.Units)
 		{
 			Serializer.DeserializeUnit(su.TypeName, su.Elem, this);
 		}
-		foreach (var sext in uniManInfo.Extensions!)
+		foreach (var sext in data.Extensions)
 		{
 			Serializer.DeserializeUnitExtension(sext.TypeName, sext.Elem, this);
 		}
-
-		return true;
 	}
 
 	#endregion //  .Serialization

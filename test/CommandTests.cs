@@ -19,6 +19,7 @@ public class CommandTests : ArTest.TestSuit
 
 	public override void BeforeEach()
 	{
+		Lvl.Simy.Reset();
 		Lvl.World.Clear();
 		Lvl.World.SetDimensions(new(6, 6));
 	}

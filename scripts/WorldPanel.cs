@@ -1,8 +1,10 @@
+using ArFactory.Serialization;
 using Godot;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Text.Json;
 
 namespace ArFactory;
 
@@ -10,12 +12,15 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 {
 	// Constants
 	public static readonly Vector2I MinDims = new(3, 3);
-	public static readonly Vector2I MaxDims = new(100, 100);
+	public static readonly Vector2I MaxDims = new(23, 15);
 
 	// Events
 	public event Action? Redrawing;
-	public event Action? Cleared;
-	public event Action? DimensionsChanged;
+	public event Action? Clearing;
+	/// <summary>
+	/// Takes the dimesions the world is about to take, gets called before dimensions are touched.
+	/// </summary>
+	public event Action<Vector2I>? DimensionsChanged;
 
 
 	// Scenes
@@ -114,7 +119,7 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 	public Tile GetTileNonNull(Vector2I gloc)
 	{
 #if DEBUG
-		return GetTile(gloc) ?? throw new InvalidProgramException("GetTileNonNull returns a null tile??");
+		return GetTile(gloc) ?? throw new InvalidProgramException($"GetTileNonNull returns a null tile on {gloc}??");
 #else
 		return GetTile(gloc)!;
 #endif
@@ -142,7 +147,7 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 	/// Returns true if the tile is installed within this world, returns false if it's floating or
 	/// installed in another world somehow.
 	/// </summary>
-	public bool IsInstalled(Tile tl) => IsWithin(tl.GLocation) && object.ReferenceEquals(tl, GetTile(tl.GLocation));
+	public bool IsInstalled(Tile tl) => object.ReferenceEquals(tl, GetTileOrNull(tl.GLocation));
 
 	public IEnumerable<Tile> GetTilesIter() => m_Tiles.Where(tl => tl is not null)!;
 
@@ -561,6 +566,23 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 	}
 
 	#endregion // Godot Overrides
+	#region .Serialization
+
+	private record WorldPanelSerializationData(Vector2I Dimensions);
+
+	public JsonElement SerializeToElement()
+	{
+		return Serializer.SerializeToElement(new WorldPanelSerializationData(Dimensions));
+	}
+
+	public void DeserializeAfterReady(JsonElement elem)
+	{
+		var data = Serializer.Deserialize<WorldPanelSerializationData>(elem);
+		Debug.AssertNotNull(data);
+		SetDimensions(data!.Dimensions);
+	}
+
+	#endregion // .Serialization
 	#region .Other Methods
 
 	/// <summary>
@@ -576,11 +598,21 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 			return;
 		}
 		
+		// Let's let the watchers react before we scramble the tiles and stuff.
+		DimensionsChanged?.Invoke(newDims);
+
+		// Orphan damn tiles
+		for (var i = m_OrphanTiles.Count; i > 0; --i)
+		{
+			var tl = m_OrphanTiles[i - 1];
+			if (!new Rect2I(Vector2I.Zero, newDims).HasPoint(tl.GLocation))
+			{
+				DeleteTile(tl);
+			}
+		}
+
 		m_Dims = newDims;
 		Size = CellWidth * (Vector2)m_Dims;
-
-		// Let's let the watchers react before we scramble the tiles and stuff.
-		DimensionsChanged?.Invoke();
 
 		var oldTiles = m_Tiles;
 		m_Tiles = [];
@@ -590,6 +622,7 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 		}
 
 		// Copy over the tiles.
+		// TODO: fix this! must call destory on culled tiles!
 		for (int y = 0, ylim = int.Min(oldDims.Y, newDims.Y); y < ylim; ++y)
 		{
 			for (int x = 0, xlim = int.Min(oldDims.X, newDims.X); x < xlim; ++x)
@@ -603,16 +636,16 @@ public partial class WorldPanel : Godot.Panel, ITileOwner, IDestroyable
 
 	public void Clear()
 	{
-		Cleared?.Invoke();
+		Clearing?.Invoke();
 
-		for (var i = m_OrphanTiles.Count - 1; i >= 0; --i)
+		for (var i = m_OrphanTiles.Count; i > 0; --i)
 		{
-			var tl = m_OrphanTiles[i];
+			var tl = m_OrphanTiles[i - 1];
 			DeleteTile(tl);
 		}
 
 		Debug.Assert(m_Tiles.All(tl => tl is null));
-		Debug.Assert(m_OrphanTiles.All(tl => tl is null));
+		Debug.Assert(m_OrphanTiles.Count == 0);
 	}
 
 	#endregion // .Other Methods

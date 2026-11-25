@@ -239,6 +239,16 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	#region Public Interface
 
 	/// <summary>
+	/// Returns enclosing Rect2I in grid-space.
+	/// </summary>
+	public Godot.Rect2I GetGridRect() => new(GLocation, Dimensions);
+
+	/// <summary>
+	/// Returns enclosing Rect2 in world-space.
+	/// </summary>
+	public Godot.Rect2 GetWorldRect() => new(GLocation, (Vector2)Dimensions * World.CellWidth);
+
+	/// <summary>
 	/// Returns true if the machine is expected to operate during this tick, <see cref="m_Rate"/> determines how often
 	/// this function returns true, ex. when <see cref="m_Rate"/> is 1, it returns true every single tick.
 	/// </summary>
@@ -333,7 +343,7 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	/// <summary>
 	/// Must fit not have any other tiles in the way.
 	/// </summary>
-	public void Construct()
+	public virtual void Construct()
 	{
 		Debug.Assert(Unit.CanFitIn(World, GLocation, Dimensions, Dir));
 		Debug.Assert(!Sprite.Visible);
@@ -368,7 +378,7 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	/// <summary>
 	/// Must not be floating already, has pending commands (just call <see cref="Reset"/>), or have any items within.
 	/// </summary>
-	public void Deconstruct()
+	public virtual void Deconstruct()
 	{
 		Debug.Assert(!IsFloating());
 		Debug.Assert(!HasPendingCmds());
@@ -415,7 +425,7 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	public virtual JsonElement SerializeToElement() 
 		=> Serializer.SerializeToElement(SerializeBase<UnitSerializationData>());
 
-	public virtual void RestoreAfterInit(UnitSerializationData data)
+	public virtual void DeserializeAfterReady(UnitSerializationData data)
 	{
 		if (data.IsLocked)
 		{
@@ -492,7 +502,11 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	/// </summary>
 	public virtual bool CanFaceDir(Direction dir) => dir == Direction.East || dir == Direction.West;
 
-	public void SetDirection(Direction newDir)
+	/// <summary>
+	/// Can be overriden to control how things other than the bg sprite rotate, not to limit directions, use 
+	/// <see cref="CanFaceDir"/> for that.
+	/// </summary>
+	public virtual void SetDirection(Direction newDir)
 	{
 		Debug.Assert(Enum.IsDefined(newDir));
 		if (newDir == m_Dir)
@@ -517,30 +531,14 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 
 	private void SyncSpriteRotation()
 	{
-		switch (m_Dir) {
-		case Direction.North: 
-			Sprite.FlipH = false; 
-			Sprite.Rotation = -0.5f * Mathf.Pi; 
-			break;
-		
-		case Direction.East : 
-			Sprite.FlipH = false; 
-			Sprite.Rotation = 0f; 
-			break;
-		
-		case Direction.South: 
-			Sprite.FlipH = false; 
-			Sprite.Rotation = +0.5f * Mathf.Pi; 
-			break;
-		
-		case Direction.West: // special 
-			Sprite.FlipH = true; 
-			Sprite.Rotation = 0f;
-			break;
-		
-		default:
-			throw new NotImplementedException();
-		}
+		Sprite.Rotation = m_Dir switch
+		{
+			Direction.North => -0.5f * Mathf.Pi,
+			Direction.East => 0f,
+			Direction.South => +0.5f * Mathf.Pi,
+			Direction.West => Mathf.Pi,
+			_ => throw new NotImplementedException(),
+		};
 	}
 
 	public void Rotate180()

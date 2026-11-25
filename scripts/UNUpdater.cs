@@ -40,6 +40,7 @@ public partial class UNUpdater : Unit
 		Debug.Assert(Enum.IsDefined(upT));
 		BaseInit(world, TickType.OnDemand, workRate, gloc, Vector2I.One, dir);
 
+		m_UpTypeLabel!.PivotOffsetRatio = 0.5f * Vector2.One;
 		SetUpdateType(upT);
 	}
 
@@ -82,6 +83,13 @@ public partial class UNUpdater : Unit
 			_ => throw new NotImplementedException(),
 		};
 	}
+
+	public override void SetDirection(Direction newDir)
+	{
+		base.SetDirection(newDir);
+		m_UpTypeLabel!.Rotation = -Sprite.Rotation;
+	}
+
 	
 	public override JsonElement SerializeToElement() 
 	{

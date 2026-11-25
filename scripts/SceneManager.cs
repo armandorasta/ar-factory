@@ -29,7 +29,7 @@ public static class SceneManager
 	{
 		var editor = GD.Load<Godot.PackedScene>(EditorScenePath).Instantiate<Editor>();
 		ChangeSceneToNodeImmediately(tree, editor);
-		editor.Deserialize();
+		editor.Deserialize(Editor.AutoSaveFilePath);
 	}
 
 	#endregion // .Transitions

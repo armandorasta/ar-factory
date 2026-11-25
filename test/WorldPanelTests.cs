@@ -21,6 +21,7 @@ public class WorldPanelTests : ArTest.TestSuit
 	{
 		Lvl.Simy.Reset();
 		Lvl.World.Clear();
+		Lvl.World.SetDimensions(new(10, 10));
 	}
 
 	public override void AfterEach()
@@ -405,8 +406,13 @@ public class WorldPanelTests : ArTest.TestSuit
 		AssertThrow(() => world.CloneItem(it0.GLocation, Vector2I.One * 1000));
 	}
 
-	// [ArTest.RunThisOnly]
-	[ArTest.Test] public void TestSetDims()
+	[ArTest.Test] public void TestSetDimensions_empty_world()
+	{
+		var world = Lvl.World;
+		AssertEq(world.Dimensions, new Vector2I(10, 10));
+	}
+
+	[ArTest.Test] public void TestSetDimensions_empty_tiles()
 	{
 		var world = Lvl.World;
 		var tls = new Tile[]
@@ -418,7 +424,7 @@ public class WorldPanelTests : ArTest.TestSuit
 		};
 
 		// All tiles fit
-		world.SetDimensions(new(10, 10));
+		world.SetDimensions(new(12, 12));
 		AssertEq(tls[0].GLocation, new(1, 2));
 		AssertEq(tls[1].GLocation, new(3, 3));
 		AssertEq(tls[2].GLocation, new(0, 7));
@@ -438,10 +444,87 @@ public class WorldPanelTests : ArTest.TestSuit
 		AssertRefEq(tls[0], world[1, 2]);
 		AssertRefEq(tls[1], world[3, 3]);
 		AssertRefEq(tls[3], world[2, 0]);
+	}
 
+	[ArTest.Test] public void TestSetDimensions_all_units_fit()
+	{
 		// TODO: Now Add some units and decide what happens to cut-off units...
 		// Do we return them?
 		// Do we bomb them?
 		// Do we shift them around when nothing is in the way? (oh god)
+		var world = Lvl.World;
+		var units = new Unit[]
+		{
+			Lvl.UniMan.PlaceSlider(new Vector2I(1, 2), Direction.East),
+			Lvl.UniMan.PlaceBranch(new Vector2I(4, 4), Direction.East, 1, CmdIf.CheckType.Greater, 0),
+			Lvl.UniMan.PlaceCloner(new Vector2I(0, 7), Direction.West, 1),
+			Lvl.UniMan.PlaceUpdater(new Vector2I(2, 0), Direction.West, 1, UNUpdater.UpdateType.Increment),
+		};
+
+		// All units fit
+		world.SetDimensions(new(12, 12));
+		AssertEq(units[0].GLocation, new(1, 2));
+		AssertEq(units[1].GLocation, new(4, 4));
+		AssertEq(units[2].GLocation, new(0, 7));
+		AssertEq(units[3].GLocation, new(2, 0));
+		AssertRefEq(units[0], Lvl.UniMan.GetUnit(new Vector2I(1, 2)));
+		AssertRefEq(units[1], Lvl.UniMan.GetUnit(new Vector2I(4, 4)));
+		AssertRefEq(units[2], Lvl.UniMan.GetUnit(new Vector2I(0, 7)));
+		AssertRefEq(units[3], Lvl.UniMan.GetUnit(new Vector2I(2, 0)));
+	}
+
+	[ArTest.Test] public void TestSetDimensions_whole_unit_is_out_of_bounds()
+	{
+		var world = Lvl.World;
+		var units = new Unit[]
+		{
+			Lvl.UniMan.PlaceSlider(new Vector2I(1, 2), Direction.East),
+			Lvl.UniMan.PlaceBranch(new Vector2I(4, 4), Direction.East, 1, CmdIf.CheckType.Greater, 0),
+			Lvl.UniMan.PlaceCloner(new Vector2I(0, 7), Direction.West, 1),
+			Lvl.UniMan.PlaceUpdater(new Vector2I(2, 0), Direction.West, 1, UNUpdater.UpdateType.Increment),
+		};
+
+		// Third unit gets its ass handed over to it.
+		world.SetDimensions(new(6, 6));
+		AssertEq(units[0].GLocation, new(1, 2));
+		AssertEq(units[1].GLocation, new(4, 4));
+		AssertEq(units[3].GLocation, new(2, 0));
+		AssertTrue(units[2].IsQueuedForDeletion() || !Godot.GodotObject.IsInstanceValid(units[2]));
+
+		AssertRefEq(units[0], Lvl.UniMan.GetUnit(new Vector2I(1, 2)));
+		AssertRefEq(units[1], Lvl.UniMan.GetUnit(new Vector2I(4, 4)));
+		AssertRefEq(units[3], Lvl.UniMan.GetUnit(new Vector2I(2, 0)));
+
+		// Cutting part of the unit (branch), second unit ded
+		world.SetDimensions(new(4, 4));
+		AssertEq(units[0].GLocation, new(1, 2));
+		AssertEq(units[3].GLocation, new(2, 0));
+		AssertTrue(units[1].IsQueuedForDeletion() || !Godot.GodotObject.IsInstanceValid(units[1]));
+		AssertTrue(units[2].IsQueuedForDeletion() || !Godot.GodotObject.IsInstanceValid(units[2]));
+
+		AssertRefEq(units[0], Lvl.UniMan.GetUnit(new Vector2I(1, 2)));
+		AssertRefEq(units[3], Lvl.UniMan.GetUnit(new Vector2I(2, 0)));
+	}
+
+	[ArTest.Test] public void TestSetDimensions_unit_is_partially_out_of_bounds()
+	{
+		var world = Lvl.World;
+		var units = new Unit[]
+		{
+			Lvl.UniMan.PlaceSlider(new Vector2I(1, 2), Direction.East),
+			Lvl.UniMan.PlaceBranch(new Vector2I(4, 4), Direction.East, 1, CmdIf.CheckType.Greater, 0),
+			Lvl.UniMan.PlaceCloner(new Vector2I(0, 7), Direction.West, 1),
+			Lvl.UniMan.PlaceUpdater(new Vector2I(2, 0), Direction.West, 1, UNUpdater.UpdateType.Increment),
+		};
+
+		// Cutting part of the unit (branch), second unit ded
+		world.SetDimensions(new(5, 4));
+		AssertEq(units[0].GLocation, new(1, 2));
+		AssertEq(units[3].GLocation, new(2, 0));
+		AssertTrue(units[1].IsQueuedForDeletion() || !Godot.GodotObject.IsInstanceValid(units[1]));
+		AssertTrue(units[2].IsQueuedForDeletion() || !Godot.GodotObject.IsInstanceValid(units[2]));
+
+		AssertRefEq(units[0], Lvl.UniMan.GetUnit(new Vector2I(1, 2)));
+		AssertRefEq(units[3], Lvl.UniMan.GetUnit(new Vector2I(2, 0)));
 	}
 }

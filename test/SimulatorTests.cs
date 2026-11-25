@@ -21,13 +21,14 @@ public class SimulatorTests : ArTest.TestSuit
 
 	public override void BeforeEach()
 	{
+		Lvl.Simy.Reset();
+		Lvl.World.Clear();
+		Lvl.World.SetDimensions(new(6, 6));
 	}
 
 	public override void AfterEach()
 	{
 		AssertTrue(Lvl.Simy.IsHalted());
-		Lvl.Simy.Reset();
-		Lvl.World.Clear();
 	}
 
 	public override void AfterAll()
