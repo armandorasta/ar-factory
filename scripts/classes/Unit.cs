@@ -14,7 +14,7 @@ namespace ArFactory;
 /// For now units own the tiles they engolf, so anything from outside touching those tiles is instant UB. 
 /// This means the unit is reponsible for deleting those tiles when it's deleted.
 /// </summary>
-public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
+public abstract partial class Unit : Node2D, ITileOwner, IDestroyable, IUnitWithTypeId
 {
 	public readonly Vector2I InvalidGLocation = new(-1, -1);
 
@@ -49,6 +49,9 @@ public abstract partial class Unit : Node2D, ITileOwner, IDestroyable
 	/// Varies per unit, some units never call this.
 	/// </summary>
 	public event Action? TriggerHappened;
+
+
+	public static UnitTypeId Id => UnitTypeId.Invalid;
 
 
 	// Public Interface

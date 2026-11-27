@@ -63,14 +63,17 @@ public partial class Editor : Godot.Node2D
 	private UnitManager? m_UniMan;
 
 	// Editor stuff
-	private record struct UnitPlacement(Godot.ButtonGroup ButtGroup, Godot.Button? Butt, Direction Dir);
-	private record UnitPickerButtInfo(Vector2I Dims, bool bEastWest, Func<Vector2I, Direction, Unit> PlacementFunc);
+	private class UnitPickerButtInfo
+	{
+		public Vector2I Dims; 
+		public bool bEastWest;
+		public Func<Vector2I, Direction, Unit> PlacementFunc;
+	}
 
+	public Godot.ButtonGroup m_UnitButtGroup = new();
 	public Godot.Label CursorLabel => m_CursorLabel!;
 	private Godot.Label? m_CursorLabel;
-	private UnitPlacement m_CurrUnitPlacement = new();
 	private readonly Dictionary<string, UnitPickerButtInfo> m_UnitPickerButtInfos = [];
-	private Unit? m_ConnecterUnit;
 	
 	// private Godot.ButtonGroup m_ToolboxButtGroup = new() { AllowUnpress = true };
 
@@ -168,8 +171,10 @@ public partial class Editor : Godot.Node2D
 
 	private void InitUnitPicker()
 	{
-		m_CurrUnitPlacement.ButtGroup = new() { AllowUnpress = true };
-		m_CurrUnitPlacement.ButtGroup.Pressed += OnUnitPicker_Pressed;
+		// TODO: Remove this after refactoring
+		m_UnitButtGroup = new() { AllowUnpress = true };
+		m_UnitButtGroup.Pressed += OnUnitPicker_Pressed;
+		
 		AddUnitToPicker("Supplier", Vector2I.One, true, 
 			"res://resources/supplier.png", 
 			(l, d) => UniMan.PlaceSupplier(l, d, 1, [1, 2, 3, 4, 5, 6]));
@@ -198,10 +203,9 @@ public partial class Editor : Godot.Node2D
 		AddUnitToPicker("Teleporter", Vector2I.One, false, 
 			"res://resources/belt.png", (l, d) =>
 			{
-				m_ConnecterUnit = UniMan.PlaceTeleInput(l, d, 1);
-				CursorLabel.Text = $"Out: {m_CurrUnitPlacement.Dir}";
-				SetState(new EditorStatePlacingMatchingTeleOutput(this));
-				return m_ConnecterUnit;
+				var teleIn = UniMan.PlaceTeleInput(l, d, 1);
+				SetState(new EditorStatePlacingMatchingTeleOutput(this, teleIn));
+				return teleIn;
 			});
 	}
 
@@ -212,7 +216,7 @@ public partial class Editor : Godot.Node2D
 		{
 			Text = text,
 			CustomMinimumSize = new Vector2I(0, 90),
-			ButtonGroup = m_CurrUnitPlacement.ButtGroup,
+			ButtonGroup = m_UnitButtGroup,
 			ToggleMode = true,
 			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
 			Icon = GD.Load<Texture2D>(iconPath),
@@ -244,7 +248,7 @@ public partial class Editor : Godot.Node2D
 			Text = text,
 			CustomMinimumSize = new Vector2I(60, 0),
 			ToggleMode = true,
-			ButtonGroup = m_CurrUnitPlacement.ButtGroup,
+			ButtonGroup = m_UnitButtGroup,
 		};
 		ToolsHBox.AddChild(butt);
 		butt.Pressed += () =>
@@ -382,12 +386,7 @@ public partial class Editor : Godot.Node2D
 	{
 		Debug.AssertIs(baseButt, typeof(Godot.Button));
 		var butt = (baseButt as Godot.Button)!;
-		// SetStateOld(State.Placement);
 		SetState(new EditorStateUnitPlacement(this));		
-		m_CurrUnitPlacement.Butt = butt;
-		m_CurrUnitPlacement.Dir = Direction.East;
-
-		CursorLabel.Text = m_CurrUnitPlacement.Dir.ToString();
 	}
 
 	private void OnWorld_DimensionsChanged(Vector2I newDims)
@@ -446,16 +445,60 @@ public partial class Editor : Godot.Node2D
 
 	#region .Inner Classes
 
+	private struct UniPlacement
+	{
+		public readonly Godot.ButtonGroup ButtGroup => m_Parent.m_UnitButtGroup;
+		public readonly Godot.Label CursorLabel => m_Parent.CursorLabel;
+		public readonly Godot.Button Butt => (ButtGroup.GetPressedButton() as Button)!;
+		public Direction Dir { get; private set; }
+
+		public string Prefix { readonly get => m_Prefix; set { m_Prefix = value; UpdateCursorLabel(); } }
+		public string Postfix { readonly get => m_Postfix; set { m_Postfix = value; UpdateCursorLabel(); } }
+
+		private readonly Editor m_Parent;
+		private string m_Prefix;
+		private string m_Postfix;
+
+		public UniPlacement(Editor parent, Direction initDir = Direction.East)
+		{
+			m_Prefix = string.Empty;
+			m_Postfix = string.Empty;
+			m_Parent = parent;
+			Dir = initDir;
+
+			UpdateCursorLabel();
+		}
+
+		public void Rotate() => RotateImpl(m_Parent.m_UnitPickerButtInfos[Butt.Name].bEastWest);
+		public void Rotate(Unit tgtUnit) => RotateImpl(!tgtUnit.CanFaceDir(Dir.Rotate90()));
+
+		public void RotateImpl(bool bEastWest)
+		{
+			Dir = !bEastWest ? Dir.Rotate90() : Dir is Direction.East ? Direction.West : Direction.East;
+			UpdateCursorLabel();
+		}
+
+		private readonly void UpdateCursorLabel()
+		{
+			CursorLabel.Text = $"{Prefix}{Dir}{Postfix}";
+		}
+	}
+
 	private abstract class EditorState(Editor parent)
 	{
-		protected Editor m_Parent = parent;
+		protected readonly Editor m_Parent = parent;
 
 		public abstract void SyncButtStates();
 		public abstract void OnUnhandledInput(InputEvent ev);
 		
 		public virtual void OnProcess(double dt) { }
 
-		protected void ResetEverythingForButtSync()
+		protected void SetState(EditorState newState)
+		{
+			m_Parent.SetState(newState);
+		}
+
+		protected void HideEverythingForButtSync()
 		{
 			// Hide everything first.
 			// I could the extra marshalling by using in-between booleans but who cares bruh, this only happens once in 
@@ -544,9 +587,8 @@ public partial class Editor : Godot.Node2D
 
 								case 1: // Connector
 									GD.Print("Connecting...");
-									m_Parent.m_ConnecterUnit = slid;
 									m_Parent.CursorLabel.Text = "Connecting...";
-									m_Parent.SetState(new EditorStatePlacingUEConnector(m_Parent));
+									SetState(new EditorStateConnectorUEConnector(m_Parent, slid));
 									break;
 
 								case 2: // Toggle
@@ -594,11 +636,18 @@ public partial class Editor : Godot.Node2D
 					break;
 				}
 			}
+			else if (Input.IsActionPressed(InputManager.Names.EdDelete, true))
+			{
+				if (m_Parent.UniMan.GetUnit(m_Parent.World.GetMouseGridLocation()) is { } u)
+				{
+					m_Parent.UniMan.DeleteUnit(u);
+				}
+			}
 		}
 
 		public override void SyncButtStates()
 		{
-			ResetEverythingForButtSync();
+			HideEverythingForButtSync();
 			m_Parent.PlayButt.Disabled = false;
 			m_Parent.DebugButt.Disabled = false;
 			m_Parent.ToolsHBox.Show();
@@ -608,7 +657,7 @@ public partial class Editor : Godot.Node2D
 		public void OnDebugButtPressed()
 		{
 			m_Parent.Simy.StartAndPause();
-			m_Parent.SetState(new EditorStateDebug(m_Parent));
+			SetState(new EditorStateDebug(m_Parent));
 		}
 
 		public void OnHaltButtPressed()
@@ -619,7 +668,7 @@ public partial class Editor : Godot.Node2D
 		public void OnPlayButtPressed()
 		{
 			m_Parent.Simy.Start();
-			m_Parent.SetState(new EditorStatePlay(m_Parent));
+			SetState(new EditorStatePlay(m_Parent));
 		}
 
 		private void MakePopup(Godot.InputEventMouse mev, IEnumerable<(string? Name, int id)> items, Action<int> pressFunc)
@@ -643,111 +692,112 @@ public partial class Editor : Godot.Node2D
 
 	private class EditorStateUnitPlacement(Editor parent) : EditorState(parent)
 	{
+		public UniPlacement Placement = new(parent);
+		public Godot.Label CursorLabel => m_Parent.CursorLabel;
+
 		public override void OnUnhandledInput(InputEvent ev)
 		{
 			if (Input.IsActionJustPressed(InputManager.Names.RightClick, true))
 			{
-				m_Parent.SetState(new EditorStateIdle(m_Parent));
-				m_Parent.m_CurrUnitPlacement.Butt!.ButtonPressed = false;
+				SetState(new EditorStateIdle(m_Parent));
+				Placement.Butt.ButtonPressed = false;
 			}
 			else if (Input.IsActionJustPressed(InputManager.Names.LeftClick, true))
 			{
 				var mousePos = m_Parent.GetLocalMousePosition();
 				if (m_Parent.World.GetWorldRect().HasPoint(mousePos))
 				{
-					var info = m_Parent.m_UnitPickerButtInfos[m_Parent.m_CurrUnitPlacement.Butt!.Name];
+					var info = m_Parent.m_UnitPickerButtInfos[Placement.Butt.Name];
 					Vector2I mgloc = m_Parent.World.GetMouseGridLocation();
-					if (Unit.CanFitIn(m_Parent.World, mgloc, info.Dims, m_Parent.m_CurrUnitPlacement.Dir))
+					if (Unit.CanFitIn(m_Parent.World, mgloc, info.Dims, Placement.Dir))
 					{
-						info.PlacementFunc.Invoke(mgloc, m_Parent.m_CurrUnitPlacement.Dir);
+						info.PlacementFunc.Invoke(mgloc, Placement.Dir);
 					}
 				}
 			}
 			else if (Input.IsActionJustPressed(InputManager.Names.EdRotate, true))
 			{
-				var info = m_Parent.m_UnitPickerButtInfos[m_Parent.m_CurrUnitPlacement.Butt!.Name];
-				if (info.bEastWest)
-				{
-					m_Parent.m_CurrUnitPlacement.Dir = m_Parent.m_CurrUnitPlacement.Dir switch
-					{
-						Direction.East => Direction.West,
-						Direction.West or _ => Direction.East,
-					};
-				}
-				else
-				{
-					m_Parent.m_CurrUnitPlacement.Dir = m_Parent.m_CurrUnitPlacement.Dir.Rotate90();
-				}
-				m_Parent.CursorLabel.Text = m_Parent.m_CurrUnitPlacement.Dir.ToString();
+				Placement.Rotate();
 			}
 		}
 
 		public override void SyncButtStates()
 		{
-			ResetEverythingForButtSync();
+			HideEverythingForButtSync();
 			m_Parent.ToolsHBox.Show();
 			m_Parent.UnitPlacerMarCon.Show();
-			m_Parent.CursorLabel.Show();
+			CursorLabel.Show();
 		}
 
 		public override void OnProcess(double dt)
 		{
-			m_Parent.CursorLabel.Position = m_Parent.GetLocalMousePosition() + Vector2.One * 50;
+			CursorLabel.Position = m_Parent.GetLocalMousePosition() + Vector2.One * 50;
 		}
 	}
 
-	private class EditorStatePlacingUEConnector(Editor parent) : EditorState(parent)
+	private class EditorStateConnectorUEConnector(Editor parent, Unit connectorUnit) : EditorState(parent)
 	{
+		public readonly Unit ConnectorUnit = connectorUnit;
+		public Godot.Label CursorLabel => m_Parent.CursorLabel;
+
+		public override void OnProcess(double dt)
+		{
+			CursorLabel.Position = m_Parent.GetLocalMousePosition() + Vector2.One * 50;
+		}
+
 		public override void OnUnhandledInput(InputEvent ev)
 		{
 			if (Input.IsActionJustPressed(InputManager.Names.LeftClick, true))
 			{
 				if (m_Parent.UniMan.GetUnit(m_Parent.World.GetMouseGridLocation()) is UNSlider tgtSlid)
 				{
-					if (tgtSlid == m_Parent.m_ConnecterUnit)
+					if (tgtSlid == ConnectorUnit)
 					{
 						GD.Print("Hit the connecting slider bruh...");
 					}
 					else
 					{
-						var connSlid = (m_Parent.m_ConnecterUnit as UNSlider)!;
+						var connSlid = (ConnectorUnit as UNSlider)!;
 						m_Parent.UniMan.DetachExtensionFrom(connSlid);
 						m_Parent.UniMan.AttachExtension(new UnitManager.UEConnector(connSlid, tgtSlid));
 						GD.Print($"Connected slider on {connSlid!.GLocation} to the one on {tgtSlid.GLocation}");
-						m_Parent.SetState(new EditorStateIdle(m_Parent));
-						m_Parent.m_ConnecterUnit = null;
+						SetState(new EditorStateIdle(m_Parent));
 					}
 				}
 				else
 				{
 					GD.Print("Hit nothing and cancelled anyway");
-					m_Parent.SetState(new EditorStateIdle(m_Parent));
+					SetState(new EditorStateIdle(m_Parent));
 				}
 			}
 			else if (Input.IsActionJustPressed(InputManager.Names.RightClick, true))
 			{
 				GD.Print("Lock cancelled");
-				m_Parent.SetState(new EditorStateIdle(m_Parent));
-				m_Parent.m_ConnecterUnit = null;
+				SetState(new EditorStateIdle(m_Parent));
 			}
 		}
 
 		public override void SyncButtStates()
 		{
-			ResetEverythingForButtSync();
+			HideEverythingForButtSync();
 			m_Parent.ToolsHBox.Show();
 			m_Parent.UnitPlacerMarCon.Show();
 			m_Parent.CursorLabel.Show();
 		}
-
-		public override void OnProcess(double dt)
-		{
-			m_Parent.CursorLabel.Position = m_Parent.GetLocalMousePosition() + Vector2.One * 50;
-		}
 	}
 
-	private class EditorStatePlacingMatchingTeleOutput(Editor parent) : EditorState(parent)
+	private class EditorStatePlacingMatchingTeleOutput : EditorState
 	{
+		public readonly UNTeleInput MatchingInput;
+		public Godot.Label CursorLabel => m_Parent.CursorLabel;
+		public UniPlacement Placement;
+
+		public EditorStatePlacingMatchingTeleOutput(Editor parent, UNTeleInput teleIn) : base(parent)
+		{
+			MatchingInput = teleIn;
+			Placement = new(parent) { Prefix = "Out: " };
+		}
+
 		public override void OnUnhandledInput(InputEvent ev)
 		{
 			if (Input.IsActionJustPressed(InputManager.Names.LeftClick, true))
@@ -755,11 +805,9 @@ public partial class Editor : Godot.Node2D
 				var mgloc = m_Parent.World.GetMouseGridLocation();
 				if (Unit.CanFitIn(m_Parent.World, mgloc, Vector2I.One, Direction.East))
 				{
-					var teleIn = (m_Parent.m_ConnecterUnit as UNTeleInput)!;
-					var teleOut = m_Parent.UniMan.PlaceTeleOutput(mgloc, m_Parent.m_CurrUnitPlacement.Dir, 1);
-					teleIn.AssignOutput(teleOut);
-					m_Parent.m_ConnecterUnit = null;
-					m_Parent.SetState(new EditorStateUnitPlacement(m_Parent));
+					var teleOut = m_Parent.UniMan.PlaceTeleOutput(mgloc, Placement.Dir, 1);
+					MatchingInput.AssignOutput(teleOut);
+					SetState(new EditorStateUnitPlacement(m_Parent));
 				}
 				else
 				{
@@ -768,37 +816,42 @@ public partial class Editor : Godot.Node2D
 			}
 			else if (Input.IsActionJustPressed(InputManager.Names.RightClick, true))
 			{
-				m_Parent.UniMan.DeleteUnit(m_Parent.m_ConnecterUnit!);
+				m_Parent.UniMan.DeleteUnit(MatchingInput);
 				GD.Print("Cancelled");
-				m_Parent.m_ConnecterUnit = null;
-				m_Parent.SetState(new EditorStateUnitPlacement(m_Parent));
+				SetState(new EditorStateUnitPlacement(m_Parent));
 			}
 			if (Input.IsActionJustPressed(InputManager.Names.EdRotate, true))
 			{
-				m_Parent.m_CurrUnitPlacement.Dir = m_Parent.m_CurrUnitPlacement.Dir.Rotate90();
-				m_Parent.CursorLabel.Text = $"Out: {m_Parent.m_CurrUnitPlacement.Dir}";
+				Placement.Rotate();
 			}
 		}
 
 		public override void SyncButtStates()
 		{
-			ResetEverythingForButtSync();
+			HideEverythingForButtSync();
 			m_Parent.ToolsHBox.Show();
 			m_Parent.UnitPlacerMarCon.Show();
-			m_Parent.CursorLabel.Show();
+			CursorLabel.Show();
 		}
 
 		public override void OnProcess(double dt)
 		{
-			m_Parent.CursorLabel.Position = m_Parent.GetLocalMousePosition() + Vector2.One * 50;
+			CursorLabel.Position = m_Parent.GetLocalMousePosition() + Vector2.One * 50;
 		}
 	}
 
-	private class EditorStateMoveTool(Editor parent) : EditorState(parent)
+	private class EditorStateMoveTool : EditorState
 	{
+		public Godot.Label CursorLabel => m_Parent.CursorLabel;
+
+		public EditorStateMoveTool(Editor parent) : base(parent)
+		{
+			CursorLabel.Text = nameof(EditorStateMoveTool);
+		}
+
 		public override void OnProcess(double dt)
 		{
-			m_Parent.CursorLabel.Position = m_Parent.GetLocalMousePosition() + Vector2.One * 50;
+			CursorLabel.Position = m_Parent.GetLocalMousePosition() + Vector2.One * 50;
 		}
 
 		public override void OnUnhandledInput(InputEvent ev)
@@ -807,36 +860,48 @@ public partial class Editor : Godot.Node2D
 			{
 				if (m_Parent.UniMan.GetUnit(m_Parent.World.GetMouseGridLocation()) is { } u)
 				{
-					m_Parent.m_ConnecterUnit = u;
-					u.Deconstruct();
+					var movedUnit = u;
+					movedUnit.Deconstruct();
 					GD.Print($"Picked up a {u.GetType().Name}");
-					m_Parent.m_CurrUnitPlacement.Dir = u.Dir;
-					m_Parent.CursorLabel.Text = $"Moving a {u.GetType().Name} ({m_Parent.m_CurrUnitPlacement.Dir})";
-					m_Parent.SetState(new EditorStatePlacingMovedUnit(m_Parent));
+					SetState(new EditorStatePlacingMovedUnit(m_Parent, movedUnit));
 				}
 			}
 			else if (Input.IsActionJustPressed(InputManager.Names.RightClick, true))
 			{
 				GD.Print("Cancelled move tool");
-				m_Parent.SetState(new EditorStateIdle(m_Parent));
-				m_Parent.m_CurrUnitPlacement.ButtGroup.GetPressedButton().ButtonPressed = false;
+				SetState(new EditorStateIdle(m_Parent));
+				m_Parent.m_UnitButtGroup.GetPressedButton().ButtonPressed = false;
 			}
 		}
 
 		public override void SyncButtStates()
 		{
-			ResetEverythingForButtSync();
+			HideEverythingForButtSync();
 			m_Parent.ToolsHBox.Show();
 			m_Parent.UnitPlacerMarCon.Show();
 			m_Parent.CursorLabel.Show();
 		}
 	}
 
-	private class EditorStatePlacingMovedUnit(Editor parent) : EditorState(parent)
+	private class EditorStatePlacingMovedUnit : EditorState
 	{
+		public Godot.Label CursorLabel => m_Parent.CursorLabel;
+		public readonly Unit FloatingUnit;
+		public UniPlacement Placement;
+
+		public EditorStatePlacingMovedUnit(Editor parent, Unit movedUnit) : base(parent)
+		{
+			FloatingUnit = movedUnit;
+			Placement = new(parent, initDir: movedUnit.Dir) 
+			{ 
+				Prefix = $"Moving a {FloatingUnit.GetType().Name} (",
+				Postfix = ")",
+			};
+		}
+
 		public override void OnProcess(double dt)
 		{
-			m_Parent.CursorLabel.Position = m_Parent.GetLocalMousePosition() + Vector2.One * 50;
+			CursorLabel.Position = m_Parent.GetLocalMousePosition() + Vector2.One * 50;
 		}
 
 		public override void OnUnhandledInput(InputEvent ev)
@@ -844,9 +909,9 @@ public partial class Editor : Godot.Node2D
 			if (Input.IsActionJustPressed(InputManager.Names.RightClick, true))
 			{
 				GD.Print("Cancelled moving.");
-				m_Parent.m_ConnecterUnit!.Construct(); // Where it originally was.
-				m_Parent.CursorLabel.Text = nameof(EditorStateMoveTool);
-				m_Parent.SetState(new EditorStateMoveTool(m_Parent));
+				FloatingUnit.Construct(); // Where it originally was.
+				CursorLabel.Text = nameof(EditorStateMoveTool);
+				SetState(new EditorStateMoveTool(m_Parent));
 			}
 			else if (Input.IsActionJustPressed(InputManager.Names.LeftClick, true))
 			{
@@ -854,14 +919,13 @@ public partial class Editor : Godot.Node2D
 				if (m_Parent.World.GetWorldRect().HasPoint(mousePos))
 				{
 					var mgloc = m_Parent.World.GetMouseGridLocation();
-					if (Unit.CanFitIn(m_Parent.World, mgloc, m_Parent.m_ConnecterUnit!))
+					if (Unit.CanFitIn(m_Parent.World, mgloc, FloatingUnit))
 					{
-						GD.Print($"Moved a {m_Parent.m_ConnecterUnit!.GetType().Name} from {m_Parent.m_ConnecterUnit.GLocation} to {mgloc}");
-						m_Parent.m_ConnecterUnit!.SetGLocation(mgloc);
-						m_Parent.m_ConnecterUnit.SetDirection(m_Parent.m_CurrUnitPlacement.Dir);
-						m_Parent.m_ConnecterUnit.Construct();
-						m_Parent.CursorLabel.Text = nameof(EditorStateMoveTool);
-						m_Parent.SetState(new EditorStateMoveTool(m_Parent));
+						GD.Print($"Moved a {FloatingUnit.GetType().Name} from {FloatingUnit.GLocation} to {mgloc}");
+						FloatingUnit.SetGLocation(mgloc);
+						FloatingUnit.SetDirection(Placement.Dir);
+						FloatingUnit.Construct();
+						SetState(new EditorStateMoveTool(m_Parent));
 					}
 					else
 					{
@@ -871,25 +935,13 @@ public partial class Editor : Godot.Node2D
 			}
 			else if (Input.IsActionJustPressed(InputManager.Names.EdRotate, true))
 			{
-				if (m_Parent.m_ConnecterUnit!.CanFaceDir(Direction.North) is false)
-				{
-					m_Parent.m_CurrUnitPlacement.Dir = m_Parent.m_CurrUnitPlacement.Dir switch
-					{
-						Direction.East => Direction.West,
-						Direction.West or _ => Direction.East,
-					};
-				}
-				else
-				{
-					m_Parent.m_CurrUnitPlacement.Dir = m_Parent.m_CurrUnitPlacement.Dir.Rotate90();
-				}
-				m_Parent.CursorLabel.Text = $"Moving a {m_Parent.m_ConnecterUnit!.GetType().Name} ({m_Parent.m_CurrUnitPlacement.Dir})";
+				Placement.Rotate(FloatingUnit);
 			}
 		}
 
 		public override void SyncButtStates()
 		{
-			ResetEverythingForButtSync();
+			HideEverythingForButtSync();
 			m_Parent.ToolsHBox.Show();
 			m_Parent.UnitPlacerMarCon.Show();
 			m_Parent.CursorLabel.Show();
@@ -936,14 +988,14 @@ public partial class Editor : Godot.Node2D
 			else if (Input.IsActionJustPressed(InputManager.Names.RightClick))
 			{
 				GD.Print("Cancelled rotation tool");
-				m_Parent.SetState(new EditorStateIdle(m_Parent));
-				m_Parent.m_CurrUnitPlacement.ButtGroup.GetPressedButton().ButtonPressed = false;
+				SetState(new EditorStateIdle(m_Parent));
+				m_Parent.m_UnitButtGroup.GetPressedButton().ButtonPressed = false;
 			}
 		}
 
 		public override void SyncButtStates()
 		{
-			ResetEverythingForButtSync();
+			HideEverythingForButtSync();
 			m_Parent.ToolsHBox.Show();
 			m_Parent.UnitPlacerMarCon.Show();
 		}
@@ -959,7 +1011,7 @@ public partial class Editor : Godot.Node2D
 
 		public override void SyncButtStates()
 		{
-			ResetEverythingForButtSync();
+			HideEverythingForButtSync();
 			m_Parent.HaltButt.Disabled = false;
 			m_Parent.DebugButt.Disabled = false;
 			m_Parent.PlayHBox.Show();
@@ -968,13 +1020,13 @@ public partial class Editor : Godot.Node2D
 		public void OnDebugButtPressed()
 		{
 			m_Parent.Simy.Pause();
-			m_Parent.SetState(new EditorStateDebug(m_Parent));
+			SetState(new EditorStateDebug(m_Parent));
 		}
 
 		public void OnHaltButtPressed()
 		{
 			m_Parent.Simy.Halt();
-			m_Parent.SetState(new EditorStateIdle(m_Parent));
+			SetState(new EditorStateIdle(m_Parent));
 		}
 
 		public void OnPlayButtPressed()
@@ -993,7 +1045,7 @@ public partial class Editor : Godot.Node2D
 
 		public override void SyncButtStates()
 		{
-			ResetEverythingForButtSync();
+			HideEverythingForButtSync();
 			m_Parent.PlayButt.Disabled = false;
 			m_Parent.HaltButt.Disabled = false;
 			m_Parent.DebugButt.Disabled = false;
@@ -1013,13 +1065,13 @@ public partial class Editor : Godot.Node2D
 		public void OnHaltButtPressed()
 		{
 			m_Parent.Simy.Halt();
-			m_Parent.SetState(new EditorStateIdle(m_Parent));
+			SetState(new EditorStateIdle(m_Parent));
 		}
 
 		public void OnPlayButtPressed()
 		{
 			m_Parent.Simy.Resume();
-			m_Parent.SetState(new EditorStatePlay(m_Parent));
+			SetState(new EditorStatePlay(m_Parent));
 		}
 	}
 

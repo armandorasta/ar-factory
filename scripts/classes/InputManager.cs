@@ -10,6 +10,7 @@ public static class InputManager
 		public const string LeftClick = "left_click";
 		public const string RightClick = "right_click";
 		public const string EdRotate = "ed_rotate";
+		public const string EdDelete = "ed_delete";
 		public const string EdRotationToolNorm = "ed_rotation_tool_norm";
 		public const string EdRotationToolAlt = "ed_rotation_tool_alt";
 	}

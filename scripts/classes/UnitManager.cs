@@ -30,6 +30,7 @@ public class UnitManager : IDestroyable
 
 	public WorldPanel World { get; private init; }
 
+	private readonly Dictionary<UnitTypeId, UnitDef> m_UnitDefs = [];
 	private readonly List<Unit> m_Units = [];
 	private readonly Dictionary<Unit, UnitExtension> m_Extensions = [];
 
@@ -38,6 +39,8 @@ public class UnitManager : IDestroyable
 		this.World = world;
 		World.Clearing += Clear;
 		World.DimensionsChanged += OnWorld_DimensionsChanged;
+
+		LoadResourcesFromDisk();
 	}
 
 
@@ -317,8 +320,15 @@ public class UnitManager : IDestroyable
 		}
 	}
 
+	private void LoadResourcesFromDisk()
+	{
+		m_UnitDefs.Add(UnitTypeId.Slider, new(UnitTypeId.Slider, "uid://knx24ed2y4xy", "uid://l47ebmw40sm6"));
+	}
+
 	#endregion //  .Serialization
 	#region .Inner Classes
+
+	#region .Exstensions
 
 	public abstract class UnitExtension
 	{
@@ -522,5 +532,11 @@ public class UnitManager : IDestroyable
 		}
 	}
 
+	#endregion .Exstensions
+	#region .Other
+
+	
+
+	#endregion .Other
 	#endregion // .Inner Classes
 }
